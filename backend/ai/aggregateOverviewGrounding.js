@@ -21,9 +21,27 @@ function aggregateCountClaims(sentence = "") {
   const quantity = "(?:\\d+|no|zero|one|two|three|four|five|six|seven|eight|nine|ten)";
   const words = { no: 0, zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
   const countOf = value => words[value.toLowerCase()] ?? Number(value);
-  let match = text.match(new RegExp(`^you (?:(?:currently )?have (?:currently )?)?completed (${quantity}) (?:cases?|matters?)$`, "i"));
+  let match = text.match(new RegExp(`^(${quantity}) (active|completed|total) (?:cases?|matters?)$`, "i"));
+  if (match) return [{ measure: match[2].toLowerCase(), count: countOf(match[1]) }];
+  match = text.match(new RegExp(`^(${quantity}) (?:cases?|matters?) (?:are|is) (active|completed)$`, "i"));
+  if (match) return [{ measure: match[2].toLowerCase(), count: countOf(match[1]) }];
+  match = text.match(new RegExp(`^(?:your )?(active|completed|total) (?:case|matter) count is (${quantity})$`, "i"));
+  if (match) return [{ measure: match[1].toLowerCase(), count: countOf(match[2]) }];
+  match = text.match(new RegExp(`^(active|completed|total) (?:cases?|matters?): (${quantity})$`, "i"));
+  if (match) return [{ measure: match[1].toLowerCase(), count: countOf(match[2]) }];
+  match = text.match(/^none of your (?:cases|matters) are (active|completed)$/i);
+  if (match) return [{ measure: match[1].toLowerCase(), count: 0 }];
+  if (/^you (?:have not|haven't) yet completed (?:any |a )?(?:cases?|matters?)$/i.test(text) || /^you have yet to complete (?:any |a )?(?:cases?|matters?)$/i.test(text)) return [{ measure: "completed", count: 0 }];
+  match = text.match(new RegExp(`^you (?:(?:currently )?have (?:currently )?)?completed (${quantity}) (?:cases?|matters?)$`, "i"));
   if (match) return [{ measure: "completed", count: countOf(match[1]) }];
   if (/^you (?:have not|haven't) completed (?:any )?(?:cases?|matters?)$/i.test(text)) return [{ measure: "completed", count: 0 }];
+  // Whole-sentence absence claims still require the same exact, fresh, owned
+  // count facts below. Normalize the absence family, never individual status.
+  const absence = text.match(/^(?:you (?:currently )?(?:do not|don't) (?:currently )?have|there (?:currently )?(?:are not|aren't|is not|isn't)(?: currently)?|your account (?:currently )?(?:does not|doesn't) (?:currently )?have) (?:any|a|an) (?:(active|completed)(?: (?:or|and) (active|completed))? )?(?:cases?|matters?)$/i);
+  if (absence) {
+    const measures = [absence[1] || "total", absence[2]].filter(Boolean).map(value => value.toLowerCase());
+    return new Set(measures).size === measures.length ? measures.map(measure => ({ measure, count: 0 })) : [];
+  }
   match = text.match(/^(?:you (?:currently )?have|there (?:are|is)|your account has) (?:currently )?(.+)$/i);
   if (!match) return [];
   const parts = match[1].replace(/,\s*and\s+/gi, ",").split(/\s*,\s*|\s+and\s+/i);

@@ -163,3 +163,107 @@ describe("own-account aggregate count grounding without individual-Matter author
     } finally { for (const key of keys) if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key]; }
   });
 });
+
+
+describe("ordinary negated account-count sentences retain exact grounding", () => {
+  test.each([
+    "You don't have any completed matters yet.",
+    "You do not have any completed matters.",
+    "You currently don't have any completed matters.",
+    "You don't currently have any completed matters.",
+    "You don’t have any completed cases so far.",
+    "There aren't any completed matters in your account.",
+    "There currently aren't any completed matters.",
+    "There are not currently any completed cases.",
+    "There isn't a completed matter in your account.",
+    "Your account doesn't have any completed matters.",
+    "Your account currently does not have any completed cases.",
+    "Your account doesn't currently have a completed matter.",
+    "You don't have any active or completed matters.",
+    "There aren't any matters in your account.",
+  ])("grounds the complete absence sentence: %s", reply => {
+    expect(errors(reply, [overview()])).toEqual([]);
+  });
+  test.each([
+    ["You don't have any completed matters.", { active: 1, completed: 0 }, []],
+    ["You don't have any active matters.", { active: 0, completed: 1 }, []],
+    ["You don't have any completed matters.", { active: 0, completed: 1 }, ["unsupported_status_or_lifecycle_claim"]],
+    ["You don't have any active matters.", { active: 1, completed: 0 }, ["unsupported_status_or_lifecycle_claim"]],
+    ["There aren't any matters in your account.", { active: 1, completed: 0 }, ["unsupported_status_or_lifecycle_claim"]],
+    ["You don't have any active or completed matters.", { active: 1, completed: 0 }, ["unsupported_status_or_lifecycle_claim"]],
+  ])("compares each absent measure to its actual count: %s %j", (reply, options, expected) => {
+    const actual = errors(reply, [overview(options)]);
+    for (const value of expected) expect(actual).toContain(value);
+    if (!expected.length) expect(actual).toEqual([]);
+  });
+  test.each([
+    ["other owner", { owner: { id: FOREIGN, role: "attorney" } }],
+    ["stale evidence", { at: NOW - 60001 }],
+    ["future evidence", { at: NOW + 1 }],
+    ["wrong role", { owner: { id: OWNER, role: "paralegal" } }],
+  ])("rejects negated counts with %s", (_name, options) => {
+    expect(errors("You don't have any completed matters.", [overview(options)])).toContain("unsupported_status_or_lifecycle_claim");
+  });
+  test.each([
+    "Your payment is completed.",
+    "You don't have any completed matters. Your matter is completed.",
+    "You don't have any completed matters and your payment is completed.",
+    "You don't have any completed matters because your matter is completed.",
+  ])("does not authorize an individual or mixed claim: %s", reply => {
+    expect(errors(reply, [overview()])).toContain("unsupported_status_or_lifecycle_claim");
+  });
+  test("a singular negated Matter status never receives aggregate authority", () => {
+    const reply = "Your matter isn't completed.";
+    expect(aggregateCountClaims(reply)).toEqual([]);
+    expect(supportedAccountOverviewSentence(reply, [overview()], { accountOwnerId: OWNER, now: NOW })).toBe(false);
+  });
+  test("serialized zero evidence cannot forge ownership for absence wording", () => {
+    expect(errors("You don't have any completed matters.", [JSON.parse(JSON.stringify(overview()))])).toContain("unsupported_status_or_lifecycle_claim");
+  });
+});
+
+
+describe("complete account-count sentence families use the same owned facts", () => {
+  test.each([
+    "No completed matters yet.", "Zero completed cases.", "0 active matters.",
+    "0 matters are completed.", "No cases are active.",
+    "Your completed matter count is zero.", "Completed case count is 0.",
+    "Completed matters: 0.", "Active cases: no.", "Total matters: zero.",
+    "None of your matters are completed.", "None of your cases are active.",
+    "You haven't yet completed any matters.", "You have not yet completed a case.",
+    "You have yet to complete a matter.",
+  ])("supports the exact zero count: %s", reply => { expect(errors(reply, [overview()])).toEqual([]); });
+  test.each([
+    ["2 active matters.", { active: 2, completed: 1 }],
+    ["1 matter is completed.", { active: 2, completed: 1 }],
+    ["Your total matter count is 3.", { active: 2, completed: 1 }],
+    ["Completed matters: one.", { active: 2, completed: 1 }],
+  ])("supports the exact nonzero measure: %s", (reply, options) => { expect(errors(reply, [overview(options)])).toEqual([]); });
+  test.each([
+    "No completed matters yet.", "0 matters are completed.",
+    "Your completed matter count is zero.", "Completed matters: 0.",
+    "None of your matters are completed.", "You have not yet completed a matter.",
+  ])("denies false zero even when another measure is zero: %s", reply => {
+    expect(errors(reply, [overview({ active: 0, completed: 1 })])).toContain("unsupported_status_or_lifecycle_claim");
+  });
+  test.each([
+    "0 completed matters. Your matter is completed.",
+    "No completed matters with the Johnson filing completed.",
+    "Completed matters: 0 and your payment is completed.",
+  ])("does not grant extra or individual claims: %s", reply => { expect(errors(reply, [overview()])).toContain("unsupported_status_or_lifecycle_claim"); });
+});
+
+
+describe("current overview does not prove historical absence", () => {
+  test.each([
+    "You didn't have any completed matters.",
+    "You did not have any completed cases.",
+    "There weren't any completed matters.",
+    "There were not any completed cases.",
+    "No matters were completed.",
+    "Your account didn't have any completed matters.",
+  ])("rejects unsupported historical absence: %s", reply => {
+    expect(aggregateCountClaims(reply)).toEqual([]);
+    expect(errors(reply, [overview()])).toContain("unsupported_status_or_lifecycle_claim");
+  });
+});
