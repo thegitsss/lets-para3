@@ -1,0 +1,108 @@
+name: Selected native acceptance return
+on:
+  workflow_call:
+    inputs:
+      bridge_sha256:
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  selection:
+    name: Verify exact selected native scope matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - id: plan
+        name: Require reviewed source, selection and finite evidence allocation
+        env:
+          APPROVED_PLAN_SHA256: ${{ inputs.bridge_sha256 }}
+        run: |
+          node - <<'JS'
+          const fs=require('fs'),cp=require('child_process'),crypto=require('crypto'),assert=require('assert/strict');
+          const file='backend/tests/playwright/acceptance/native-continuation-plan.json',sha=b=>crypto.createHash('sha256').update(b).digest('hex'),bytes=fs.readFileSync(file),p=JSON.parse(bytes);
+          assert(/^[a-f0-9]{64}$/.test(process.env.APPROVED_PLAN_SHA256||''));assert.equal(sha(bytes),process.env.APPROVED_PLAN_SHA256);assert.equal(process.env.GITHUB_EVENT_NAME,'workflow_dispatch');assert.equal(process.env.GITHUB_REPOSITORY,'thegitsss/lets-para3');assert.equal(cp.execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),process.env.GITHUB_SHA);assert.equal(cp.execFileSync('git',['status','--porcelain=v1','--untracked-files=normal'],{encoding:'utf8'}).trim(),'');
+          assert.equal(p.candidateCommit,'@checked-out-head');assert.equal(p.sourcePins[file],'@approved-plan');const files=cp.execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean).sort();assert.deepEqual(Object.keys(p.sourcePins).sort(),files);for(const f of files)assert.equal(sha(fs.readFileSync(f)),f===file?process.env.APPROVED_PLAN_SHA256:p.sourcePins[f]);
+          assert.equal(p.expectedOverall,6245);assert.equal(p.expectedCritical,5939);assert.equal(p.expectedOther,306);assert.equal(p.scopes.length,34);const scopes=p.scopes.filter(s=>s.selected.length);assert.equal(scopes.length,23);assert.equal(scopes.reduce((n,s)=>n+s.selected.length,0),492);assert.equal(p.rows.filter(r=>r.disposition==='execute').length,492);assert.equal(p.cloudEvidence.maximumNewBytes,8*1024**3);
+          const budgets=p.cloudEvidence.scopes;assert.equal(budgets.length,23);assert.equal(new Set(budgets.map(b=>b.scope)).size,23);assert.equal(budgets.reduce((n,b)=>n+b.maxBytes,0),8*1024**3);assert(p.cloudEvidence.priorRetainedBytes+8*1024**3<=10*1024**3);
+          const include=scopes.map(s=>{assert(/^[a-z0-9-]+$/.test(s.name));const budget=budgets.find(b=>b.scope===s.name);assert(budget&&Number.isSafeInteger(budget.maxBytes)&&budget.maxBytes>0);const selected=p.rows.filter(r=>r.scope===s.name&&r.disposition==='execute');assert.equal(selected.length,s.selected.length);const browsers=[...new Set(selected.map(r=>r.engine))].sort();assert(browsers.every(b=>['chromium','firefox','webkit'].includes(b)));return{scope:s.name,selected:s.selected.length,browsers,maxBytes:budget.maxBytes};});
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'matrix='+JSON.stringify({include})+'\n');console.log(JSON.stringify({status:'EXACT492_SELECTED_CATALOG6245_PRESERVED',source:process.env.GITHUB_SHA,selected:492,scopes:23,prior4138And1615RemainUnqualified:true}));
+          JS
+  selected:
+    name: Selected original native callbacks (${{ matrix.scope }})
+    needs: selection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.selection.outputs.matrix) }}
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm
+        run: node backend/scripts/verify-runtime.js
+      - name: Install exact dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Install only selected locked Playwright engines
+        env:
+          SELECTED_BROWSERS_JSON: ${{ toJSON(matrix.browsers) }}
+        run: |
+          node - <<'JS'
+          const cp=require('child_process'),assert=require('assert/strict'),b=JSON.parse(process.env.SELECTED_BROWSERS_JSON);assert(b.length&&b.every(x=>['chromium','firefox','webkit'].includes(x)));cp.execFileSync(process.execPath,['backend/node_modules/playwright/cli.js','install','--with-deps',...b],{stdio:'inherit'});
+          JS
+      - name: Install locked receipt-rendering Chrome
+        working-directory: backend
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "false"
+        run: ./node_modules/.bin/puppeteer browsers install chrome
+      - name: Build exact current frontend
+        working-directory: backend
+        run: npm run build:frontend
+      - name: Execute only reviewed original identities without retries
+        env:
+          APPROVED_PLAN_SHA256: ${{ inputs.bridge_sha256 }}
+          EXACT_NATIVE_SCOPE: ${{ matrix.scope }}
+        run: |
+          node backend/scripts/run-native-browser-continuation.cjs --execute backend/tests/playwright/acceptance/native-continuation-plan.json "$APPROVED_PLAN_SHA256" "$EXACT_NATIVE_SCOPE" "backend/test-results/jest/shards/native-$EXACT_NATIVE_SCOPE"
+      - name: Bound complete raw evidence before upload
+        id: bound
+        if: always()
+        env:
+          EXACT_NATIVE_SCOPE: ${{ matrix.scope }}
+          EXACT_MAXIMUM_BYTES: ${{ matrix.maxBytes }}
+        run: |
+          node - <<'JS'
+          const fs=require('fs'),path=require('path'),assert=require('assert/strict');const scope=process.env.EXACT_NATIVE_SCOPE;assert(/^[a-z0-9-]+$/.test(scope));const root=path.resolve('backend/test-results/jest/shards/native-'+scope),files=[];let directories=0;function walk(p){directories++;assert(!fs.lstatSync(p).isSymbolicLink(),'Evidence symlink');for(const entry of fs.readdirSync(p,{withFileTypes:true})){const f=path.join(p,entry.name);assert(!entry.isSymbolicLink(),'Evidence symlink');if(entry.isDirectory())walk(f);else{assert(entry.isFile());files.push({path:path.relative(root,f),bytes:fs.statSync(f).size});}}}walk(root);assert(files.length);const bound=Math.ceil(files.reduce((n,f)=>n+f.bytes,0)*1.01)+(files.length+directories)*256*1024+128*1024;assert(Number.isSafeInteger(Number(process.env.EXACT_MAXIMUM_BYTES)));assert(bound<=Number(process.env.EXACT_MAXIMUM_BYTES),'Complete evidence exceeds reviewed scope allocation; never truncate');console.log(JSON.stringify({scope,files:files.length,directories,conservativeZipMaximum:bound,allocation:Number(process.env.EXACT_MAXIMUM_BYTES),fullRawEvidence:true}));
+          JS
+      - name: Upload complete selected native evidence on success or failure
+        if: ${{ always() && steps.bound.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-focused-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/shards/native-${{ matrix.scope }}
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true

@@ -274,3 +274,57 @@ describe("reviewed backend continuation workflow binding", () => {
     expect(() => validateWorkflowContract(leaked)).toThrow(/Only preparation, shards and union/);
   });
 });
+
+describe("bounded source-bound acceptance return", () => {
+  const defaultJobs = ["deployment-blueprint", "runtime-checks", "backend-tests", "backend-coverage", "validate", "codeql", "secrets"];
+  const returnJobs = ["source-bound-backend-return", "selected-native-return"];
+  const evaluate = (expression, event, scope) => Function("github", "inputs", `return (${expression.replace("always()", "true")})`)(
+    { event_name: event }, { execution_scope: scope });
+
+  test.each([
+    ["pull_request", "source-return", true], ["push", "source-return", true],
+    ["workflow_dispatch", "full", true], ["workflow_dispatch", "backend-source", true],
+    ["workflow_dispatch", undefined, true], ["workflow_dispatch", "unknown", true],
+    ["workflow_dispatch", "source-return", false],
+  ])("preserves every default source gate for %s/%s", (event, scope, expected) => {
+    const workflow = currentWorkflow();
+    validateWorkflowContract(workflow);
+    for (const name of defaultJobs) expect(evaluate(workflow.jobs[name].if, event, scope)).toBe(expected);
+    for (const name of returnJobs) expect(evaluate(workflow.jobs[name].if, event, scope)).toBe(event === "workflow_dispatch" && scope === "source-return");
+  });
+
+  test("omits original browser execution only for the exact reviewed return dispatch", () => {
+    const workflow = currentWorkflow();
+    validateWorkflowContract(workflow);
+    for (const name of ["browser-collection", "browser-checks", "browser-role-journeys", "browser-contracts"]) {
+      expect(evaluate(workflow.jobs[name].if, "workflow_dispatch", "source-return")).toBe(false);
+      expect(evaluate(workflow.jobs[name].if, "pull_request", "source-return")).toBe(true);
+    }
+  });
+
+  test("rejects mutable/external calls, inherited secrets, elevated permissions and unbound proof hashes", () => {
+    for (const name of returnJobs) for (const mutate of [
+      job => { job.uses = "other/repo/.github/workflows/return.yml@main"; },
+      job => { job.secrets = "inherit"; },
+      job => { job.permissions.actions = "write"; },
+      job => { job.with.bridge_sha256 = "a".repeat(64); },
+      job => { job.if = "github.event_name == 'workflow_dispatch'"; },
+      job => { job["continue-on-error"] = true; },
+      job => { job.needs = "validate"; },
+    ]) {
+      const workflow = currentWorkflow(); mutate(workflow.jobs[name]);
+      expect(() => validateWorkflowContract(workflow)).toThrow(/Source-bound return calls/);
+    }
+  });
+
+  test("rejects broad source skips and the missing-directory failure in both fixed aggregates", () => {
+    for (const name of ["deployment-blueprint", "codeql", "secrets"]) {
+      const workflow = currentWorkflow(); workflow.jobs[name].if = "github.event_name != 'workflow_dispatch'";
+      expect(() => validateWorkflowContract(workflow)).toThrow(/preserve default acceptance/);
+    }
+    for (const name of ["validate", "browser-contracts"]) {
+      const workflow = currentWorkflow(); delete workflow.jobs[name].steps[0]["working-directory"];
+      expect(() => validateWorkflowContract(workflow)).toThrow(/Checkout-free.*aggregate/);
+    }
+  });
+});

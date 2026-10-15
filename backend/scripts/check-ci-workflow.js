@@ -4,7 +4,10 @@ const { parseDocument } = require("yaml");
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const defaultWorkflowPath = path.join(repositoryRoot, ".github/workflows/quality.yml");
-const BROWSER_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source'";
+const SOURCE_RETURN_GUARD = "github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'source-return'";
+const DEFAULT_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'";
+const DEFAULT_GATE_GUARD = "always() && (" + DEFAULT_SCOPE_GUARD + ")";
+const BROWSER_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')";
 const BROWSER_GATE_GUARD = "always() && (" + BROWSER_SCOPE_GUARD + ")";
 const CONTINUATION_PLAN_BINDING = "${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'backend-source' && inputs.continuation_plan_sha256 || '' }}";
 const REQUIRED_JOBS = Object.freeze([
@@ -273,6 +276,7 @@ function validateGroupedBrowserJobs(jobs, catalog) {
   if (gate.steps?.length !== 1 || final?.["continue-on-error"] ||
       JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}" }) ||
       final?.run?.trim() !== 'test "$COLLECTION_RESULT" = success\ntest "$CHECKS_RESULT" = success\ntest "$ROLES_RESULT" = success') fail("Browser aggregate must fail closed unless every complete dependency succeeds.");
+  if (final["working-directory"] !== "${{ runner.temp }}") fail("Checkout-free Browser aggregate requires the existing runner temporary directory.");
   return catalog.groups.length;
 }
 
@@ -298,7 +302,7 @@ function validateGroupedBackendJobs(jobs) {
   const checks = jobs["runtime-checks"], shards = jobs["backend-tests"], union = jobs["backend-coverage"], gate = jobs.validate;
   if (!checks || !shards || !union) fail("Runtime checks, disjoint complete backend shards and raw coverage union are required.");
   for (const [name, job] of [["runtime-checks", checks], ["backend-tests", shards], ["backend-coverage", union]]) {
-    if (job["continue-on-error"] || (name === "backend-coverage" ? job.if !== "always()" : job.if) || job.steps?.some(step => step["continue-on-error"])) fail(`${name} cannot suppress or skip complete backend acceptance.`);
+    if (job["continue-on-error"] || job.if !== (name === "backend-coverage" ? DEFAULT_GATE_GUARD : DEFAULT_SCOPE_GUARD) || job.steps?.some(step => step["continue-on-error"])) fail(`${name} cannot suppress or skip complete backend acceptance outside the exact source-bound return.`);
     validateRuntimeBeforeInstall(job, name);validateCandidateBeforeInstall(job);
   }
   requireCommands(checks, ["npm ci", ...REQUIRED_VALIDATE_COMMANDS, "node scripts/verify-ci-jest-shards.js --prepare"], "runtime-checks");
@@ -317,10 +321,32 @@ function validateGroupedBackendJobs(jobs) {
   if (download?.with?.pattern !== "jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*" || download.with.path !== "backend/test-results/jest/shard-artifacts" || download.with["merge-multiple"] !== false || download.with["digest-mismatch"] !== "error") fail("Every separate raw shard artifact must be downloaded without overwrites or digest waivers.");
   validateLaunchEvidenceArtifact(union, { stepName: "Upload complete backend union evidence", pathFragment: "backend/test-results/jest/required-coverage.json" });
   const dependencies = ["backend-coverage", "backend-tests", "runtime-checks"];
-  if (gate.if !== "always()" || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify(dependencies) || gate["continue-on-error"]) fail("Fixed Runtime gate must always require every source, shard and raw coverage dependency.");
+  if (gate.if !== DEFAULT_GATE_GUARD || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify(dependencies) || gate["continue-on-error"]) fail("Fixed Runtime gate must always require every source, shard and raw coverage dependency outside the exact source-bound return.");
   const final = findStep(gate, "Require source checks and the exact complete backend union");
   if (gate.steps?.length !== 1 || final?.["continue-on-error"] || JSON.stringify(final?.env) !== JSON.stringify({CHECKS_RESULT:"${{ needs.runtime-checks.result }}",SHARDS_RESULT:"${{ needs.backend-tests.result }}",COVERAGE_RESULT:"${{ needs.backend-coverage.result }}"}) || final.run?.trim() !== 'test "$CHECKS_RESULT" = success\ntest "$SHARDS_RESULT" = success\ntest "$COVERAGE_RESULT" = success') fail("Runtime aggregate must fail closed for failed, cancelled or skipped backend evidence.");
+  if (final["working-directory"] !== "${{ runner.temp }}") fail("Checkout-free Runtime aggregate requires the existing runner temporary directory.");
   return 8;
+}
+
+function validateSourceReturnCalls(jobs) {
+  const calls = {
+    "source-bound-backend-return": "./.github/workflows/backend-acceptance-return.yml",
+    "selected-native-return": "./.github/workflows/native-acceptance-return.yml",
+  };
+  for (const [name, file] of Object.entries(calls)) {
+    const job = jobs[name];
+    if (!job || job.uses !== file || job.if !== SOURCE_RETURN_GUARD ||
+        JSON.stringify(job.with) !== JSON.stringify({ bridge_sha256: "${{ inputs.continuation_plan_sha256 }}" }) ||
+        JSON.stringify(Object.keys(job.permissions || {}).sort()) !== JSON.stringify(["actions", "contents"]) ||
+        job.permissions.contents !== "read" || job.permissions.actions !== "read" ||
+        Object.keys(job).some(key => !["name", "if", "uses", "with", "permissions"].includes(key))) {
+      fail("Source-bound return calls require only exact local reusable workflows, manual scope, external plan SHA and read-only permissions; no inherited secrets or suppressed result.");
+    }
+  }
+  for (const name of ["deployment-blueprint", "codeql", "secrets"]) {
+    if (jobs[name]?.if !== DEFAULT_SCOPE_GUARD) fail(`${name} must preserve default acceptance outside the exact source-bound return.`);
+  }
+  return new Set(Object.keys(calls));
 }
 
 function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/package.json"), "utf8")), catalog = browserCatalog()) {
@@ -336,10 +362,10 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
       typeof continuationInput.description !== "string" || !continuationInput.description ||
       Object.keys(continuationInput).some(key => !["type", "required", "default", "description"].includes(key)) ||
       !input || input.type !== "choice" || input.required !== true || input.default !== "full" ||
-      JSON.stringify(input.options) !== JSON.stringify(["full", "backend-source"]) ||
+      JSON.stringify(input.options) !== JSON.stringify(["full", "backend-source", "source-return"]) ||
       typeof input.description !== "string" || !input.description ||
       Object.keys(input).some(key => !["type", "required", "default", "options", "description"].includes(key))) {
-    fail("Only explicit manual backend-source dispatch may omit browser execution; full is required by default.");
+    fail("Only explicit manual backend-source or source-return dispatch may select source-bound evidence; full is required by default.");
   }
 
   if (Object.prototype.hasOwnProperty.call(triggers, "pull_request_target")) {
@@ -353,12 +379,14 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   }
 
   const jobs = workflow.jobs || {};
+  const sourceReturnCalls = validateSourceReturnCalls(jobs);
   validateContinuationBinding(jobs);
   for (const jobName of REQUIRED_JOBS) {
     if (!jobs[jobName]) fail(`Required job ${jobName} is missing.`);
     if (jobs[jobName].name !== REQUIRED_GATE_NAMES[jobName]) fail(`Required named gate context changed: ${jobName}.`);
   }
   for (const [jobName, job] of Object.entries(jobs)) {
+    if (sourceReturnCalls.has(jobName)) continue;
     if (job["runs-on"] !== "ubuntu-24.04") fail(`${jobName} must use the pinned ubuntu-24.04 runner.`);
     const timeout = Number(job["timeout-minutes"]);
     if (!Number.isInteger(timeout) || timeout < 1 || timeout > 60) {

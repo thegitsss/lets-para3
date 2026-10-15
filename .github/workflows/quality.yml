@@ -11,7 +11,7 @@ on:
         type: choice
         required: true
         default: full
-        options: [full, backend-source]
+        options: [full, backend-source, source-return]
       continuation_plan_sha256:
         description: Optional reviewed backend continuation plan SHA-256 (backend-source manual dispatch only)
         type: string
@@ -31,6 +31,7 @@ defaults:
 
 jobs:
   deployment-blueprint:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'
     name: Deployment Blueprint
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -63,6 +64,7 @@ jobs:
         run: npm run check:deploy
 
   runtime-checks:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'
     name: Runtime and source checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -155,6 +157,7 @@ jobs:
           compression-level: 9
           include-hidden-files: true
   backend-tests:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'
     name: Backend original suite shard ${{ matrix.shard }}
     needs: runtime-checks
     runs-on: ubuntu-24.04
@@ -231,7 +234,7 @@ jobs:
     needs:
       - runtime-checks
       - backend-tests
-    if: always()
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -310,11 +313,12 @@ jobs:
       - runtime-checks
       - backend-tests
       - backend-coverage
-    if: always()
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require source checks and the exact complete backend union
+        working-directory: ${{ runner.temp }}
         env:
           CHECKS_RESULT: ${{ needs.runtime-checks.result }}
           SHARDS_RESULT: ${{ needs.backend-tests.result }}
@@ -325,7 +329,7 @@ jobs:
           test "$COVERAGE_RESULT" = success
 
   browser-collection:
-    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source'
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')
     name: Browser fixture collection
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -392,7 +396,7 @@ jobs:
           include-hidden-files: true
 
   browser-checks:
-    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source'
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')
     name: Browser checks (${{ matrix.scope }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -488,7 +492,7 @@ jobs:
           include-hidden-files: true
 
   browser-role-journeys:
-    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source'
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')
     name: Role journeys (${{ matrix.group }})
     needs: browser-collection
     runs-on: ubuntu-24.04
@@ -612,11 +616,12 @@ jobs:
   browser-contracts:
     name: Browser contracts
     needs: [browser-collection, browser-checks, browser-role-journeys]
-    if: always() && (github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source')
+    if: always() && (github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every original browser scope and role group
+        working-directory: ${{ runner.temp }}
         env:
           COLLECTION_RESULT: ${{ needs.browser-collection.result }}
           CHECKS_RESULT: ${{ needs.browser-checks.result }}
@@ -646,6 +651,7 @@ jobs:
           deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later
 
   codeql:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'
     name: CodeQL
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -666,6 +672,7 @@ jobs:
         uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
 
   secrets:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'
     name: Secret scan
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -705,3 +712,21 @@ jobs:
           retention-days: 1
           compression-level: 9
           include-hidden-files: true
+
+  source-bound-backend-return:
+    if: github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'source-return'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/backend-acceptance-return.yml
+    with:
+      bridge_sha256: ${{ inputs.continuation_plan_sha256 }}
+
+  selected-native-return:
+    if: github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'source-return'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/native-acceptance-return.yml
+    with:
+      bridge_sha256: ${{ inputs.continuation_plan_sha256 }}
