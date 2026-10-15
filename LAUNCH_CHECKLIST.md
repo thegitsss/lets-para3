@@ -59,11 +59,13 @@ The implementation owner is responsible for finding and correcting inconsistenci
 
 ## 4. Payments and financial integrity
 
+Owner verification-method approval, October 15, 2026: simulate financial faults in Stripe TEST, then verify a genuine production purchase and bank payout before LPC is ready for client work. Keep every substantive payment and recovery requirement. This method approval grants no deployment, real-payment or spending authority.
+
 - [x] Payment operations use durable idempotency, Stripe webhook signature verification, a pinned API version, reconciliation, immutable financial events, and lifecycle invariants.
 - [ ] Confirm live Stripe and Connect keys, both webhook secrets, endpoint destinations, event subscriptions, and the pinned API version in production. Never place secret values in the launch record.
 - [ ] Execute the candidate’s payment suite and retain results.
-- [ ] In an authorized live-mode test, verify funding success, authentication-required, decline, cancellation, duplicate/out-of-order webhook, completion, payout, payout retry, partial/full refund, dispute, and Connect-incomplete paths.
-- [ ] Reconcile LPC records, Stripe objects, balances, platform fees, payouts, refunds, and receipts for every live-mode test object; record object IDs, not credentials.
+- [ ] On hosted staging with real Stripe TEST integrations, verify funding success, authentication-required, decline, cancellation, duplicate/out-of-order webhook, completion, payout, failed-payout recovery/retry, partial/full refund, dispute, and Connect-incomplete paths. Preserve the substantive assertions and reconcile every synthetic object; deliberate fault simulations belong in TEST.
+- [ ] Before client-work GO, complete a separately authorized genuine production purchase and verify the resulting bank payout, correct platform fees/transfers, LPC records and receipts. Inspect actual production exception/reconciliation state; reconcile any real exception that occurs. Record object/event IDs and evidence, never credentials. The verification method does not authorize deployment, a real payment or spending.
 - [ ] Confirm no unresolved `PaymentOperation`, webhook, payout, dispute, or reconciliation item is aged beyond its operational threshold.
 
 ## 5. Matter lifecycle and role journeys
@@ -71,7 +73,7 @@ The implementation owner is responsible for finding and correcting inconsistenci
 - [x] Domain transitions and money-sensitive invariants are centralized and covered by focused tests.
 - [x] CI rejects literal frontend API targets without a mounted backend route; speculative search, profile fallback, admin email-test, and message-attachment actions have been removed rather than presented as working features.
 - [x] Production-surface hygiene rejects placeholder links, native browser dialogs, query-enabled demos, fabricated demo/mock records, unfinished copy, and delayed full-screen loaders; fail-safe operational views expose null/unavailable state rather than invented values.
-- [x] Isolated local browser journeys use the real product controls and mounted routes for profile persistence, Create Matter, application/invitation, invitation acceptance, hire/funding, messaging, realtime fallback, payouts, and withdrawal; Stripe behavior remains explicitly local-mock evidence until live-mode certification.
+- [x] Isolated local browser journeys use the real product controls and mounted routes for profile persistence, Create Matter, application/invitation, invitation acceptance, hire/funding, messaging, realtime fallback, payouts, and withdrawal; Stripe behavior in those local journeys remains local-mock evidence; actual hosted Stripe TEST evidence and the separately authorized genuine production purchase/bank-payout evidence are distinct release requirements.
 - [ ] Run the complete Jest suite, critical Playwright role journeys, UI contracts, and lifecycle/payment matrices on the candidate with no skips, flakes, focused tests, or retries hiding a defect.
 - [ ] Complete attorney: signup → approval → profile → browse → create matter → fund → hire → collaborate → dispute/complete → receipt.
 - [ ] Complete paralegal: signup → approval → profile → availability → apply/invitation → collaborate → completion → payout.

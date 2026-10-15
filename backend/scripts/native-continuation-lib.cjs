@@ -31,4 +31,22 @@ function exactOutcomeSelection(actual,expected){const a=unique(actual),b=unique(
 
 function managedResources(directory){const load=name=>{const file=path.join(directory,name+'.jsonl');const bytes=fs.existsSync(file)?fs.readFileSync(file):Buffer.alloc(0);return{file,sha256:hash(bytes),rows:bytes.toString().split('\n').filter(Boolean).map(line=>JSON.parse(line))};},mongo=load('mongo'),http=load('http'),starts=mongo.rows.filter(r=>r.phase==='started'),listeners=http.rows.filter(r=>r.phase==='listening');assert(starts.length||listeners.length,'No actual observer lifetime evidence');assert.equal(mongo.rows.filter(r=>r.phase==='spawn-error').length,0,'Mongo spawn error');for(const start of starts){const events=mongo.rows.filter(r=>r.pid===start.pid&&r.observerPid===start.observerPid);for(const phase of ['started','exit','closed']){const matches=events.filter(r=>r.phase===phase);assert.equal(matches.length,1,'Incomplete/duplicate Mongo '+phase);if(phase!=='started'){assert.equal(matches[0].code,0,'Non-normal Mongo exit');assert.equal(matches[0].signal,null,'Signaled Mongo exit');}}}assert.equal(mongo.rows.length,starts.length*3,'Unowned/incomplete Mongo observation');for(const start of listeners){const events=http.rows.filter(r=>r.pid===start.pid&&r.id===start.id&&r.observerPid===start.observerPid);assert.equal(events.filter(r=>r.phase==='listening').length,1);assert.equal(events.filter(r=>r.phase==='closed').length,1,'Opened HTTP listener did not close exactly once');}assert.equal(http.rows.length,listeners.length*2,'Unowned/incomplete HTTP observation');return{status:'ACTUAL_OBSERVED_MANAGED_RESOURCES_CLOSED_NORMALLY',mongoChildren:starts.length,httpListeners:listeners.length,mongoClass:starts.length?'actual-owned-mongo-exit-and-close0-null':'genuine-zero-observed-mongo-no-model-proof',mongo,http};}
 
-module.exports={hash,key,semantic,clean,rows,unique,actualPass,ast,pinned,testList,exactSelection,sourceMap,verifyPins,effectiveConfig,selectedEffectiveConfig,environment,verifyCustody,exactOutcomeSelection,managedResources};
+// Preparation-only conversion of the three actually observed macOS collection
+// fields to the fixed Ubuntu hosted acceptance environment. Runtime comparison
+// remains exact: no field is ignored, no callback or timeout is changed.
+function bindLinuxCollectionConfig(original,binding){
+ assert.deepEqual(Object.keys(binding).sort(),['sourcePlatform','sourceTemporaryDirectory','sourceUserTextEncoding','targetPlatform','targetTemporaryDirectory'].sort(),'Exact reviewed platform binding fields required');
+ assert.equal(binding.sourcePlatform,'darwin');assert.equal(binding.targetPlatform,'linux');assert.equal(binding.targetTemporaryDirectory,'/tmp');
+ assert.equal(binding.sourceTemporaryDirectory,'/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T');assert.equal(binding.sourceUserTextEncoding,'0x1F5:0x0:0x0');
+ const target=JSON.parse(JSON.stringify(original));if(!target.webServer)return target;
+ const servers=Array.isArray(target.webServer)?target.webServer:[target.webServer];
+ for(const server of servers){
+  if(server.cwd===binding.sourceTemporaryDirectory)server.cwd=binding.targetTemporaryDirectory;
+  else assert(typeof server.cwd==='string'&&(server.cwd==='<ROOT>'||server.cwd.startsWith('<ROOT>/')),'Unknown temporary server working directory cannot be rebound');
+  if(Object.hasOwn(server.env||{},'MONGOMS_RUNTIME_DOWNLOAD')){assert.equal(server.env.MONGOMS_RUNTIME_DOWNLOAD,'false','Unknown runtime-download collection policy');delete server.env.MONGOMS_RUNTIME_DOWNLOAD;}
+  if(Object.hasOwn(server.env||{},'__CF_USER_TEXT_ENCODING')){assert.equal(server.env.__CF_USER_TEXT_ENCODING,binding.sourceUserTextEncoding,'Unknown macOS-only encoding value');delete server.env.__CF_USER_TEXT_ENCODING;}
+ }
+ return target;
+}
+
+module.exports={hash,key,semantic,clean,rows,unique,actualPass,ast,pinned,testList,exactSelection,sourceMap,verifyPins,effectiveConfig,selectedEffectiveConfig,environment,verifyCustody,exactOutcomeSelection,managedResources,bindLinuxCollectionConfig};

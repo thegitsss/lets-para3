@@ -11,7 +11,7 @@ permissions:
   actions: read
 jobs:
   final-file:
-    name: Final signed-recovery17 with retained J backend evidence
+    name: Actual current signed-recovery17; strict local prior union required
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -46,7 +46,7 @@ jobs:
           node - <<'JS'
           const fs=require('fs'),crypto=require('crypto'),assert=require('assert/strict');assert(process.env.GITHUB_ENV);fs.appendFileSync(process.env.GITHUB_ENV,'JWT_SECRET='+crypto.randomBytes(48).toString('hex')+'\nDATA_ENCRYPTION_KEY='+crypto.randomBytes(32).toString('hex')+'\n');
           JS
-      - name: Execute exact final17 once and verify actual J538 provenance
+      - name: Execute exact current final17 once; preserve raw source and cleanup evidence
         id: verify
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,7 +71,7 @@ jobs:
           retention-days: 1
           compression-level: 9
           include-hidden-files: true
-      - name: Require actual final-file execution and qualified source-bound union
+      - name: Require actual current final17 execution; local prior union remains separate
         if: always()
         working-directory: ${{ runner.temp }}
         env:
