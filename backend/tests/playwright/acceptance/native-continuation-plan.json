@@ -12,9 +12,9 @@
   "expectedOverall": 6251,
   "sourceManifest": {
     "proofClass": "Complete final tracked sourcePins; external approved hash resolves plan self-pin. No deployment receipt.",
-    "finalOSourceImpactReview": {
-      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_O_SOURCE_IMPACT_AND_ACCEPTANCE_REVIEW.json",
-      "sha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad"
+    "finalPSourceImpactReview": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_P_SOURCE_IMPACT_AND_ACCEPTANCE_REVIEW.json",
+      "sha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795"
     }
   },
   "priorIndex": {
@@ -30,7 +30,7 @@
     ".github/dependabot.yml": "74c5d13fa7d248f58bdb7885d54f7581ea2a71d448f1b744908f110a5a98d325",
     ".github/workflows/backend-acceptance-return.yml": "d2819180a34ca816cca132dcf3ffb66fc88690f05cf492c97dcf24715aedd884",
     ".github/workflows/backend-single-file-return.yml": "5dcc15b3807296d30e54c6123339e9e80d6f3d2e75981d1eea751551e44ca7ef",
-    ".github/workflows/native-acceptance-return.yml": "321ebf3a51a3dd356cecfe20b727d8aa966a6e8d2275d5ca4890a278ccae37f4",
+    ".github/workflows/native-acceptance-return.yml": "40c42e1c97f3ae755996e4582572a9162a30f3298975cbc50bcf5cb8fabcd5d1",
     ".github/workflows/public-release.yml": "888567a645fd62681a70d4f17dbd8fe22501b07f8a800b18b6d68f3c35f8cd9d",
     ".github/workflows/quality.yml": "5d595a833b4a009cf76a3d9cae333d0df61dfafd410e17f06537f77046084923",
     ".gitignore": "6a2ba6a35f6f75eb15cfe4d8dd95c66eef57addcc94fd00825b1a3d22217f78f",
@@ -225,7 +225,7 @@
     "backend/routes/applications.js": "14c2b24d85eb4352c77d045977bb2ca306d1624310bb7a8bfc73e588e3c56cac",
     "backend/routes/attorneyDashboard.js": "7e5ee7aabc0af9d25936795b50bbc5ae67a17fa8c7d95feae53e7e195e999b1a",
     "backend/routes/attorneyMatterInventory.js": "d40ad8ee8e5feb6de28e15e4477cfea1fb7006c9ba8707d6d532b499702ee5f7",
-    "backend/routes/auth.js": "647bbee6a9e5b758a285357d58d91d78b4d4df56923aae93207b2ea7e3ffd2b7",
+    "backend/routes/auth.js": "2574a1c6533ad012dc7e7ccba4d4dbdada9d3f192348ac65551f4b3e114e7a32",
     "backend/routes/autonomousActions.js": "e041004c270189162a4bbfc2dada5ede2df39bd0b8b91f36fb2491f6f7e8467c",
     "backend/routes/blocks.js": "854b383ec2a7322132c6ad8d6034793f31f1b1b1b8bcbd19e999ca3e88c15aac",
     "backend/routes/caseDrafts.js": "6510320a77fc9840287170a88a636617f7b227258408841f1bde078d050a46dc",
@@ -272,7 +272,7 @@
     "backend/scripts/check-admin-communications.js": "f6604b6bc99a990c3fce0744dcd4e8dd335387771f7e42cce964d67ef53620ab",
     "backend/scripts/check-backend-reachability.js": "214076367906c7a88a17e4557aa98edf72622304dbede817d16620cf1cd74ed7",
     "backend/scripts/check-candidate-secrets.js": "827eee3df0f7244c05eb42c07ea664c5f619f0cb373b175fe461f42692dd61b3",
-    "backend/scripts/check-ci-workflow.js": "e1b88ba0fcf2d5ca1f24c9505b090dc5c27bf4ac5d7563559d4b7b6f1cd27215",
+    "backend/scripts/check-ci-workflow.js": "59047c8805bbc4b97d268da4ebe829f89d4319f17dc6f705ebd7796bbbe6ab70",
     "backend/scripts/check-focused-tests.js": "401cbe08b3907bf7405825b6c60a952de425700f33f279782f737955692545c1",
     "backend/scripts/check-frontend-api-contract.js": "c90f0801708c3c91d5ac2890e2841856fcaa6a351e94dfc0c32c69263358e42f",
     "backend/scripts/check-frontend-bindings.mjs": "3ecf75323f39059675302ad65352c6c62fb9aa299c6d96ef4939bf00fabd6a3b",
@@ -388,7 +388,7 @@
     "backend/scripts/verify-critical-browser-groups.js": "6015deaa9deb7a6f0b6d8fdde328e3290626483b019140cbe8609940262b68ef",
     "backend/scripts/verify-production-surface.js": "59a98e67bfdbae1fd1b505d5a2b8654a40f9f45f9526ef16a4217bb4cf75dcf2",
     "backend/scripts/verify-runtime.js": "bdf42bca89111953a6964b3992c2de2e2f696f173517ac37db745e06629fe038",
-    "backend/scripts/verify-single-file-jest-return.cjs": "89550fca212b696f35568d7b374831befbfb488c4a57f15f74553fdca58e9c6e",
+    "backend/scripts/verify-single-file-jest-return.cjs": "09ccb9c26687a813500dbe7d8a6ae3051dfb9445e077c1f1c1e566152f36adc7",
     "backend/scripts/verify-source-bound-backend-return.js": "9339327e593eef71d51e10d9b20ea52f550fa890e0111c6026b7498d943f7787",
     "backend/scripts/verify-staging-storage-controls.py": "001c366da8451277794ed71566c348ca2fea22c6e7a2c7d2d87a276987c4d274",
     "backend/services/accountApplicationProjections.js": "1f26295a9e0a9d74fb46b0cb1b54c7928ccf9891b92f33d3a17654f6af7f0081",
@@ -613,7 +613,7 @@
     "backend/services/payoutHoldService.js": "328bcf97dda717df1b4ac51aefd875b118aefcc45b7bed13b4918d0ef0be12b6",
     "backend/services/pendingHireContext.js": "7594b649f938ddcbbca911de6729700376a24387e12a56e6fdbd3112faa1d5da",
     "backend/services/personalDocumentReferences.js": "97b61bcd94f557ccdbde3a4ed5c6a845ebc4ede687629cc3aac3a805ff39efc8",
-    "backend/services/personalStorageDeletion.js": "d160456e6a625071896cd6bfbbf557524350149bd5d3800c18bfe881ca4d921c",
+    "backend/services/personalStorageDeletion.js": "06892c91d11cb4a942371d3064051e1b9e9c6502128e1f5f79057201ca084181",
     "backend/services/platformFeePolicy.js": "f5446b6012c39e37c9f7408fa1c40594e7723e3a369229badab2df312e49c97e",
     "backend/services/privateNoteWrite.js": "da47d694fb95944cad1628da3f256d5b0779ee8850f73e6fe7af1b864ca69b3f",
     "backend/services/productionFundingReconciliationService.js": "f13f4842586506ab2c37f27a4596350b2793dd2354983149261cd4f8bc872a5c",
@@ -682,7 +682,7 @@
     "backend/tests/accountSecurityGuards.test.js": "75f701790f3ec3778612b3d7b23a707aff4e5c881bbcc36fd19852dc6d61b590",
     "backend/tests/accountThemeMigration.test.js": "b9fbe12ee17856ae78578bc8ae84354cb583c1ff87b9b8aa054b3cfb1aab3cf6",
     "backend/tests/accountWriteConcurrency.test.js": "774ffca89ea8fe33287e4a2aa4a7af4ee9978f9d8f3dd0d96c847dbfb9e3354a",
-    "backend/tests/adminAdmissionsJourney.test.js": "02a4154c135031f787842d89f5e6cf3b56f30f8c0ef75e34c904c8830861462b",
+    "backend/tests/adminAdmissionsJourney.test.js": "e35e71df8235baeaf7f4806ffe9611bc6798fd2ad1333d6d744ff4dd58e01106",
     "backend/tests/adminApprovalRecovery.test.js": "94f36b1346fd09416a13736ad926de67872da3be83f9c1340028f827e1686f8d",
     "backend/tests/adminAssistantActions.test.js": "75a7f3f43ec0c2d14d5f00ed6da26fe890b7dc5c1ff805af46e45a1d6b25885f",
     "backend/tests/adminChatConcurrency.test.js": "3cc6e7c83945f316c4d3b849bbb556a69f13e391b392c46b0f6b277dd06f97b6",
@@ -827,6 +827,7 @@
     "backend/tests/auditCoverage.test.js": "4438f055a636009b1f37e814478032d091dcdf9deddce943cd5ba1dabbfdd998",
     "backend/tests/auditLogging.test.js": "6d30e4b71915053b4f8581b53f9e0e3d43ebbfb9ce42943f55a36d5f8fc79c3b",
     "backend/tests/auth.test.js": "7714a19748ee60e1ebb1f99999a71af792df7f59885530d12cd34c07aba139c2",
+    "backend/tests/authAdmissionUploadRecovery.test.js": "0c6ae02713e437046db908cf4374f2bbbfb4a7680ca82a4923b7fe3cb2d16829",
     "backend/tests/authCsrf.test.js": "69510cb3da1591053e81162be44789cd1cbdd4780bb20994f6e386c7b2760941",
     "backend/tests/authFactorConcurrency.test.js": "bce5555a1c328d45f88a26be8ad3fbb0edbbecb9bd9abe0550fcdb2dc7bc6a51",
     "backend/tests/authFactorGoogleLinkAtomicity.test.js": "08a502192f5188fce13d79b4a1259911db8a46662a5bbf37d78d7dcf5a24b646",
@@ -1141,7 +1142,7 @@
     "backend/tests/phase3FrontendContract.test.js": "22336af741ed2ac3c07fa2c25733a5cc1bd58488ad1ddedfbb30f04a8165bea0",
     "backend/tests/phase6CompatibilityAuditContract.test.js": "eec2436e67cd3f41d76fe9d3a6016c6e56ad830ce8e722d03ac24ca0529f4c5f",
     "backend/tests/playwright/acceptance/group.config.cjs": "0fb44b2486c5e845ab1b533030f7acefe8d4bcf3af335f5a85a97e7b19175e59",
-    "backend/tests/playwright/acceptance/groups.json": "012c26f5c7bdb78c5a5b5ba769f50851891e030ae271794f6af5d66cab13070e",
+    "backend/tests/playwright/acceptance/groups.json": "08b50009a5b37b03e50d28639dab87e41fd627dc34fda134e5059e337518940f",
     "backend/tests/playwright/acceptance/native-continuation-plan.json": "@approved-plan",
     "backend/tests/playwright/acceptance/native-continuation.config.cjs": "a54bf492fd717229d43e3fd83964cc19f7328d44ea9dad2fd213ef83bd840132",
     "backend/tests/playwright/accessibility/auth-pages-phase-seven.spec.js": "5d0d0f61c308624804caecae0067d4fd4f72dea2d1e48bea53bb4eca586eedb9",
@@ -1294,7 +1295,7 @@
     "backend/tests/playwright/attorney-v2/inventory-fixture.js": "e015b52187c69929c5acfca3973faa12ae124da397af63cad2a03cb1914d431a",
     "backend/tests/playwright/attorney-v2/invitation-actions.spec.js": "3c731b57d709555b086f966c0e18b8695f9eabd52e44f257ba76895e113d04b4",
     "backend/tests/playwright/attorney-v2/invitation-inventory.spec.js": "8b124c5b1b6c6fb23ff4844fbb79f24483ac7594af59c8032482a9703a507e34",
-    "backend/tests/playwright/attorney-v2/invitations.spec.js": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+    "backend/tests/playwright/attorney-v2/invitations.spec.js": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
     "backend/tests/playwright/attorney-v2/legacy-home.spec.js": "64006d8a78743c76d4d7fc4967d38ee7b6c3acc8ef6273617d59dd4cf08f43f3",
     "backend/tests/playwright/attorney-v2/legacy-invitations.spec.js": "78abff2bf164870654fcd441258a5045b1a2e8f704cbb47410a2a4288d63dda1",
     "backend/tests/playwright/attorney-v2/legacy-profile-engagement.spec.js": "a360c57971c54c927534c3527b8c7adfbf6d56bc1be952dfdb74328e49545df2",
@@ -2357,7 +2358,7 @@
     "frontend/assets/styles/matter-creation.css": "dd67fd294fbb8954c0bd1126830ef9da8a567377961eaa03611ddb1d114589aa",
     "frontend/assets/styles/matter-invitations.css": "354085463d4757305dcd70cadbd03288889b7f44eecd6bbec1224cecf2acc1e5",
     "frontend/assets/styles/matter-notes.css": "79378b738c8d5327d021d21e72730735230caba7b3963e30553cfa8ced82470a",
-    "frontend/assets/styles/matter-publication.css": "872591dd87fa47395f65f3600cd941c7014cec367e31d03aef3317d270082637",
+    "frontend/assets/styles/matter-publication.css": "89d6fb558516cab460df3ed806581708c3d1394cb11f1ef8f017f155f64704d6",
     "frontend/assets/styles/matter-work-queue.css": "08688013de5de4148bd142cf430a7ad883d73e492e1ba1f22e73b7fb16a86048",
     "frontend/assets/styles/matter-workspace-navigation.css": "95186ab5b76e98d2bbe3ce8b735e0799a9a22b4365ada67c24163627678ea3f5",
     "frontend/assets/styles/notification-center.css": "423487e132360edf975e60f851aa31b9f2e65406dd6ffb122a51eae7faf94a30",
@@ -2458,7 +2459,7 @@
     "backend/tests/playwright/acceptance/native-continuation.config.cjs": "a54bf492fd717229d43e3fd83964cc19f7328d44ea9dad2fd213ef83bd840132"
   },
   "packageLockSha256": "a5100240a796274e7fa20f690afa8ad796982f96923772318e3ae63358ff05d5",
-  "buildManifestSha256": "bcbad8a5d35c13de7ad3eaf8ca75ec9d4459263b90747d699f9273792e60a56c",
+  "buildManifestSha256": "e8912a82b776b2102e11fbcbfac7eec21e7260d07147c8d180e8816e8bad1b76",
   "runtime": {
     "node": "v24.18.0",
     "playwright": "1.62.1",
@@ -2492,8 +2493,8 @@
   ],
   "catalogSha256": "a59e6e5eceb4a030f460caa50a93bb21c42e5f68460d507a9990cbcc97af20f2",
   "counts": {
-    "execute": 33,
-    "qualified-current-explicit-original-class": 467
+    "execute": 6,
+    "qualified-current-explicit-original-class": 494
   },
   "scopes": [
     {
@@ -3265,14 +3266,8 @@
         }
       },
       "selected": [
-        "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",60,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"chromium\"]",
-        "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",70,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"chromium\"]",
         "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",109,1,\"a changed session during refresh clears both invitation surfaces without reading another account\",\"chromium\"]",
-        "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",60,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",70,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"firefox\"]",
         "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",109,1,\"a changed session during refresh clears both invitation surfaces without reading another account\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",60,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"webkit\"]",
-        "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",70,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"webkit\"]",
         "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",109,1,\"a changed session during refresh clears both invitation surfaces without reading another account\",\"webkit\"]"
       ],
       "originalDarwinEffectiveConfigSha256": "79a32bfe7ac67fc1c9ecff9eab44b91c4ad642d29dbc87477727751e0bbedadc",
@@ -4167,12 +4162,7 @@
           }
         }
       },
-      "selected": [
-        "[\"backend/tests/playwright/attorney-v2/applications.spec.js\",167,1,\"original application profile returns to the same active or withdrawn record without a mutation\",\"chromium\"]",
-        "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",63,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"chromium\"]",
-        "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",63,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",63,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"webkit\"]"
-      ],
+      "selected": [],
       "originalDarwinEffectiveConfigSha256": "ce9a6ebc19e37227a8602d5f6844bd65d97c16a45310618954f2a1ada332064f",
       "originalDarwinEffectiveConfig": {
         "configFile": "<ROOT>/backend/tests/playwright/acceptance/native-continuation.config.cjs",
@@ -4910,10 +4900,7 @@
           }
         }
       },
-      "selected": [
-        "[\"backend/tests/playwright/paralegal-support/v2-global-tools.spec.js\",763,1,\"office polish: Help discloses answers with keyboard control and retains the open answer\",\"webkit\"]",
-        "[\"backend/tests/playwright/paralegal-support/v2-help.spec.js\",332,1,\"Help and report states remain readable and operable in supported layouts\",\"webkit\"]"
-      ],
+      "selected": [],
       "originalDarwinEffectiveConfigSha256": "54954ae730f5d01695d78a3e37f13eef134c2c447580667f7305af812d09166c"
     },
     {
@@ -7966,7 +7953,22 @@
         "reason": "Original actual current-qualified outcome remains missing.",
         "evidence": [],
         "originalProofClass": "junit-business-fragment-only"
-      }
+      },
+      "previousAffectedPassingOutcome": {
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "4f5edb5e0ea3784e2321fe61f9ee557c2e1ce8aac1811bd9c4c36cbef1b83294",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
+      },
+      "requiredRecheckReason": "Exact draft-page CSS is changed; original three-engine layout callback is affected."
     },
     {
       "source": "backend/tests/playwright/attorney-v2/draft-workflow.spec.js",
@@ -8009,7 +8011,22 @@
         "reason": "Original actual current-qualified outcome remains missing.",
         "evidence": [],
         "originalProofClass": "junit-business-fragment-only"
-      }
+      },
+      "previousAffectedPassingOutcome": {
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "4f5edb5e0ea3784e2321fe61f9ee557c2e1ce8aac1811bd9c4c36cbef1b83294",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
+      },
+      "requiredRecheckReason": "Exact draft-page CSS is changed; original three-engine layout callback is affected."
     },
     {
       "source": "backend/tests/playwright/attorney-v2/conversation.spec.js",
@@ -10998,11 +11015,11 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "6aac95eddd0212cf8e438a0b1634f5d2da264c8b0977c0e55a210fe07fd1de42",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "008b7eba76dc73cc3155a27c1bacf01d617c0b4e3d948ca32e1368b83a31af3a",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
       "disposition": "qualified-current-explicit-original-class",
@@ -11037,8 +11054,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 2947,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:12.411Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-1",
       "configSha256": "1a9805085613ab88d9afb7cc30301bd3d863b03bbf93b311d13b488a78bd42e4",
       "id": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",60,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"chromium\"]",
@@ -11048,24 +11079,31 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "6091d4fb61e0915e04b6be27a07ab68d80108230facbff9d54656fc1e91fb937",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "6091d4fb61e0915e04b6be27a07ab68d80108230facbff9d54656fc1e91fb937",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",54,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"chromium\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"chromium\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
       }
     },
     {
@@ -11080,8 +11118,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 2790,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:15.528Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-1",
       "configSha256": "1a9805085613ab88d9afb7cc30301bd3d863b03bbf93b311d13b488a78bd42e4",
       "id": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",70,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"chromium\"]",
@@ -11091,24 +11143,31 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "16fb82320ca7a5ed0dd471cd9f2741bfcd58dfe6f93ed808bee78292b17201f3",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "16fb82320ca7a5ed0dd471cd9f2741bfcd58dfe6f93ed808bee78292b17201f3",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",64,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"chromium\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"chromium\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
       }
     },
     {
@@ -11134,11 +11193,11 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "callbackSha256": "acdf17f5684ca8c28329c705d8817ac7c0139bbd4307f77ee7bf2afb1e1c3c27",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "callbackSha256": "a30c5572b0f5a8a1c8d43b694c8018f960bb14c5cee3856482260ddfa4f42219",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "acdf17f5684ca8c28329c705d8817ac7c0139bbd4307f77ee7bf2afb1e1c3c27",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
       "disposition": "execute",
@@ -11152,7 +11211,22 @@
         "reason": "Original actual current-qualified outcome remains missing.",
         "evidence": [],
         "originalProofClass": "junit-business-fragment-only"
-      }
+      },
+      "previousAffectedPassingOutcome": {
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
+      },
+      "requiredRecheckReason": "Exact changed-session fixture is corrected for completed redirect and independent pre-loss contexts; the same original callback is affected in all three engines."
     },
     {
       "source": "backend/tests/playwright/attorney-v2/invitations.spec.js",
@@ -11177,11 +11251,11 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "6aac95eddd0212cf8e438a0b1634f5d2da264c8b0977c0e55a210fe07fd1de42",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "008b7eba76dc73cc3155a27c1bacf01d617c0b4e3d948ca32e1368b83a31af3a",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
       "disposition": "qualified-current-explicit-original-class",
@@ -11216,8 +11290,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 4220,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:20.450Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-1",
       "configSha256": "1a9805085613ab88d9afb7cc30301bd3d863b03bbf93b311d13b488a78bd42e4",
       "id": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",60,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"firefox\"]",
@@ -11227,24 +11315,31 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "6091d4fb61e0915e04b6be27a07ab68d80108230facbff9d54656fc1e91fb937",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "6091d4fb61e0915e04b6be27a07ab68d80108230facbff9d54656fc1e91fb937",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",54,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
       }
     },
     {
@@ -11259,8 +11354,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 3119,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:25.051Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-1",
       "configSha256": "1a9805085613ab88d9afb7cc30301bd3d863b03bbf93b311d13b488a78bd42e4",
       "id": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",70,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"firefox\"]",
@@ -11270,24 +11379,31 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "16fb82320ca7a5ed0dd471cd9f2741bfcd58dfe6f93ed808bee78292b17201f3",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "16fb82320ca7a5ed0dd471cd9f2741bfcd58dfe6f93ed808bee78292b17201f3",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",64,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
       }
     },
     {
@@ -11313,11 +11429,11 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "callbackSha256": "acdf17f5684ca8c28329c705d8817ac7c0139bbd4307f77ee7bf2afb1e1c3c27",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "callbackSha256": "a30c5572b0f5a8a1c8d43b694c8018f960bb14c5cee3856482260ddfa4f42219",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "acdf17f5684ca8c28329c705d8817ac7c0139bbd4307f77ee7bf2afb1e1c3c27",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
       "disposition": "execute",
@@ -11331,7 +11447,22 @@
         "reason": "Original actual current-qualified outcome remains missing.",
         "evidence": [],
         "originalProofClass": "junit-business-fragment-only"
-      }
+      },
+      "previousAffectedPassingOutcome": {
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
+      },
+      "requiredRecheckReason": "Exact changed-session fixture is corrected for completed redirect and independent pre-loss contexts; the same original callback is affected in all three engines."
     },
     {
       "source": "backend/tests/playwright/attorney-v2/invitations.spec.js",
@@ -11356,11 +11487,11 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "6aac95eddd0212cf8e438a0b1634f5d2da264c8b0977c0e55a210fe07fd1de42",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "008b7eba76dc73cc3155a27c1bacf01d617c0b4e3d948ca32e1368b83a31af3a",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
       "disposition": "qualified-current-explicit-original-class",
@@ -11395,8 +11526,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 7811,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:32.706Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-1",
       "configSha256": "1a9805085613ab88d9afb7cc30301bd3d863b03bbf93b311d13b488a78bd42e4",
       "id": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",60,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"webkit\"]",
@@ -11406,24 +11551,31 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "6091d4fb61e0915e04b6be27a07ab68d80108230facbff9d54656fc1e91fb937",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "6091d4fb61e0915e04b6be27a07ab68d80108230facbff9d54656fc1e91fb937",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",54,1,\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",\"both dashboards distinguish initial errors, empty lists and unreadable records\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
       }
     },
     {
@@ -11438,8 +11590,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 3820,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:40.995Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-1",
       "configSha256": "1a9805085613ab88d9afb7cc30301bd3d863b03bbf93b311d13b488a78bd42e4",
       "id": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",70,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"webkit\"]",
@@ -11449,24 +11615,31 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
       "callbackSha256": "16fb82320ca7a5ed0dd471cd9f2741bfcd58dfe6f93ed808bee78292b17201f3",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "16fb82320ca7a5ed0dd471cd9f2741bfcd58dfe6f93ed808bee78292b17201f3",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",64,1,\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/invitations.spec.js\",\"failed refresh removes previous names, retries safely and rejects foreign or malformed responses\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "EXPLICIT_O_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "bb8e3ef2eb33708bc302c059784db381f0c5d75d1f601c10111e2e9aa420221a",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1
       }
     },
     {
@@ -11492,11 +11665,11 @@
           45000
         ],
         "dynamicExpressions": [],
-        "sourceSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+        "sourceSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
         "rule": "Exact unchanged source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "callbackSha256": "acdf17f5684ca8c28329c705d8817ac7c0139bbd4307f77ee7bf2afb1e1c3c27",
-      "currentSpecSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+      "callbackSha256": "a30c5572b0f5a8a1c8d43b694c8018f960bb14c5cee3856482260ddfa4f42219",
+      "currentSpecSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
       "priorCallbackSha256": "acdf17f5684ca8c28329c705d8817ac7c0139bbd4307f77ee7bf2afb1e1c3c27",
       "priorSpecSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
       "disposition": "execute",
@@ -15674,8 +15847,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 6301,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:03.250Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-5",
       "configSha256": "6fa4bc3547f42aa3390e04999780d8a989e86bc936c9fc6c4fea1dff17beb572",
       "id": "[\"backend/tests/playwright/attorney-v2/applications.spec.js\",167,1,\"original application profile returns to the same active or withdrawn record without a mutation\",\"chromium\"]",
@@ -15692,17 +15879,24 @@
       "currentSpecSha256": "2b46a3c527f30b1de5fd3e7256a3e60df5959e38185fd2e84014c07d7039cda8",
       "priorCallbackSha256": "e2742683e75b0b363a3e33648992eb44553146ce5de6fbec255ea09d8fbc51aa",
       "priorSpecSha256": "7d8a66a028e9afa9053928bd9d421123c43ff56206b1762163c93073b6966d4c",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/applications.spec.js\",167,1,\"original application profile returns to the same active or withdrawn record without a mutation\",\"chromium\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/applications.spec.js\",\"original application profile returns to the same active or withdrawn record without a mutation\",\"chromium\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_O_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "1f692a5f9810a17982c47c99913ed2cb131dcbe984eaaf2a88933c0c988fc149",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0
       }
     },
     {
@@ -15767,8 +15961,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 2897,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:09.811Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-5",
       "configSha256": "6fa4bc3547f42aa3390e04999780d8a989e86bc936c9fc6c4fea1dff17beb572",
       "id": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",63,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"chromium\"]",
@@ -15785,17 +15993,24 @@
       "currentSpecSha256": "eccf08b46539e45ef939ff692061b4470feb486e42b74d34fb298eaa0ca1ad56",
       "priorCallbackSha256": "393ca3104cae41e959e11821bec741f8b54e0e931c73eca6b891877f51aa59b1",
       "priorSpecSha256": "a9ef032f759bf8aa0ec80f0e9e2f77d90df48bfae69e7f891bc84f7604a39177",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",52,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"chromium\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",\"card setup preserves the exact application until the attorney returns and clears it\",\"chromium\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_O_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "1f692a5f9810a17982c47c99913ed2cb131dcbe984eaaf2a88933c0c988fc149",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0
       }
     },
     {
@@ -15810,8 +16025,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 4688,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:13.320Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-5",
       "configSha256": "6fa4bc3547f42aa3390e04999780d8a989e86bc936c9fc6c4fea1dff17beb572",
       "id": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",63,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"firefox\"]",
@@ -15828,17 +16057,24 @@
       "currentSpecSha256": "eccf08b46539e45ef939ff692061b4470feb486e42b74d34fb298eaa0ca1ad56",
       "priorCallbackSha256": "393ca3104cae41e959e11821bec741f8b54e0e931c73eca6b891877f51aa59b1",
       "priorSpecSha256": "a9ef032f759bf8aa0ec80f0e9e2f77d90df48bfae69e7f891bc84f7604a39177",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",52,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",\"card setup preserves the exact application until the attorney returns and clears it\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_O_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "1f692a5f9810a17982c47c99913ed2cb131dcbe984eaaf2a88933c0c988fc149",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0
       }
     },
     {
@@ -15853,8 +16089,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 5481,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:53:19.367Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-declared-5",
       "configSha256": "6fa4bc3547f42aa3390e04999780d8a989e86bc936c9fc6c4fea1dff17beb572",
       "id": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",63,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"webkit\"]",
@@ -15871,17 +16121,24 @@
       "currentSpecSha256": "eccf08b46539e45ef939ff692061b4470feb486e42b74d34fb298eaa0ca1ad56",
       "priorCallbackSha256": "393ca3104cae41e959e11821bec741f8b54e0e931c73eca6b891877f51aa59b1",
       "priorSpecSha256": "a9ef032f759bf8aa0ec80f0e9e2f77d90df48bfae69e7f891bc84f7604a39177",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",52,1,\"card setup preserves the exact application until the attorney returns and clears it\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/payment-setup.spec.js\",\"card setup preserves the exact application until the attorney returns and clears it\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_O_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "1f692a5f9810a17982c47c99913ed2cb131dcbe984eaaf2a88933c0c988fc149",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0
       }
     },
     {
@@ -16160,8 +16417,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 90000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 11133,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:52:42.008Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "paralegal-support-declared-2",
       "configSha256": "58a1c3353b98d969c80ab573afafd613a38ab6c43941b8cc5e14896cd1835570",
       "id": "[\"backend/tests/playwright/paralegal-support/v2-global-tools.spec.js\",763,1,\"office polish: Help discloses answers with keyboard control and retains the open answer\",\"webkit\"]",
@@ -16178,17 +16449,24 @@
       "currentSpecSha256": "b356941804eb48edbcba92bf753489eaf679db8a8631ac5c83d979724ef7a5bc",
       "priorCallbackSha256": "6d32763559ac9b7cdd98805e789ea7b5f898fbd4d0258a17ac1c180fbd7d9f09",
       "priorSpecSha256": "b356941804eb48edbcba92bf753489eaf679db8a8631ac5c83d979724ef7a5bc",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/paralegal-support/v2-global-tools.spec.js\",763,1,\"office polish: Help discloses answers with keyboard control and retains the open answer\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/paralegal-support/v2-global-tools.spec.js\",\"office polish: Help discloses answers with keyboard control and retains the open answer\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_O_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "cb3e4985cd4d7cd7bd0dc299dc1078ed067e6ffa315897708389b60c02e9fbf9",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0
       }
     },
     {
@@ -16203,8 +16481,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 90000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 8969,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:52:53.927Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "paralegal-support-declared-2",
       "configSha256": "58a1c3353b98d969c80ab573afafd613a38ab6c43941b8cc5e14896cd1835570",
       "id": "[\"backend/tests/playwright/paralegal-support/v2-help.spec.js\",332,1,\"Help and report states remain readable and operable in supported layouts\",\"webkit\"]",
@@ -16221,17 +16513,24 @@
       "currentSpecSha256": "3b47bd356ab47fcf53fde78342d6ede249a9c429bcac7c8f80e11d36399ff082",
       "priorCallbackSha256": "eb734a3580f28e64b841af76a95eb5c1b43d18a3634ee5dff1b3fc3173d371ea",
       "priorSpecSha256": "3b47bd356ab47fcf53fde78342d6ede249a9c429bcac7c8f80e11d36399ff082",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/paralegal-support/v2-help.spec.js\",332,1,\"Help and report states remain readable and operable in supported layouts\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/paralegal-support/v2-help.spec.js\",\"Help and report states remain readable and operable in supported layouts\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_O_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "945929752f7a23c4daa3800918e5c190df9fd2e7",
+        "runId": 38763930354,
+        "attempt": 1,
+        "sourceArchiveSha256": "cb3e4985cd4d7cd7bd0dc299dc1078ed067e6ffa315897708389b60c02e9fbf9",
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+          "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0
       }
     },
     {
@@ -33166,11 +33465,11 @@
     "Output must be backend/test-results/jest/shards/native-<scope>; no extra filters or deadline/retry flags.",
     "Retain all34 scopes in original order, including zero-selected scopes, so per-scope loopback port/environment indices remain exact; workflow matrix filters selected.length>0."
   ],
-  "executionSelectionCount": 33,
-  "executionSelected": 33,
+  "executionSelectionCount": 6,
+  "executionSelected": 6,
   "cloudEvidence": {
     "maximumNewBytes": 8589934592,
-    "priorRetainedBytes": 1354649122,
+    "priorRetainedBytes": 1390334758,
     "cumulativeMaximumBytes": 9846623859,
     "approvedCumulativeBytes": 10737418240,
     "retentionDays": 1,
@@ -33183,18 +33482,8 @@
       },
       {
         "scope": "attorney-v2-declared-1",
-        "selected": 9,
-        "maxBytes": 3758096384
-      },
-      {
-        "scope": "attorney-v2-declared-5",
-        "selected": 4,
-        "maxBytes": 2147483648
-      },
-      {
-        "scope": "paralegal-support-declared-2",
-        "selected": 2,
-        "maxBytes": 2067791872
+        "selected": 3,
+        "maxBytes": 7973371904
       }
     ],
     "priorArchives": [
@@ -33233,6 +33522,12 @@
         "sha256": "315f49142b1030b97b6d2a6b2ddc705f47e9ef5d48aa2e1830fdce959308c3e8",
         "artifacts": 11,
         "bytes": 97959855
+      },
+      {
+        "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/live-o-run-38763930354-attempt-1/archive/verified-artifact-manifest.json",
+        "sha256": "f229a6c0a2a9f112f572d3b2add985beae76f20f0051beb184b01f7b631251a8",
+        "artifacts": 9,
+        "bytes": 35685636
       }
     ],
     "coverage": "All8 complete current success/failure native artifacts, actual final17 and4 source/security artifacts share8GiB; previous129 archives reserve1256689267B. Prior raw stays local; no historicalZIP upload or538 rerun.",
@@ -33364,8 +33659,8 @@
       {
         "path": ".github/workflows/native-acceptance-return.yml",
         "beforeSha256": null,
-        "afterSha256": "321ebf3a51a3dd356cecfe20b727d8aa966a6e8d2275d5ca4890a278ccae37f4",
-        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+        "afterSha256": "40c42e1c97f3ae755996e4582572a9162a30f3298975cbc50bcf5cb8fabcd5d1",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -33433,6 +33728,17 @@
         "browserAcceptanceRequired": true
       },
       {
+        "path": "backend/routes/auth.js",
+        "beforeSha256": "647bbee6a9e5b758a285357d58d91d78b4d4df56923aae93207b2ea7e3ffd2b7",
+        "afterSha256": "2574a1c6533ad012dc7e7ccba4d4dbdada9d3f192348ac65551f4b3e114e7a32",
+        "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464",
+        "kind": "product-change",
+        "affectedSuites": [
+          "tests/authAdmissionUploadRecovery.test.js",
+          "tests/adminAdmissionsJourney.test.js"
+        ]
+      },
+      {
         "path": "backend/routes/paymentsWebhook.js",
         "beforeSha256": "4b459bb02a81467ca4ab0da18c94f22ccb2a7e3fa09d205b222fb5744e416367",
         "afterSha256": "fa8ef09b933b7ff433e636179d29c77a04d870e8b38eafe9e9d5d8e7c8f8b07c",
@@ -33454,8 +33760,8 @@
       {
         "path": "backend/scripts/check-ci-workflow.js",
         "beforeSha256": "38e3fe13e8932aaee9926d71c012d19e1ea4b1ec546ad7cdec8fa05a5367433a",
-        "afterSha256": "e1b88ba0fcf2d5ca1f24c9505b090dc5c27bf4ac5d7563559d4b7b6f1cd27215",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "59047c8805bbc4b97d268da4ebe829f89d4319f17dc6f705ebd7796bbbe6ab70",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -33572,8 +33878,8 @@
       {
         "path": "backend/scripts/verify-single-file-jest-return.cjs",
         "beforeSha256": null,
-        "afterSha256": "89550fca212b696f35568d7b374831befbfb488c4a57f15f74553fdca58e9c6e",
-        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+        "afterSha256": "09ccb9c26687a813500dbe7d8a6ae3051dfb9445e077c1f1c1e566152f36adc7",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -33618,6 +33924,37 @@
         ],
         "reviewedEvidenceSha256": "a52a9b89a72d837507edf772dffc937c53c383af249221751edaaeeb7e12e4da",
         "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/recovery-l-affected-map/FINAL_L_RECOVERY_AFFECTED_EVIDENCE_MAP.json"
+      },
+      {
+        "path": "backend/services/personalStorageDeletion.js",
+        "beforeSha256": "d160456e6a625071896cd6bfbbf557524350149bd5d3800c18bfe881ca4d921c",
+        "afterSha256": "06892c91d11cb4a942371d3064051e1b9e9c6502128e1f5f79057201ca084181",
+        "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464",
+        "kind": "product-change",
+        "affectedSuites": [
+          "tests/authAdmissionUploadRecovery.test.js",
+          "tests/personalStorageDeletion.test.js"
+        ]
+      },
+      {
+        "path": "backend/tests/adminAdmissionsJourney.test.js",
+        "beforeSha256": "02a4154c135031f787842d89f5e6cf3b56f30f8c0ef75e34c904c8830861462b",
+        "afterSha256": "e35e71df8235baeaf7f4806ffe9611bc6798fd2ad1333d6d744ff4dd58e01106",
+        "reviewedEvidenceSha256": "0c8488006159efe06ff58faacdd62443ccb1a2357208935e199be6943f6b31eb",
+        "kind": "test-fixture",
+        "affectedSuites": [
+          "tests/adminAdmissionsJourney.test.js"
+        ]
+      },
+      {
+        "path": "backend/tests/authAdmissionUploadRecovery.test.js",
+        "beforeSha256": null,
+        "afterSha256": "0c6ae02713e437046db908cf4374f2bbbfb4a7680ca82a4923b7fe3cb2d16829",
+        "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464",
+        "kind": "test-fixture",
+        "affectedSuites": [
+          "tests/authAdmissionUploadRecovery.test.js"
+        ]
       },
       {
         "path": "backend/tests/ciWorkflowContract.test.js",
@@ -33673,8 +34010,8 @@
       {
         "path": "backend/tests/playwright/acceptance/groups.json",
         "beforeSha256": "e17994881651dd7823b1a0ce4fdaad30b9ed7e05df0d06a3b5849ee69bcee20c",
-        "afterSha256": "012c26f5c7bdb78c5a5b5ba769f50851891e030ae271794f6af5d66cab13070e",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "08b50009a5b37b03e50d28639dab87e41fd627dc34fda134e5059e337518940f",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "test-fixture",
         "affectedSuites": []
       },
@@ -33682,7 +34019,7 @@
         "path": "backend/tests/playwright/acceptance/native-continuation-plan.json",
         "beforeSha256": null,
         "afterSha256": "@approved-plan",
-        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "test-fixture",
         "affectedSuites": []
       },
@@ -33768,8 +34105,8 @@
       {
         "path": "backend/tests/playwright/attorney-v2/invitations.spec.js",
         "beforeSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-        "afterSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "test-fixture",
         "affectedSuites": [],
         "backendRuntimeImpact": "none-reviewed",
@@ -34160,8 +34497,8 @@
       {
         "path": "frontend/assets/styles/matter-publication.css",
         "beforeSha256": "4ca25d74a3ff876eeb255e54de0c66e6b5daa4c9beb3602fbce66fd09732e101",
-        "afterSha256": "872591dd87fa47395f65f3600cd941c7014cec367e31d03aef3317d270082637",
-        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+        "afterSha256": "89d6fb558516cab460df3ed806581708c3d1394cb11f1ef8f017f155f64704d6",
+        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
         "kind": "browser-only-product",
         "affectedSuites": [],
         "backendRuntimeImpact": "none-reviewed",
@@ -34235,20 +34572,20 @@
       }
     ],
     "ciAdaptationEvidence": {
-      "rawReportBase64": "eyJudW1GYWlsZWRUZXN0U3VpdGVzIjowLCJudW1GYWlsZWRUZXN0cyI6MCwibnVtUGFzc2VkVGVzdFN1aXRlcyI6MSwibnVtUGFzc2VkVGVzdHMiOjY2LCJudW1QZW5kaW5nVGVzdFN1aXRlcyI6MCwibnVtUGVuZGluZ1Rlc3RzIjowLCJudW1SdW50aW1lRXJyb3JUZXN0U3VpdGVzIjowLCJudW1Ub2RvVGVzdHMiOjAsIm51bVRvdGFsVGVzdFN1aXRlcyI6MSwibnVtVG90YWxUZXN0cyI6NjYsIm9wZW5IYW5kbGVzIjpbXSwic25hcHNob3QiOnsiYWRkZWQiOjAsImRpZFVwZGF0ZSI6ZmFsc2UsImZhaWx1cmUiOmZhbHNlLCJmaWxlc0FkZGVkIjowLCJmaWxlc1JlbW92ZWQiOjAsImZpbGVzUmVtb3ZlZExpc3QiOltdLCJmaWxlc1VubWF0Y2hlZCI6MCwiZmlsZXNVcGRhdGVkIjowLCJtYXRjaGVkIjowLCJ0b3RhbCI6MCwidW5jaGVja2VkIjowLCJ1bmNoZWNrZWRLZXlzQnlGaWxlIjpbXSwidW5tYXRjaGVkIjowLCJ1cGRhdGVkIjowfSwic3RhcnRUaW1lIjoxNzkyMDc1NjA0MTI3LCJzdWNjZXNzIjp0cnVlLCJ0ZXN0UmVzdWx0cyI6W3siYXNzZXJ0aW9uUmVzdWx0cyI6W3siYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6NzgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCB0aGUgY3VycmVudCB3b3JrZmxvdyBlbmZvcmNlcyBldmVyeSBsYXVuY2gtY3JpdGljYWwgcmVwb3NpdG9yeSBhbmQgYnJvd3NlciBnYXRlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNDc4OSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJ0aGUgY3VycmVudCB3b3JrZmxvdyBlbmZvcmNlcyBldmVyeSBsYXVuY2gtY3JpdGljYWwgcmVwb3NpdG9yeSBhbmQgYnJvd3NlciBnYXRlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjo2MywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgb21pc3Npb24gb2YgY29tcGxldGUgc2hhcmVkLW1hdHRlciBicm93c2VyIGFjY2VwdGFuY2UiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA0ODY4LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgb21pc3Npb24gb2YgY29tcGxldGUgc2hhcmVkLW1hdHRlciBicm93c2VyIGFjY2VwdGFuY2UifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjIsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCByZWplY3RzIG9taXNzaW9uIG9mIGNvbXBsZXRlIGFkbWluLXNvbG8gYnJvd3NlciBhY2NlcHRhbmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNDkzMSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG9taXNzaW9uIG9mIGNvbXBsZXRlIGFkbWluLXNvbG8gYnJvd3NlciBhY2NlcHRhbmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjoxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBvbWlzc2lvbiBvZiBjb21wbGV0ZSBhZG1pbi1ldmlkZW5jZSBicm93c2VyIGFjY2VwdGFuY2UiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA0OTMzLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgb21pc3Npb24gb2YgY29tcGxldGUgYWRtaW4tZXZpZGVuY2UgYnJvd3NlciBhY2NlcHRhbmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjoxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBuYXJyb3dpbmcgb3IgcmVwbGFjaW5nIGNyaXRpY2FsIGFjY2VwdGFuY2Ugd2l0aCAtLWdyZXAgc2VsZWN0ZWQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA0OTM0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgbmFycm93aW5nIG9yIHJlcGxhY2luZyBjcml0aWNhbCBhY2NlcHRhbmNlIHdpdGggLS1ncmVwIHNlbGVjdGVkIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjoxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBuYXJyb3dpbmcgb3IgcmVwbGFjaW5nIGNyaXRpY2FsIGFjY2VwdGFuY2Ugd2l0aCAtLXByb2plY3QgY2hyb21pdW0iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA0OTM1LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgbmFycm93aW5nIG9yIHJlcGxhY2luZyBjcml0aWNhbCBhY2NlcHRhbmNlIHdpdGggLS1wcm9qZWN0IGNocm9taXVtIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjoxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBuYXJyb3dpbmcgb3IgcmVwbGFjaW5nIGNyaXRpY2FsIGFjY2VwdGFuY2Ugd2l0aCAtLXJldHJpZXMgMiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjEsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDQ5MzYsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBuYXJyb3dpbmcgb3IgcmVwbGFjaW5nIGNyaXRpY2FsIGFjY2VwdGFuY2Ugd2l0aCAtLXJldHJpZXMgMiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6OTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCByZWplY3RzIHNvdXJjZS1vbmx5IGJyb3dzZXIgZml4dHVyZXMgb3IgYnVpbGRpbmcgYWZ0ZXIgdmVyaWZpY2F0aW9uIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNDkzNywic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIHNvdXJjZS1vbmx5IGJyb3dzZXIgZml4dHVyZXMgb3IgYnVpbGRpbmcgYWZ0ZXIgdmVyaWZpY2F0aW9uIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjo1NiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgY2FuZGlkYXRlIGlkZW50aXR5IGNoZWNrcyBhZnRlciBpbnN0YWxsYXRpb24gb3Igd2l0aG91dCByZXRhaW5lZCBldmlkZW5jZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDUwMzUsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBjYW5kaWRhdGUgaWRlbnRpdHkgY2hlY2tzIGFmdGVyIGluc3RhbGxhdGlvbiBvciB3aXRob3V0IHJldGFpbmVkIGV2aWRlbmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjozMiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgcmVtb3ZhbCBvZiB0aGUgcHJvZHVjdGlvbiBuby10aGVhdGVyIGdhdGUiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoyLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1MDkxLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgcmVtb3ZhbCBvZiB0aGUgcHJvZHVjdGlvbiBuby10aGVhdGVyIGdhdGUifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjQxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBtdXRhYmxlIGFjdGlvbiB0YWdzIGFuZCBjcmVkZW50aWFsLXBlcnNpc3RpbmcgY2hlY2tvdXQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoyLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1MTIzLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgbXV0YWJsZSBhY3Rpb24gdGFncyBhbmQgY3JlZGVudGlhbC1wZXJzaXN0aW5nIGNoZWNrb3V0In0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjo1MCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgZWxldmF0ZWQgZGVwZW5kZW5jeS1yZXZpZXcgcGVybWlzc2lvbnMgYW5kIHB1bGxfcmVxdWVzdF90YXJnZXQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoyLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1MTY0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgZWxldmF0ZWQgZGVwZW5kZW5jeS1yZXZpZXcgcGVybWlzc2lvbnMgYW5kIHB1bGxfcmVxdWVzdF90YXJnZXQifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjcyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBtaXNzaW5nIG9yIHNob3J0LWxpdmVkIHN1Y2Nlc3NmdWwgdGVzdCBldmlkZW5jZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDUyMTQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBtaXNzaW5nIG9yIHNob3J0LWxpdmVkIHN1Y2Nlc3NmdWwgdGVzdCBldmlkZW5jZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiY29tcGxldGUgcGFyYWxsZWwgYnJvd3NlciBnYXRlIGdyYXBoIl0sImR1cmF0aW9uIjo0MSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGggcmVqZWN0cyBvbWlzc2lvbiBvciBkdXBsaWNhdGlvbiBvZiBhbnkgY29tcGxldGUgcm9sZSBncm91cCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDUyODYsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBvbWlzc2lvbiBvciBkdXBsaWNhdGlvbiBvZiBhbnkgY29tcGxldGUgcm9sZSBncm91cCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiY29tcGxldGUgcGFyYWxsZWwgYnJvd3NlciBnYXRlIGdyYXBoIl0sImR1cmF0aW9uIjo4MywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGggcmVqZWN0cyBvbWl0dGVkIHB1YmxpYyBzY29wZSwgbmFycm93ZWQgZ3JvdXAsIG9yIGZhaWwtZmFzdCBjYW5jZWxsYXRpb24iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjozLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1MzI4LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgb21pdHRlZCBwdWJsaWMgc2NvcGUsIG5hcnJvd2VkIGdyb3VwLCBvciBmYWlsLWZhc3QgY2FuY2VsbGF0aW9uIn0seyJhbmNlc3RvclRpdGxlcyI6WyJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGgiXSwiZHVyYXRpb24iOjc4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCByZXF1aXJlcyBmaXhlZCBuYW1lZCBnYXRlIGFuZCBmYWlsLWNsb3NlZCBzdWNjZXNzIGZyb20gY29sbGVjdGlvbiBhbmQgZXZlcnkgbWF0cml4IiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6NCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNTQxMSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZXF1aXJlcyBmaXhlZCBuYW1lZCBnYXRlIGFuZCBmYWlsLWNsb3NlZCBzdWNjZXNzIGZyb20gY29sbGVjdGlvbiBhbmQgZXZlcnkgbWF0cml4In0seyJhbmNlc3RvclRpdGxlcyI6WyJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGgiXSwiZHVyYXRpb24iOjM3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCByZWplY3RzIHN1cHByZXNzZWQgZmFpbHVyZXMgYW5kIGluZmxhdGVkIGpvYiBkZWFkbGluZXMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoyLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1NDg5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgc3VwcHJlc3NlZCBmYWlsdXJlcyBhbmQgaW5mbGF0ZWQgam9iIGRlYWRsaW5lcyJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiY29tcGxldGUgcGFyYWxsZWwgYnJvd3NlciBnYXRlIGdyYXBoIl0sImR1cmF0aW9uIjoyNSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGggcmVxdWlyZXMgZnVsbC1zdWl0ZSBzb3VyY2UgYmluZGluZyBiZWZvcmUgYW5kIGNvdmVyYWdlIHZlcmlmaWNhdGlvbiBhZnRlciBKZXN0IiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MiwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNTUyNiwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZXF1aXJlcyBmdWxsLXN1aXRlIHNvdXJjZSBiaW5kaW5nIGJlZm9yZSBhbmQgY292ZXJhZ2UgdmVyaWZpY2F0aW9uIGFmdGVyIEplc3QifSx7ImFuY2VzdG9yVGl0bGVzIjpbImNvbXBsZXRlIGRpc2pvaW50IGJhY2tlbmQgZ2F0ZSBncmFwaCJdLCJkdXJhdGlvbiI6NDYsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiY29tcGxldGUgZGlzam9pbnQgYmFja2VuZCBnYXRlIGdyYXBoIHJlamVjdHMgYSBtaXNzaW5nIHNoYXJkLCBuYXJyb3dlZCBsYXVuY2hlciwgZmFpbC1mYXN0IG9taXNzaW9ucyBhbmQgc2tpcHBlZCBmaXhlZCBSdW50aW1lIGdhdGUiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1NTUxLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgYSBtaXNzaW5nIHNoYXJkLCBuYXJyb3dlZCBsYXVuY2hlciwgZmFpbC1mYXN0IG9taXNzaW9ucyBhbmQgc2tpcHBlZCBmaXhlZCBSdW50aW1lIGdhdGUifSx7ImFuY2VzdG9yVGl0bGVzIjpbImNvbXBsZXRlIGRpc2pvaW50IGJhY2tlbmQgZ2F0ZSBncmFwaCJdLCJkdXJhdGlvbiI6NTAsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiY29tcGxldGUgZGlzam9pbnQgYmFja2VuZCBnYXRlIGdyYXBoIHJlamVjdHMgcmF3IGFydGlmYWN0IG92ZXJ3cml0ZXMsIHN1cHByZXNzZWQgcmVzdWx0LCB3ZWFrZXIgZml4ZWQgZ2F0ZSBhbmQgaW5mbGF0ZWQgYmFja2VuZCBidWRnZXQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1NTk3LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgcmF3IGFydGlmYWN0IG92ZXJ3cml0ZXMsIHN1cHByZXNzZWQgcmVzdWx0LCB3ZWFrZXIgZml4ZWQgZ2F0ZSBhbmQgaW5mbGF0ZWQgYmFja2VuZCBidWRnZXQifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIl0sImR1cmF0aW9uIjoxNywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCBicm93c2VyIGV4ZWN1dGlvbiBpcyBwcmVzZXJ2ZWQgZm9yIHB1bGxfcmVxdWVzdC91bmRlZmluZWQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1NjQ4LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3IgcHVsbF9yZXF1ZXN0L3VuZGVmaW5lZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2giXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIGJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3IgcHVzaC91bmRlZmluZWQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1NjY1LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3IgcHVzaC91bmRlZmluZWQifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIl0sImR1cmF0aW9uIjoxOCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCBicm93c2VyIGV4ZWN1dGlvbiBpcyBwcmVzZXJ2ZWQgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2Z1bGwiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1NjgzLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2giXSwiZHVyYXRpb24iOjE2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIGJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5kZWZpbmVkIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6NCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNTcwMSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJicm93c2VyIGV4ZWN1dGlvbiBpcyBwcmVzZXJ2ZWQgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2giXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIGJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93biIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDU3MTcsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCJdLCJkdXJhdGlvbiI6MTYsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2ggYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciB3b3JrZmxvd19kaXNwYXRjaC9iYWNrZW5kLXNvdXJjZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDU3MzUsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciB3b3JrZmxvd19kaXNwYXRjaC9iYWNrZW5kLXNvdXJjZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2giXSwiZHVyYXRpb24iOjE3OCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCByZWplY3RzIG9taXNzaW9uLCBicm9hZGVyIHNraXAgZXhwcmVzc2lvbnMsIGRlZmF1bHQgbmFycm93aW5nIGFuZCBleHRyYSBpbnB1dHMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxMywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNTc1MSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG9taXNzaW9uLCBicm9hZGVyIHNraXAgZXhwcmVzc2lvbnMsIGRlZmF1bHQgbmFycm93aW5nIGFuZCBleHRyYSBpbnB1dHMifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjE2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3IgcHVsbF9yZXF1ZXN0L2JhY2tlbmQtc291cmNlL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjozLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA1OTI5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHB1bGxfcmVxdWVzdC9iYWNrZW5kLXNvdXJjZS9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0seyJhbmNlc3RvclRpdGxlcyI6WyJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIl0sImR1cmF0aW9uIjoxNywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIGJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHB1c2gvYmFja2VuZC1zb3VyY2UvYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDU5NDUsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3IgcHVzaC9iYWNrZW5kLXNvdXJjZS9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0seyJhbmNlc3RvclRpdGxlcyI6WyJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIl0sImR1cmF0aW9uIjoxNiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIGJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2Z1bGwvYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDU5NjMsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbC9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0seyJhbmNlc3RvclRpdGxlcyI6WyJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIl0sImR1cmF0aW9uIjoxNywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIGJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3Vua25vd24vYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDU5NzksInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93bi9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0seyJhbmNlc3RvclRpdGxlcyI6WyJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIl0sImR1cmF0aW9uIjoxNywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIGJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlLyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDU5OTYsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvYmFja2VuZC1zb3VyY2UvIn0seyJhbmNlc3RvclRpdGxlcyI6WyJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIl0sImR1cmF0aW9uIjoxOCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIGJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjozLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2MDEzLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSByZXZpZXdlZCBwbGFuIG9ubHkgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjU3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgcmVxdWlyZXMgYSB0cnVseSBvcHRpb25hbCBlbXB0eSBzdHJpbmcgZGVmYXVsdCB3aXRob3V0IGFjY2VwdGluZyBleHRyYSBpbnB1dHMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo1LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2MDMxLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlcXVpcmVzIGEgdHJ1bHkgb3B0aW9uYWwgZW1wdHkgc3RyaW5nIGRlZmF1bHQgd2l0aG91dCBhY2NlcHRpbmcgZXh0cmEgaW5wdXRzIn0seyJhbmNlc3RvclRpdGxlcyI6WyJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIl0sImR1cmF0aW9uIjo5OSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIHJlamVjdHMgdW5ib3VuZCBoYXNoZXMgYW5kIFNIQSBmb3J3YXJkaW5nIG91dHNpZGUgdGhlIGV4cGxpY2l0IGRpc3BhdGNoIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjA4OCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIHVuYm91bmQgaGFzaGVzIGFuZCBTSEEgZm9yd2FyZGluZyBvdXRzaWRlIHRoZSBleHBsaWNpdCBkaXNwYXRjaCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicmV2aWV3ZWQgYmFja2VuZCBjb250aW51YXRpb24gd29ya2Zsb3cgYmluZGluZyJdLCJkdXJhdGlvbiI6MTQ2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgbGltaXRzIHByaW9yIGFydGlmYWN0IGFjY2VzcyB0byBwcmVwYXJhdGlvbiBhbmQgdW5pb24gd2l0aCBleGFjdCByZWFkLW9ubHkgcGVybWlzc2lvbnMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxMywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjE4Nywic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJsaW1pdHMgcHJpb3IgYXJ0aWZhY3QgYWNjZXNzIHRvIHByZXBhcmF0aW9uIGFuZCB1bmlvbiB3aXRoIGV4YWN0IHJlYWQtb25seSBwZXJtaXNzaW9ucyJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjIwLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciBwdWxsX3JlcXVlc3Qvc291cmNlLXJldHVybiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDYzMzMsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHB1bGxfcmVxdWVzdC9zb3VyY2UtcmV0dXJuIn0seyJhbmNlc3RvclRpdGxlcyI6WyJib3VuZGVkIHNvdXJjZS1ib3VuZCBhY2NlcHRhbmNlIHJldHVybiJdLCJkdXJhdGlvbiI6MjAsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHB1c2gvc291cmNlLXJldHVybiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDYzNTMsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHB1c2gvc291cmNlLXJldHVybiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjIzLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC9mdWxsIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjM3Mywic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJwcmVzZXJ2ZXMgZXZlcnkgZGVmYXVsdCBzb3VyY2UgZ2F0ZSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjI3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC9iYWNrZW5kLXNvdXJjZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDYzOTYsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJib3VuZGVkIHNvdXJjZS1ib3VuZCBhY2NlcHRhbmNlIHJldHVybiJdLCJkdXJhdGlvbiI6MjMsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDY0MjMsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjMxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjQ0Niwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJwcmVzZXJ2ZXMgZXZlcnkgZGVmYXVsdCBzb3VyY2UgZ2F0ZSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93biJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjIyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC9zb3VyY2UtcmV0dXJuIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjQ3Nywic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJwcmVzZXJ2ZXMgZXZlcnkgZGVmYXVsdCBzb3VyY2UgZ2F0ZSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvc291cmNlLXJldHVybiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjI0LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIG9taXRzIG9yaWdpbmFsIGJyb3dzZXIgZXhlY3V0aW9uIG9ubHkgZm9yIHRoZSBleGFjdCByZXZpZXdlZCByZXR1cm4gZGlzcGF0Y2giLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo4LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2NDk5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im9taXRzIG9yaWdpbmFsIGJyb3dzZXIgZXhlY3V0aW9uIG9ubHkgZm9yIHRoZSBleGFjdCByZXZpZXdlZCByZXR1cm4gZGlzcGF0Y2gifSx7ImFuY2VzdG9yVGl0bGVzIjpbImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIl0sImR1cmF0aW9uIjoxNjQsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcmVqZWN0cyBtdXRhYmxlL2V4dGVybmFsIGNhbGxzLCBpbmhlcml0ZWQgc2VjcmV0cywgZWxldmF0ZWQgcGVybWlzc2lvbnMgYW5kIHVuYm91bmQgcHJvb2YgaGFzaGVzIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MTQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDY1MjQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBtdXRhYmxlL2V4dGVybmFsIGNhbGxzLCBpbmhlcml0ZWQgc2VjcmV0cywgZWxldmF0ZWQgcGVybWlzc2lvbnMgYW5kIHVuYm91bmQgcHJvb2YgaGFzaGVzIn0seyJhbmNlc3RvclRpdGxlcyI6WyJib3VuZGVkIHNvdXJjZS1ib3VuZCBhY2NlcHRhbmNlIHJldHVybiJdLCJkdXJhdGlvbiI6NzMsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcmVqZWN0cyBicm9hZCBzb3VyY2Ugc2tpcHMgYW5kIHRoZSBtaXNzaW5nLWRpcmVjdG9yeSBmYWlsdXJlIGluIGJvdGggZml4ZWQgYWdncmVnYXRlcyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjUsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDY2ODgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBicm9hZCBzb3VyY2Ugc2tpcHMgYW5kIHRoZSBtaXNzaW5nLWRpcmVjdG9yeSBmYWlsdXJlIGluIGJvdGggZml4ZWQgYWdncmVnYXRlcyJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjE5LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIGJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciBwdWxsX3JlcXVlc3QvcmVjb3ZlcnktcmV0dXJuIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MTQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDY3NjEsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHB1bGxfcmVxdWVzdC9yZWNvdmVyeS1yZXR1cm4ifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjoxOSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3IgcHVzaC9yZWNvdmVyeS1yZXR1cm4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxNCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjc4MSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3IgcHVzaC9yZWNvdmVyeS1yZXR1cm4ifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjoyMSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjE0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2ODAwLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC9mdWxsIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjE0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2ODIxLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmRlZmluZWQifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjoxOCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93biIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjE0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2ODM5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MTQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDY4NTcsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTksImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3NvdXJjZS1yZXR1cm4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxNCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjg3NSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvc291cmNlLXJldHVybiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjI3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIGJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC9yZWNvdmVyeS1yZXR1cm4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxNCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNjg5NCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvcmVjb3ZlcnktcmV0dXJuIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTEyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIG5hbWVkIHZhbGlkYXRlIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PWZhbHNlKSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA2OTIxLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im5hbWVkIHZhbGlkYXRlIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PWZhbHNlKSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjEyOSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBuYW1lZCB2YWxpZGF0ZSBnYXRlIGFjY2VwdHMgb25seSBpdHMgZXhhY3QgY29tcGxldGUgcmVzdWx0IGNsYXNzIChyZWNvdmVyeT10cnVlKSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA3MDMzLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im5hbWVkIHZhbGlkYXRlIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PXRydWUpIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTAxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIG5hbWVkIGJyb3dzZXItY29udHJhY3RzIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PWZhbHNlKSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA3MTYyLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im5hbWVkIGJyb3dzZXItY29udHJhY3RzIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PWZhbHNlKSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjk4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIG5hbWVkIGJyb3dzZXItY29udHJhY3RzIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PXRydWUpIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MjEsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDcyNjQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoibmFtZWQgYnJvd3Nlci1jb250cmFjdHMgZ2F0ZSBhY2NlcHRzIG9ubHkgaXRzIGV4YWN0IGNvbXBsZXRlIHJlc3VsdCBjbGFzcyAocmVjb3Zlcnk9dHJ1ZSkifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjo4MCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyByZWNvdmVyeSB3b3JrZmxvdyBjYW5ub3QgdXNlIGFtYmllbnQgYXV0aG9yaXR5IG11dGFibGUgY29kZSBvciBhbiB1bmJvdW5kIHBsYW4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo2LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA3MzYyLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlY292ZXJ5IHdvcmtmbG93IGNhbm5vdCB1c2UgYW1iaWVudCBhdXRob3JpdHkgbXV0YWJsZSBjb2RlIG9yIGFuIHVuYm91bmQgcGxhbiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjExMiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBib3RoIG9yaWdpbmFsIG5hbWVkIGFnZ3JlZ2F0ZXMgcmVqZWN0IHByb29mIGRlcGVuZGVuY3kgZW52IHNjcmlwdCBvciByZXN1bHQgc3VwcHJlc3Npb24gZHJpZnQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo4LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA3NDQyLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJvdGggb3JpZ2luYWwgbmFtZWQgYWdncmVnYXRlcyByZWplY3QgcHJvb2YgZGVwZW5kZW5jeSBlbnYgc2NyaXB0IG9yIHJlc3VsdCBzdXBwcmVzc2lvbiBkcmlmdCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicmVjb3ZlcnkgYXJ0aWZhY3RzIHNoYXJlIHRoZSBhcHByb3ZlZCBuYXRpdmUgcG9vbCBiZWZvcmUgdXBsb2FkIl0sImR1cmF0aW9uIjoyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJlY292ZXJ5IGFydGlmYWN0cyBzaGFyZSB0aGUgYXBwcm92ZWQgbmF0aXZlIHBvb2wgYmVmb3JlIHVwbG9hZCBib3RoIGV4YWN0IHJlY292ZXJ5IGxpbWl0cyBhY2NlcHQgY29tcGxldGUgZXZpZGVuY2UgYW5kIG9yZGluYXJ5IGV2ZW50cyByZXRhaW4gdGhlaXIgYWxsb2NhdGlvbiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjgsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDc1NTQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYm90aCBleGFjdCByZWNvdmVyeSBsaW1pdHMgYWNjZXB0IGNvbXBsZXRlIGV2aWRlbmNlIGFuZCBvcmRpbmFyeSBldmVudHMgcmV0YWluIHRoZWlyIGFsbG9jYXRpb24ifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJlY292ZXJ5IGFydGlmYWN0cyBzaGFyZSB0aGUgYXBwcm92ZWQgbmF0aXZlIHBvb2wgYmVmb3JlIHVwbG9hZCJdLCJkdXJhdGlvbiI6NjIsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicmVjb3ZlcnkgYXJ0aWZhY3RzIHNoYXJlIHRoZSBhcHByb3ZlZCBuYXRpdmUgcG9vbCBiZWZvcmUgdXBsb2FkIG92ZXItYnVkZ2V0IHN0YWxlIGluY29tcGxldGUgb3IgdW5ib3VuZCBwcm9vZiBhbmQgYSByZW1vdmVkIHByZXVwbG9hZCBndWFyZCBmYWlsIGNsb3NlZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA3NTU2LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im92ZXItYnVkZ2V0IHN0YWxlIGluY29tcGxldGUgb3IgdW5ib3VuZCBwcm9vZiBhbmQgYSByZW1vdmVkIHByZXVwbG9hZCBndWFyZCBmYWlsIGNsb3NlZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyJdLCJkdXJhdGlvbiI6NiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleGFjdCByZXZpZXdlZCBjdXJyZW50IGJyb3dzZXIgZml4dHVyZSBhbWVuZG1lbnRzIGFjY2VwdHMgb25seSB0aGUgY3VycmVudCBzb3VyY2UtcGlubmVkIHJldmlld2VkIGFtZW5kbWVudHMgYW5kIHRoZSBleGFjdCBzaXggYWRkaXRpb25hbCByZWdyZXNzaW9uIGlkZW50aXRpZXMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo1LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDc1NjA3NjE4LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImFjY2VwdHMgb25seSB0aGUgY3VycmVudCBzb3VyY2UtcGlubmVkIHJldmlld2VkIGFtZW5kbWVudHMgYW5kIHRoZSBleGFjdCBzaXggYWRkaXRpb25hbCByZWdyZXNzaW9uIGlkZW50aXRpZXMifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4YWN0IHJldmlld2VkIGN1cnJlbnQgYnJvd3NlciBmaXh0dXJlIGFtZW5kbWVudHMiXSwiZHVyYXRpb24iOjQsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyBwZW5kaW5nIHNvdXJjZSwgdW5yZXZpZXdlZCBzb3VyY2UgcGlucywgbWlzc2luZyBoYW5kb2ZmcyBhbmQgdmFndWUgYXBwbGljYWJpbGl0eSBjYW5ub3QgYXV0aG9yaXplIGNoYW5nZWQgYXNzZXJ0aW9ucyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjYsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDc2MjQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicGVuZGluZyBzb3VyY2UsIHVucmV2aWV3ZWQgc291cmNlIHBpbnMsIG1pc3NpbmcgaGFuZG9mZnMgYW5kIHZhZ3VlIGFwcGxpY2FiaWxpdHkgY2Fubm90IGF1dGhvcml6ZSBjaGFuZ2VkIGFzc2VydGlvbnMifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4YWN0IHJldmlld2VkIGN1cnJlbnQgYnJvd3NlciBmaXh0dXJlIGFtZW5kbWVudHMiXSwiZHVyYXRpb24iOjM3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4YWN0IHJldmlld2VkIGN1cnJlbnQgYnJvd3NlciBmaXh0dXJlIGFtZW5kbWVudHMgYSBib29sZWFuLW9ubHkgY2hhbmdlZC1ib2R5IGJ5cGFzcyBvciBibGFua2V0IHVuY2hhbmdlZC1ib2R5IGNsYWltIGZhaWxzIGNsb3NlZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjgsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwNzU2MDc2MjgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYSBib29sZWFuLW9ubHkgY2hhbmdlZC1ib2R5IGJ5cGFzcyBvciBibGFua2V0IHVuY2hhbmdlZC1ib2R5IGNsYWltIGZhaWxzIGNsb3NlZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyJdLCJkdXJhdGlvbiI6MzksImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyBldmVyeSBoaXN0b3JpY2FsIGNhdGFsb2cgcmVxdWlyZW1lbnQgb3V0c2lkZSB0aGUgZmluaXRlIHJldmlld2VkIGFtZW5kbWVudCBpcyBpbW11dGFibGUiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxMSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA3NTYwNzY2NSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJldmVyeSBoaXN0b3JpY2FsIGNhdGFsb2cgcmVxdWlyZW1lbnQgb3V0c2lkZSB0aGUgZmluaXRlIHJldmlld2VkIGFtZW5kbWVudCBpcyBpbW11dGFibGUifV0sImVuZFRpbWUiOjE3OTIwNzU2MDc3MDYsIm1lc3NhZ2UiOiIiLCJuYW1lIjoiL3ByaXZhdGUvdG1wL2xwYy1leGVjdXRpb24tcnVudGltZS1uLTIwMjYxMDE1L2JhY2tlbmQvdGVzdHMvY2lXb3JrZmxvd0NvbnRyYWN0LnRlc3QuanMiLCJzdGFydFRpbWUiOjE3OTIwNzU2MDQxOTQsInN0YXR1cyI6InBhc3NlZCIsInN1bW1hcnkiOiIifV0sIndhc0ludGVycnVwdGVkIjpmYWxzZX0K",
-      "rawReportSha256": "73d45c78e021762d1decc5529e28f80c2e67e01c38d9660d88bf54bd6d8c9e4a",
+      "rawReportBase64": "eyJudW1GYWlsZWRUZXN0U3VpdGVzIjowLCJudW1GYWlsZWRUZXN0cyI6MCwibnVtUGFzc2VkVGVzdFN1aXRlcyI6MSwibnVtUGFzc2VkVGVzdHMiOjY2LCJudW1QZW5kaW5nVGVzdFN1aXRlcyI6MCwibnVtUGVuZGluZ1Rlc3RzIjowLCJudW1SdW50aW1lRXJyb3JUZXN0U3VpdGVzIjowLCJudW1Ub2RvVGVzdHMiOjAsIm51bVRvdGFsVGVzdFN1aXRlcyI6MSwibnVtVG90YWxUZXN0cyI6NjYsIm9wZW5IYW5kbGVzIjpbXSwic25hcHNob3QiOnsiYWRkZWQiOjAsImRpZFVwZGF0ZSI6ZmFsc2UsImZhaWx1cmUiOmZhbHNlLCJmaWxlc0FkZGVkIjowLCJmaWxlc1JlbW92ZWQiOjAsImZpbGVzUmVtb3ZlZExpc3QiOltdLCJmaWxlc1VubWF0Y2hlZCI6MCwiZmlsZXNVcGRhdGVkIjowLCJtYXRjaGVkIjowLCJ0b3RhbCI6MCwidW5jaGVja2VkIjowLCJ1bmNoZWNrZWRLZXlzQnlGaWxlIjpbXSwidW5tYXRjaGVkIjowLCJ1cGRhdGVkIjowfSwic3RhcnRUaW1lIjoxNzkyMDgwNDI1MDI5LCJzdWNjZXNzIjp0cnVlLCJ0ZXN0UmVzdWx0cyI6W3siYXNzZXJ0aW9uUmVzdWx0cyI6W3siYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6MTA4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgdGhlIGN1cnJlbnQgd29ya2Zsb3cgZW5mb3JjZXMgZXZlcnkgbGF1bmNoLWNyaXRpY2FsIHJlcG9zaXRvcnkgYW5kIGJyb3dzZXIgZ2F0ZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjEsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjU3NDcsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoidGhlIGN1cnJlbnQgd29ya2Zsb3cgZW5mb3JjZXMgZXZlcnkgbGF1bmNoLWNyaXRpY2FsIHJlcG9zaXRvcnkgYW5kIGJyb3dzZXIgZ2F0ZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6NDIsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCByZWplY3RzIG9taXNzaW9uIG9mIGNvbXBsZXRlIHNoYXJlZC1tYXR0ZXIgYnJvd3NlciBhY2NlcHRhbmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNTg1Niwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG9taXNzaW9uIG9mIGNvbXBsZXRlIHNoYXJlZC1tYXR0ZXIgYnJvd3NlciBhY2NlcHRhbmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0Il0sImR1cmF0aW9uIjoyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBvbWlzc2lvbiBvZiBjb21wbGV0ZSBhZG1pbi1zb2xvIGJyb3dzZXIgYWNjZXB0YW5jZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjEsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjU4OTgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBvbWlzc2lvbiBvZiBjb21wbGV0ZSBhZG1pbi1zb2xvIGJyb3dzZXIgYWNjZXB0YW5jZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6MSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgb21pc3Npb24gb2YgY29tcGxldGUgYWRtaW4tZXZpZGVuY2UgYnJvd3NlciBhY2NlcHRhbmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNTkwMCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG9taXNzaW9uIG9mIGNvbXBsZXRlIGFkbWluLWV2aWRlbmNlIGJyb3dzZXIgYWNjZXB0YW5jZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6MSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgbmFycm93aW5nIG9yIHJlcGxhY2luZyBjcml0aWNhbCBhY2NlcHRhbmNlIHdpdGggLS1ncmVwIHNlbGVjdGVkIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNTkwMSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG5hcnJvd2luZyBvciByZXBsYWNpbmcgY3JpdGljYWwgYWNjZXB0YW5jZSB3aXRoIC0tZ3JlcCBzZWxlY3RlZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6MSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgbmFycm93aW5nIG9yIHJlcGxhY2luZyBjcml0aWNhbCBhY2NlcHRhbmNlIHdpdGggLS1wcm9qZWN0IGNocm9taXVtIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNTkwMywic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG5hcnJvd2luZyBvciByZXBsYWNpbmcgY3JpdGljYWwgYWNjZXB0YW5jZSB3aXRoIC0tcHJvamVjdCBjaHJvbWl1bSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6MiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgbmFycm93aW5nIG9yIHJlcGxhY2luZyBjcml0aWNhbCBhY2NlcHRhbmNlIHdpdGggLS1yZXRyaWVzIDIiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI1OTA0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgbmFycm93aW5nIG9yIHJlcGxhY2luZyBjcml0aWNhbCBhY2NlcHRhbmNlIHdpdGggLS1yZXRyaWVzIDIifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjExNiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJxdWFsaXR5IHdvcmtmbG93IGNvbnRyYWN0IHJlamVjdHMgc291cmNlLW9ubHkgYnJvd3NlciBmaXh0dXJlcyBvciBidWlsZGluZyBhZnRlciB2ZXJpZmljYXRpb24iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjozLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI1OTA2LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgc291cmNlLW9ubHkgYnJvd3NlciBmaXh0dXJlcyBvciBidWlsZGluZyBhZnRlciB2ZXJpZmljYXRpb24ifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjMzLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBjYW5kaWRhdGUgaWRlbnRpdHkgY2hlY2tzIGFmdGVyIGluc3RhbGxhdGlvbiBvciB3aXRob3V0IHJldGFpbmVkIGV2aWRlbmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MiwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjAyMiwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIGNhbmRpZGF0ZSBpZGVudGl0eSBjaGVja3MgYWZ0ZXIgaW5zdGFsbGF0aW9uIG9yIHdpdGhvdXQgcmV0YWluZWQgZXZpZGVuY2UifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjE2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyByZW1vdmFsIG9mIHRoZSBwcm9kdWN0aW9uIG5vLXRoZWF0ZXIgZ2F0ZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjYwNTUsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyByZW1vdmFsIG9mIHRoZSBwcm9kdWN0aW9uIG5vLXRoZWF0ZXIgZ2F0ZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6MjksImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCByZWplY3RzIG11dGFibGUgYWN0aW9uIHRhZ3MgYW5kIGNyZWRlbnRpYWwtcGVyc2lzdGluZyBjaGVja291dCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjYwNzEsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBtdXRhYmxlIGFjdGlvbiB0YWdzIGFuZCBjcmVkZW50aWFsLXBlcnNpc3RpbmcgY2hlY2tvdXQifSx7ImFuY2VzdG9yVGl0bGVzIjpbInF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QiXSwiZHVyYXRpb24iOjMyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InF1YWxpdHkgd29ya2Zsb3cgY29udHJhY3QgcmVqZWN0cyBlbGV2YXRlZCBkZXBlbmRlbmN5LXJldmlldyBwZXJtaXNzaW9ucyBhbmQgcHVsbF9yZXF1ZXN0X3RhcmdldCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjYxMDAsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBlbGV2YXRlZCBkZXBlbmRlbmN5LXJldmlldyBwZXJtaXNzaW9ucyBhbmQgcHVsbF9yZXF1ZXN0X3RhcmdldCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCJdLCJkdXJhdGlvbiI6NDgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicXVhbGl0eSB3b3JrZmxvdyBjb250cmFjdCByZWplY3RzIG1pc3Npbmcgb3Igc2hvcnQtbGl2ZWQgc3VjY2Vzc2Z1bCB0ZXN0IGV2aWRlbmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjEzMiwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG1pc3Npbmcgb3Igc2hvcnQtbGl2ZWQgc3VjY2Vzc2Z1bCB0ZXN0IGV2aWRlbmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGgiXSwiZHVyYXRpb24iOjM2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCByZWplY3RzIG9taXNzaW9uIG9yIGR1cGxpY2F0aW9uIG9mIGFueSBjb21wbGV0ZSByb2xlIGdyb3VwIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MiwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjE4MCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIG9taXNzaW9uIG9yIGR1cGxpY2F0aW9uIG9mIGFueSBjb21wbGV0ZSByb2xlIGdyb3VwIn0seyJhbmNlc3RvclRpdGxlcyI6WyJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGgiXSwiZHVyYXRpb24iOjQ4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCByZWplY3RzIG9taXR0ZWQgcHVibGljIHNjb3BlLCBuYXJyb3dlZCBncm91cCwgb3IgZmFpbC1mYXN0IGNhbmNlbGxhdGlvbiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjYyMTYsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBvbWl0dGVkIHB1YmxpYyBzY29wZSwgbmFycm93ZWQgZ3JvdXAsIG9yIGZhaWwtZmFzdCBjYW5jZWxsYXRpb24ifSx7ImFuY2VzdG9yVGl0bGVzIjpbImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCJdLCJkdXJhdGlvbiI6NjEsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiY29tcGxldGUgcGFyYWxsZWwgYnJvd3NlciBnYXRlIGdyYXBoIHJlcXVpcmVzIGZpeGVkIG5hbWVkIGdhdGUgYW5kIGZhaWwtY2xvc2VkIHN1Y2Nlc3MgZnJvbSBjb2xsZWN0aW9uIGFuZCBldmVyeSBtYXRyaXgiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI2MjY0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlcXVpcmVzIGZpeGVkIG5hbWVkIGdhdGUgYW5kIGZhaWwtY2xvc2VkIHN1Y2Nlc3MgZnJvbSBjb2xsZWN0aW9uIGFuZCBldmVyeSBtYXRyaXgifSx7ImFuY2VzdG9yVGl0bGVzIjpbImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCJdLCJkdXJhdGlvbiI6MzEsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiY29tcGxldGUgcGFyYWxsZWwgYnJvd3NlciBnYXRlIGdyYXBoIHJlamVjdHMgc3VwcHJlc3NlZCBmYWlsdXJlcyBhbmQgaW5mbGF0ZWQgam9iIGRlYWRsaW5lcyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjYzMjUsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBzdXBwcmVzc2VkIGZhaWx1cmVzIGFuZCBpbmZsYXRlZCBqb2IgZGVhZGxpbmVzIn0seyJhbmNlc3RvclRpdGxlcyI6WyJjb21wbGV0ZSBwYXJhbGxlbCBicm93c2VyIGdhdGUgZ3JhcGgiXSwiZHVyYXRpb24iOjIzLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImNvbXBsZXRlIHBhcmFsbGVsIGJyb3dzZXIgZ2F0ZSBncmFwaCByZXF1aXJlcyBmdWxsLXN1aXRlIHNvdXJjZSBiaW5kaW5nIGJlZm9yZSBhbmQgY292ZXJhZ2UgdmVyaWZpY2F0aW9uIGFmdGVyIEplc3QiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoyLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI2MzU2LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlcXVpcmVzIGZ1bGwtc3VpdGUgc291cmNlIGJpbmRpbmcgYmVmb3JlIGFuZCBjb3ZlcmFnZSB2ZXJpZmljYXRpb24gYWZ0ZXIgSmVzdCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiY29tcGxldGUgZGlzam9pbnQgYmFja2VuZCBnYXRlIGdyYXBoIl0sImR1cmF0aW9uIjo0NSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJjb21wbGV0ZSBkaXNqb2ludCBiYWNrZW5kIGdhdGUgZ3JhcGggcmVqZWN0cyBhIG1pc3Npbmcgc2hhcmQsIG5hcnJvd2VkIGxhdW5jaGVyLCBmYWlsLWZhc3Qgb21pc3Npb25zIGFuZCBza2lwcGVkIGZpeGVkIFJ1bnRpbWUgZ2F0ZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjYzNzksInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBhIG1pc3Npbmcgc2hhcmQsIG5hcnJvd2VkIGxhdW5jaGVyLCBmYWlsLWZhc3Qgb21pc3Npb25zIGFuZCBza2lwcGVkIGZpeGVkIFJ1bnRpbWUgZ2F0ZSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiY29tcGxldGUgZGlzam9pbnQgYmFja2VuZCBnYXRlIGdyYXBoIl0sImR1cmF0aW9uIjo0NywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJjb21wbGV0ZSBkaXNqb2ludCBiYWNrZW5kIGdhdGUgZ3JhcGggcmVqZWN0cyByYXcgYXJ0aWZhY3Qgb3ZlcndyaXRlcywgc3VwcHJlc3NlZCByZXN1bHQsIHdlYWtlciBmaXhlZCBnYXRlIGFuZCBpbmZsYXRlZCBiYWNrZW5kIGJ1ZGdldCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY0MjQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyByYXcgYXJ0aWZhY3Qgb3ZlcndyaXRlcywgc3VwcHJlc3NlZCByZXN1bHQsIHdlYWtlciBmaXhlZCBnYXRlIGFuZCBpbmZsYXRlZCBiYWNrZW5kIGJ1ZGdldCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2giXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIGJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3IgcHVsbF9yZXF1ZXN0L3VuZGVmaW5lZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY0NzEsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciBwdWxsX3JlcXVlc3QvdW5kZWZpbmVkIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCJdLCJkdXJhdGlvbiI6MTksImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2ggYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciBwdXNoL3VuZGVmaW5lZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY0ODksInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciBwdXNoL3VuZGVmaW5lZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2giXSwiZHVyYXRpb24iOjE3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIGJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY1MDgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciB3b3JrZmxvd19kaXNwYXRjaC9mdWxsIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCJdLCJkdXJhdGlvbiI6MTcsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2ggYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmRlZmluZWQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI2NTI1LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJyb3dzZXIgZXhlY3V0aW9uIGlzIHByZXNlcnZlZCBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5kZWZpbmVkIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCJdLCJkdXJhdGlvbiI6MTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc291cmNlL2JhY2tlbmQgZXZpZGVuY2UgZGlzcGF0Y2ggYnJvd3NlciBleGVjdXRpb24gaXMgcHJlc2VydmVkIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6NCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjU0Miwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJicm93c2VyIGV4ZWN1dGlvbiBpcyBwcmVzZXJ2ZWQgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3Vua25vd24ifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIl0sImR1cmF0aW9uIjoxNywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCBicm93c2VyIGV4ZWN1dGlvbiBpcyBwcmVzZXJ2ZWQgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6NCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjU2MCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJicm93c2VyIGV4ZWN1dGlvbiBpcyBwcmVzZXJ2ZWQgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzb3VyY2UvYmFja2VuZCBldmlkZW5jZSBkaXNwYXRjaCJdLCJkdXJhdGlvbiI6MTgzLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNvdXJjZS9iYWNrZW5kIGV2aWRlbmNlIGRpc3BhdGNoIHJlamVjdHMgb21pc3Npb24sIGJyb2FkZXIgc2tpcCBleHByZXNzaW9ucywgZGVmYXVsdCBuYXJyb3dpbmcgYW5kIGV4dHJhIGlucHV0cyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjEzLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI2NTc3LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlamVjdHMgb21pc3Npb24sIGJyb2FkZXIgc2tpcCBleHByZXNzaW9ucywgZGVmYXVsdCBuYXJyb3dpbmcgYW5kIGV4dHJhIGlucHV0cyJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicmV2aWV3ZWQgYmFja2VuZCBjb250aW51YXRpb24gd29ya2Zsb3cgYmluZGluZyJdLCJkdXJhdGlvbiI6MTYsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicmV2aWV3ZWQgYmFja2VuZCBjb250aW51YXRpb24gd29ya2Zsb3cgYmluZGluZyBiaW5kcyB0aGUgcmV2aWV3ZWQgcGxhbiBvbmx5IGZvciBwdWxsX3JlcXVlc3QvYmFja2VuZC1zb3VyY2UvYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY3NjAsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3IgcHVsbF9yZXF1ZXN0L2JhY2tlbmQtc291cmNlL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3IgcHVzaC9iYWNrZW5kLXNvdXJjZS9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjc3Nywic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgcmV2aWV3ZWQgcGxhbiBvbmx5IGZvciBwdXNoL2JhY2tlbmQtc291cmNlL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjE5LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbC9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjc5NSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgcmV2aWV3ZWQgcGxhbiBvbmx5IGZvciB3b3JrZmxvd19kaXNwYXRjaC9mdWxsL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjIxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93bi9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjgxNCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgcmV2aWV3ZWQgcGxhbiBvbmx5IGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duL2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjE3LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvYmFja2VuZC1zb3VyY2UvIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjgzNSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgcmV2aWV3ZWQgcGxhbiBvbmx5IGZvciB3b3JrZmxvd19kaXNwYXRjaC9iYWNrZW5kLXNvdXJjZS8ifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjE2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvYmFja2VuZC1zb3VyY2UvYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY4NTMsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIHJldmlld2VkIHBsYW4gb25seSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvYmFja2VuZC1zb3VyY2UvYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicmV2aWV3ZWQgYmFja2VuZCBjb250aW51YXRpb24gd29ya2Zsb3cgYmluZGluZyJdLCJkdXJhdGlvbiI6NTcsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicmV2aWV3ZWQgYmFja2VuZCBjb250aW51YXRpb24gd29ya2Zsb3cgYmluZGluZyByZXF1aXJlcyBhIHRydWx5IG9wdGlvbmFsIGVtcHR5IHN0cmluZyBkZWZhdWx0IHdpdGhvdXQgYWNjZXB0aW5nIGV4dHJhIGlucHV0cyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjUsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjY4NjksInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVxdWlyZXMgYSB0cnVseSBvcHRpb25hbCBlbXB0eSBzdHJpbmcgZGVmYXVsdCB3aXRob3V0IGFjY2VwdGluZyBleHRyYSBpbnB1dHMifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmciXSwiZHVyYXRpb24iOjEwMSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJyZXZpZXdlZCBiYWNrZW5kIGNvbnRpbnVhdGlvbiB3b3JrZmxvdyBiaW5kaW5nIHJlamVjdHMgdW5ib3VuZCBoYXNoZXMgYW5kIFNIQSBmb3J3YXJkaW5nIG91dHNpZGUgdGhlIGV4cGxpY2l0IGRpc3BhdGNoIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNjkyNiwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJyZWplY3RzIHVuYm91bmQgaGFzaGVzIGFuZCBTSEEgZm9yd2FyZGluZyBvdXRzaWRlIHRoZSBleHBsaWNpdCBkaXNwYXRjaCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicmV2aWV3ZWQgYmFja2VuZCBjb250aW51YXRpb24gd29ya2Zsb3cgYmluZGluZyJdLCJkdXJhdGlvbiI6MTQxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJldmlld2VkIGJhY2tlbmQgY29udGludWF0aW9uIHdvcmtmbG93IGJpbmRpbmcgbGltaXRzIHByaW9yIGFydGlmYWN0IGFjY2VzcyB0byBwcmVwYXJhdGlvbiBhbmQgdW5pb24gd2l0aCBleGFjdCByZWFkLW9ubHkgcGVybWlzc2lvbnMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxMywicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzAyOCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJsaW1pdHMgcHJpb3IgYXJ0aWZhY3QgYWNjZXNzIHRvIHByZXBhcmF0aW9uIGFuZCB1bmlvbiB3aXRoIGV4YWN0IHJlYWQtb25seSBwZXJtaXNzaW9ucyJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciBwdWxsX3JlcXVlc3Qvc291cmNlLXJldHVybiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjcxNjksInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHB1bGxfcmVxdWVzdC9zb3VyY2UtcmV0dXJuIn0seyJhbmNlc3RvclRpdGxlcyI6WyJib3VuZGVkIHNvdXJjZS1ib3VuZCBhY2NlcHRhbmNlIHJldHVybiJdLCJkdXJhdGlvbiI6MTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHB1c2gvc291cmNlLXJldHVybiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjcxODgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHB1c2gvc291cmNlLXJldHVybiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC9mdWxsIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzIwNiwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJwcmVzZXJ2ZXMgZXZlcnkgZGVmYXVsdCBzb3VyY2UgZ2F0ZSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjE2LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC9iYWNrZW5kLXNvdXJjZSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjcyMjQsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJib3VuZGVkIHNvdXJjZS1ib3VuZCBhY2NlcHRhbmNlIHJldHVybiJdLCJkdXJhdGlvbiI6MTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjksInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjcyNDAsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicHJlc2VydmVzIGV2ZXJ5IGRlZmF1bHQgc291cmNlIGdhdGUgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjgyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzI1OCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJwcmVzZXJ2ZXMgZXZlcnkgZGVmYXVsdCBzb3VyY2UgZ2F0ZSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93biJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjQzLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIHByZXNlcnZlcyBldmVyeSBkZWZhdWx0IHNvdXJjZSBnYXRlIGZvciB3b3JrZmxvd19kaXNwYXRjaC9zb3VyY2UtcmV0dXJuIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6OSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzM0MCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJwcmVzZXJ2ZXMgZXZlcnkgZGVmYXVsdCBzb3VyY2UgZ2F0ZSBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvc291cmNlLXJldHVybiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4iXSwiZHVyYXRpb24iOjE4LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIG9taXRzIG9yaWdpbmFsIGJyb3dzZXIgZXhlY3V0aW9uIG9ubHkgZm9yIHRoZSBleGFjdCByZXZpZXdlZCByZXR1cm4gZGlzcGF0Y2giLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo4LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI3Mzg0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im9taXRzIG9yaWdpbmFsIGJyb3dzZXIgZXhlY3V0aW9uIG9ubHkgZm9yIHRoZSBleGFjdCByZXZpZXdlZCByZXR1cm4gZGlzcGF0Y2gifSx7ImFuY2VzdG9yVGl0bGVzIjpbImJvdW5kZWQgc291cmNlLWJvdW5kIGFjY2VwdGFuY2UgcmV0dXJuIl0sImR1cmF0aW9uIjoyNjEsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcmVqZWN0cyBtdXRhYmxlL2V4dGVybmFsIGNhbGxzLCBpbmhlcml0ZWQgc2VjcmV0cywgZWxldmF0ZWQgcGVybWlzc2lvbnMgYW5kIHVuYm91bmQgcHJvb2YgaGFzaGVzIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MTQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjc0MDIsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBtdXRhYmxlL2V4dGVybmFsIGNhbGxzLCBpbmhlcml0ZWQgc2VjcmV0cywgZWxldmF0ZWQgcGVybWlzc2lvbnMgYW5kIHVuYm91bmQgcHJvb2YgaGFzaGVzIn0seyJhbmNlc3RvclRpdGxlcyI6WyJib3VuZGVkIHNvdXJjZS1ib3VuZCBhY2NlcHRhbmNlIHJldHVybiJdLCJkdXJhdGlvbiI6ODQsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiYm91bmRlZCBzb3VyY2UtYm91bmQgYWNjZXB0YW5jZSByZXR1cm4gcmVqZWN0cyBicm9hZCBzb3VyY2Ugc2tpcHMgYW5kIHRoZSBtaXNzaW5nLWRpcmVjdG9yeSBmYWlsdXJlIGluIGJvdGggZml4ZWQgYWdncmVnYXRlcyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjUsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjc2NjMsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicmVqZWN0cyBicm9hZCBzb3VyY2Ugc2tpcHMgYW5kIHRoZSBtaXNzaW5nLWRpcmVjdG9yeSBmYWlsdXJlIGluIGJvdGggZml4ZWQgYWdncmVnYXRlcyJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjIxLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIGJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciBwdWxsX3JlcXVlc3QvcmVjb3ZlcnktcmV0dXJuIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MTQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjc3NDcsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHB1bGxfcmVxdWVzdC9yZWNvdmVyeS1yZXR1cm4ifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjoyMCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3IgcHVzaC9yZWNvdmVyeS1yZXR1cm4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxNCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzc2OCwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3IgcHVzaC9yZWNvdmVyeS1yZXR1cm4ifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjoyMSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvZnVsbCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjE0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI3Nzg4LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC9mdWxsIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTksImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3VuZGVmaW5lZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjE0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI3ODA5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmRlZmluZWQifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjoxOSwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvdW5rbm93biIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjE0LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI3ODI5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC91bmtub3duIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MTgsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MTQsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjc4NDgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL2JhY2tlbmQtc291cmNlIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6MjIsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgYmluZHMgdGhlIGV4YWN0IHNvdXJjZSBzZWN1cml0eSBhbmQgZXhlY3V0aW9uIGpvYnMgZm9yIHdvcmtmbG93X2Rpc3BhdGNoL3NvdXJjZS1yZXR1cm4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxNCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzg2Niwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvc291cmNlLXJldHVybiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjE5LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIGJpbmRzIHRoZSBleGFjdCBzb3VyY2Ugc2VjdXJpdHkgYW5kIGV4ZWN1dGlvbiBqb2JzIGZvciB3b3JrZmxvd19kaXNwYXRjaC9yZWNvdmVyeS1yZXR1cm4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxNCwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzg4OSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJiaW5kcyB0aGUgZXhhY3Qgc291cmNlIHNlY3VyaXR5IGFuZCBleGVjdXRpb24gam9icyBmb3Igd29ya2Zsb3dfZGlzcGF0Y2gvcmVjb3ZlcnktcmV0dXJuIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6OTEsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgbmFtZWQgdmFsaWRhdGUgZ2F0ZSBhY2NlcHRzIG9ubHkgaXRzIGV4YWN0IGNvbXBsZXRlIHJlc3VsdCBjbGFzcyAocmVjb3Zlcnk9ZmFsc2UpIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MjEsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjc5MDgsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoibmFtZWQgdmFsaWRhdGUgZ2F0ZSBhY2NlcHRzIG9ubHkgaXRzIGV4YWN0IGNvbXBsZXRlIHJlc3VsdCBjbGFzcyAocmVjb3Zlcnk9ZmFsc2UpIn0seyJhbmNlc3RvclRpdGxlcyI6WyJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyJdLCJkdXJhdGlvbiI6ODUsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMgbmFtZWQgdmFsaWRhdGUgZ2F0ZSBhY2NlcHRzIG9ubHkgaXRzIGV4YWN0IGNvbXBsZXRlIHJlc3VsdCBjbGFzcyAocmVjb3Zlcnk9dHJ1ZSkiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoyMSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyNzk5OSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJuYW1lZCB2YWxpZGF0ZSBnYXRlIGFjY2VwdHMgb25seSBpdHMgZXhhY3QgY29tcGxldGUgcmVzdWx0IGNsYXNzIChyZWNvdmVyeT10cnVlKSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjgzLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIG5hbWVkIGJyb3dzZXItY29udHJhY3RzIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PWZhbHNlKSIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjIxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI4MDg0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im5hbWVkIGJyb3dzZXItY29udHJhY3RzIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PWZhbHNlKSJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjc1LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIG5hbWVkIGJyb3dzZXItY29udHJhY3RzIGdhdGUgYWNjZXB0cyBvbmx5IGl0cyBleGFjdCBjb21wbGV0ZSByZXN1bHQgY2xhc3MgKHJlY292ZXJ5PXRydWUpIiwiaW52b2NhdGlvbnMiOjEsImxvY2F0aW9uIjpudWxsLCJudW1QYXNzaW5nQXNzZXJ0cyI6MjEsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0MjgxNjcsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoibmFtZWQgYnJvd3Nlci1jb250cmFjdHMgZ2F0ZSBhY2NlcHRzIG9ubHkgaXRzIGV4YWN0IGNvbXBsZXRlIHJlc3VsdCBjbGFzcyAocmVjb3Zlcnk9dHJ1ZSkifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4cGxpY2l0IHNpbmdsZS1maWxlIHJlY292ZXJ5IHJldHVybiB3aXRoIGNvbXBsZXRlIG5hbWVkIGdhdGVzIl0sImR1cmF0aW9uIjo2MywiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyByZWNvdmVyeSB3b3JrZmxvdyBjYW5ub3QgdXNlIGFtYmllbnQgYXV0aG9yaXR5IG11dGFibGUgY29kZSBvciBhbiB1bmJvdW5kIHBsYW4iLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo2LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI4MjQyLCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6InJlY292ZXJ5IHdvcmtmbG93IGNhbm5vdCB1c2UgYW1iaWVudCBhdXRob3JpdHkgbXV0YWJsZSBjb2RlIG9yIGFuIHVuYm91bmQgcGxhbiJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhwbGljaXQgc2luZ2xlLWZpbGUgcmVjb3ZlcnkgcmV0dXJuIHdpdGggY29tcGxldGUgbmFtZWQgZ2F0ZXMiXSwiZHVyYXRpb24iOjEwMiwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleHBsaWNpdCBzaW5nbGUtZmlsZSByZWNvdmVyeSByZXR1cm4gd2l0aCBjb21wbGV0ZSBuYW1lZCBnYXRlcyBib3RoIG9yaWdpbmFsIG5hbWVkIGFnZ3JlZ2F0ZXMgcmVqZWN0IHByb29mIGRlcGVuZGVuY3kgZW52IHNjcmlwdCBvciByZXN1bHQgc3VwcHJlc3Npb24gZHJpZnQiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo4LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI4MzA1LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImJvdGggb3JpZ2luYWwgbmFtZWQgYWdncmVnYXRlcyByZWplY3QgcHJvb2YgZGVwZW5kZW5jeSBlbnYgc2NyaXB0IG9yIHJlc3VsdCBzdXBwcmVzc2lvbiBkcmlmdCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsicmVjb3ZlcnkgYXJ0aWZhY3RzIHNoYXJlIHRoZSBhcHByb3ZlZCBuYXRpdmUgcG9vbCBiZWZvcmUgdXBsb2FkIl0sImR1cmF0aW9uIjoyLCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6InJlY292ZXJ5IGFydGlmYWN0cyBzaGFyZSB0aGUgYXBwcm92ZWQgbmF0aXZlIHBvb2wgYmVmb3JlIHVwbG9hZCBib3RoIGV4YWN0IHJlY292ZXJ5IGxpbWl0cyBhY2NlcHQgY29tcGxldGUgZXZpZGVuY2UgYW5kIG9yZGluYXJ5IGV2ZW50cyByZXRhaW4gdGhlaXIgYWxsb2NhdGlvbiIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjgsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjg0MDcsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYm90aCBleGFjdCByZWNvdmVyeSBsaW1pdHMgYWNjZXB0IGNvbXBsZXRlIGV2aWRlbmNlIGFuZCBvcmRpbmFyeSBldmVudHMgcmV0YWluIHRoZWlyIGFsbG9jYXRpb24ifSx7ImFuY2VzdG9yVGl0bGVzIjpbInJlY292ZXJ5IGFydGlmYWN0cyBzaGFyZSB0aGUgYXBwcm92ZWQgbmF0aXZlIHBvb2wgYmVmb3JlIHVwbG9hZCJdLCJkdXJhdGlvbiI6NjUsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoicmVjb3ZlcnkgYXJ0aWZhY3RzIHNoYXJlIHRoZSBhcHByb3ZlZCBuYXRpdmUgcG9vbCBiZWZvcmUgdXBsb2FkIG92ZXItYnVkZ2V0IHN0YWxlIGluY29tcGxldGUgb3IgdW5ib3VuZCBwcm9vZiBhbmQgYSByZW1vdmVkIHByZXVwbG9hZCBndWFyZCBmYWlsIGNsb3NlZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjMxLCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI4NDA5LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6Im92ZXItYnVkZ2V0IHN0YWxlIGluY29tcGxldGUgb3IgdW5ib3VuZCBwcm9vZiBhbmQgYSByZW1vdmVkIHByZXVwbG9hZCBndWFyZCBmYWlsIGNsb3NlZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyJdLCJkdXJhdGlvbiI6OCwiZmFpbGluZyI6ZmFsc2UsImZhaWx1cmVEZXRhaWxzIjpbXSwiZmFpbHVyZU1lc3NhZ2VzIjpbXSwiZnVsbE5hbWUiOiJleGFjdCByZXZpZXdlZCBjdXJyZW50IGJyb3dzZXIgZml4dHVyZSBhbWVuZG1lbnRzIGFjY2VwdHMgb25seSB0aGUgY3VycmVudCBzb3VyY2UtcGlubmVkIHJldmlld2VkIGFtZW5kbWVudHMgYW5kIHRoZSBleGFjdCBzaXggYWRkaXRpb25hbCByZWdyZXNzaW9uIGlkZW50aXRpZXMiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjo1LCJyZXRyeVJlYXNvbnMiOltdLCJzdGFydEF0IjoxNzkyMDgwNDI4NDc0LCJzdGF0dXMiOiJwYXNzZWQiLCJ0aXRsZSI6ImFjY2VwdHMgb25seSB0aGUgY3VycmVudCBzb3VyY2UtcGlubmVkIHJldmlld2VkIGFtZW5kbWVudHMgYW5kIHRoZSBleGFjdCBzaXggYWRkaXRpb25hbCByZWdyZXNzaW9uIGlkZW50aXRpZXMifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4YWN0IHJldmlld2VkIGN1cnJlbnQgYnJvd3NlciBmaXh0dXJlIGFtZW5kbWVudHMiXSwiZHVyYXRpb24iOjMsImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyBwZW5kaW5nIHNvdXJjZSwgdW5yZXZpZXdlZCBzb3VyY2UgcGlucywgbWlzc2luZyBoYW5kb2ZmcyBhbmQgdmFndWUgYXBwbGljYWJpbGl0eSBjYW5ub3QgYXV0aG9yaXplIGNoYW5nZWQgYXNzZXJ0aW9ucyIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjYsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjg0ODIsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoicGVuZGluZyBzb3VyY2UsIHVucmV2aWV3ZWQgc291cmNlIHBpbnMsIG1pc3NpbmcgaGFuZG9mZnMgYW5kIHZhZ3VlIGFwcGxpY2FiaWxpdHkgY2Fubm90IGF1dGhvcml6ZSBjaGFuZ2VkIGFzc2VydGlvbnMifSx7ImFuY2VzdG9yVGl0bGVzIjpbImV4YWN0IHJldmlld2VkIGN1cnJlbnQgYnJvd3NlciBmaXh0dXJlIGFtZW5kbWVudHMiXSwiZHVyYXRpb24iOjM0LCJmYWlsaW5nIjpmYWxzZSwiZmFpbHVyZURldGFpbHMiOltdLCJmYWlsdXJlTWVzc2FnZXMiOltdLCJmdWxsTmFtZSI6ImV4YWN0IHJldmlld2VkIGN1cnJlbnQgYnJvd3NlciBmaXh0dXJlIGFtZW5kbWVudHMgYSBib29sZWFuLW9ubHkgY2hhbmdlZC1ib2R5IGJ5cGFzcyBvciBibGFua2V0IHVuY2hhbmdlZC1ib2R5IGNsYWltIGZhaWxzIGNsb3NlZCIsImludm9jYXRpb25zIjoxLCJsb2NhdGlvbiI6bnVsbCwibnVtUGFzc2luZ0Fzc2VydHMiOjgsInJldHJ5UmVhc29ucyI6W10sInN0YXJ0QXQiOjE3OTIwODA0Mjg0ODUsInN0YXR1cyI6InBhc3NlZCIsInRpdGxlIjoiYSBib29sZWFuLW9ubHkgY2hhbmdlZC1ib2R5IGJ5cGFzcyBvciBibGFua2V0IHVuY2hhbmdlZC1ib2R5IGNsYWltIGZhaWxzIGNsb3NlZCJ9LHsiYW5jZXN0b3JUaXRsZXMiOlsiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyJdLCJkdXJhdGlvbiI6MzksImZhaWxpbmciOmZhbHNlLCJmYWlsdXJlRGV0YWlscyI6W10sImZhaWx1cmVNZXNzYWdlcyI6W10sImZ1bGxOYW1lIjoiZXhhY3QgcmV2aWV3ZWQgY3VycmVudCBicm93c2VyIGZpeHR1cmUgYW1lbmRtZW50cyBldmVyeSBoaXN0b3JpY2FsIGNhdGFsb2cgcmVxdWlyZW1lbnQgb3V0c2lkZSB0aGUgZmluaXRlIHJldmlld2VkIGFtZW5kbWVudCBpcyBpbW11dGFibGUiLCJpbnZvY2F0aW9ucyI6MSwibG9jYXRpb24iOm51bGwsIm51bVBhc3NpbmdBc3NlcnRzIjoxMSwicmV0cnlSZWFzb25zIjpbXSwic3RhcnRBdCI6MTc5MjA4MDQyODUxOSwic3RhdHVzIjoicGFzc2VkIiwidGl0bGUiOiJldmVyeSBoaXN0b3JpY2FsIGNhdGFsb2cgcmVxdWlyZW1lbnQgb3V0c2lkZSB0aGUgZmluaXRlIHJldmlld2VkIGFtZW5kbWVudCBpcyBpbW11dGFibGUifV0sImVuZFRpbWUiOjE3OTIwODA0Mjg1NjAsIm1lc3NhZ2UiOiIiLCJuYW1lIjoiL3ByaXZhdGUvdG1wL2xwYy1sYXN0LXR3by1wLTIwMjYxMDE1L2JhY2tlbmQvdGVzdHMvY2lXb3JrZmxvd0NvbnRyYWN0LnRlc3QuanMiLCJzdGFydFRpbWUiOjE3OTIwODA0MjUwOTksInN0YXR1cyI6InBhc3NlZCIsInN1bW1hcnkiOiIifV0sIndhc0ludGVycnVwdGVkIjpmYWxzZX0K",
+      "rawReportSha256": "14e1653adc3fe9379413372f3f38135bd48ffbfdf207c2d411c78d9bc251056e",
       "sourceBindings": {
         ".github/workflows/quality.yml": "5d595a833b4a009cf76a3d9cae333d0df61dfafd410e17f06537f77046084923",
-        "backend/scripts/check-ci-workflow.js": "e1b88ba0fcf2d5ca1f24c9505b090dc5c27bf4ac5d7563559d4b7b6f1cd27215",
+        "backend/scripts/check-ci-workflow.js": "59047c8805bbc4b97d268da4ebe829f89d4319f17dc6f705ebd7796bbbe6ab70",
         "backend/tests/ciWorkflowContract.test.js": "6b521337bf7e68718d033d4e309b4edebd7f307a0d3cc01ff115454fc9cc655a",
-        "backend/tests/playwright/acceptance/groups.json": "012c26f5c7bdb78c5a5b5ba769f50851891e030ae271794f6af5d66cab13070e",
+        "backend/tests/playwright/acceptance/groups.json": "08b50009a5b37b03e50d28639dab87e41fd627dc34fda134e5059e337518940f",
         "backend/scripts/guard-ci-artifact-budget.js": "72bafcad1a314a5178a37b61cdb842e0940a6f4bc6407956667f2179d8ad7dbe",
         "backend/scripts/verify-critical-browser-groups.js": "6015deaa9deb7a6f0b6d8fdde328e3290626483b019140cbe8609940262b68ef"
       },
       "originalPrefixBytes": 16663,
       "passedCallbacks": 66,
-      "proofClass": "Actual current local CI-only62 raw callbacks; original J36 prefix exact. Not fresh Linux product or whole current backend coverage.",
-      "rawReportPath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/root-recovery-return-ci/ci62-results-budget-c.json",
+      "proofClass": "Actual current P local source-only whole CI66 controls; original test file and assertions unchanged. No product/Mongo or full protected-Linux claim.",
+      "rawReportPath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/p-ci66-source-only/results.json",
       "priorReadOnlyRoutingReview": {
         "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/recovery-return-review/READONLY_L_ROUTING_REVIEW.json",
         "sha256": "3b9e97226ef8bbc5a939360f29106b35d5ee232a4d6316ca9a589a5b1ec6f99a"
@@ -34260,12 +34597,16 @@
       "priorRoot60Readback": {
         "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/root-recovery-return-ci/ROOT_CURRENT60_EXACT_SOURCE_READBACK.json",
         "sha256": "8dba0aea96da1d983804b2b633a9a1a918d03f2486aacedba9d6b3b3ff565b4f"
+      },
+      "currentExactSourceEvidence": {
+        "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/P_CURRENT_CI66_SOURCE_BOUND_EVIDENCE.json",
+        "sha256": "51bbecedacc1310756390c0b3ad564238573da38873a9679fa1f62b87161672d"
       }
     },
     "limits": [
       "Prior actual J538/7745 is retained only by explicit source/runtime disposition and strict eighteen local archive validation.",
       "Current20 whole files311 and ops14 JSON class replace their exact changed consumers; final17 cannot qualify these replacements.",
-      "Actual current CI66 source-only class, native33 final acceptance, source/security, hosted providers and production approval remain separate."
+      "Actual current CI66 source-only class, native6 affected final acceptance, source/security, hosted providers and production approval remain separate."
     ],
     "singleFileRecovery": {
       "schemaVersion": 1,
@@ -34316,8 +34657,8 @@
         {
           "path": ".github/workflows/native-acceptance-return.yml",
           "beforeSha256": null,
-          "afterSha256": "321ebf3a51a3dd356cecfe20b727d8aa966a6e8d2275d5ca4890a278ccae37f4",
-          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "afterSha256": "40c42e1c97f3ae755996e4582572a9162a30f3298975cbc50bcf5cb8fabcd5d1",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34385,6 +34726,17 @@
           "browserAcceptanceRequired": true
         },
         {
+          "path": "backend/routes/auth.js",
+          "beforeSha256": "647bbee6a9e5b758a285357d58d91d78b4d4df56923aae93207b2ea7e3ffd2b7",
+          "afterSha256": "2574a1c6533ad012dc7e7ccba4d4dbdada9d3f192348ac65551f4b3e114e7a32",
+          "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464",
+          "kind": "product-change",
+          "affectedSuites": [
+            "tests/authAdmissionUploadRecovery.test.js",
+            "tests/adminAdmissionsJourney.test.js"
+          ]
+        },
+        {
           "path": "backend/routes/paymentsWebhook.js",
           "beforeSha256": "4b459bb02a81467ca4ab0da18c94f22ccb2a7e3fa09d205b222fb5744e416367",
           "afterSha256": "fa8ef09b933b7ff433e636179d29c77a04d870e8b38eafe9e9d5d8e7c8f8b07c",
@@ -34406,8 +34758,8 @@
         {
           "path": "backend/scripts/check-ci-workflow.js",
           "beforeSha256": "38e3fe13e8932aaee9926d71c012d19e1ea4b1ec546ad7cdec8fa05a5367433a",
-          "afterSha256": "e1b88ba0fcf2d5ca1f24c9505b090dc5c27bf4ac5d7563559d4b7b6f1cd27215",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "59047c8805bbc4b97d268da4ebe829f89d4319f17dc6f705ebd7796bbbe6ab70",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34524,8 +34876,8 @@
         {
           "path": "backend/scripts/verify-single-file-jest-return.cjs",
           "beforeSha256": null,
-          "afterSha256": "89550fca212b696f35568d7b374831befbfb488c4a57f15f74553fdca58e9c6e",
-          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "afterSha256": "09ccb9c26687a813500dbe7d8a6ae3051dfb9445e077c1f1c1e566152f36adc7",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34570,6 +34922,37 @@
           ],
           "reviewedEvidenceSha256": "a52a9b89a72d837507edf772dffc937c53c383af249221751edaaeeb7e12e4da",
           "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/recovery-l-affected-map/FINAL_L_RECOVERY_AFFECTED_EVIDENCE_MAP.json"
+        },
+        {
+          "path": "backend/services/personalStorageDeletion.js",
+          "beforeSha256": "d160456e6a625071896cd6bfbbf557524350149bd5d3800c18bfe881ca4d921c",
+          "afterSha256": "06892c91d11cb4a942371d3064051e1b9e9c6502128e1f5f79057201ca084181",
+          "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464",
+          "kind": "product-change",
+          "affectedSuites": [
+            "tests/authAdmissionUploadRecovery.test.js",
+            "tests/personalStorageDeletion.test.js"
+          ]
+        },
+        {
+          "path": "backend/tests/adminAdmissionsJourney.test.js",
+          "beforeSha256": "02a4154c135031f787842d89f5e6cf3b56f30f8c0ef75e34c904c8830861462b",
+          "afterSha256": "e35e71df8235baeaf7f4806ffe9611bc6798fd2ad1333d6d744ff4dd58e01106",
+          "reviewedEvidenceSha256": "0c8488006159efe06ff58faacdd62443ccb1a2357208935e199be6943f6b31eb",
+          "kind": "test-fixture",
+          "affectedSuites": [
+            "tests/adminAdmissionsJourney.test.js"
+          ]
+        },
+        {
+          "path": "backend/tests/authAdmissionUploadRecovery.test.js",
+          "beforeSha256": null,
+          "afterSha256": "0c6ae02713e437046db908cf4374f2bbbfb4a7680ca82a4923b7fe3cb2d16829",
+          "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464",
+          "kind": "test-fixture",
+          "affectedSuites": [
+            "tests/authAdmissionUploadRecovery.test.js"
+          ]
         },
         {
           "path": "backend/tests/ciWorkflowContract.test.js",
@@ -34625,8 +35008,8 @@
         {
           "path": "backend/tests/playwright/acceptance/groups.json",
           "beforeSha256": "e17994881651dd7823b1a0ce4fdaad30b9ed7e05df0d06a3b5849ee69bcee20c",
-          "afterSha256": "012c26f5c7bdb78c5a5b5ba769f50851891e030ae271794f6af5d66cab13070e",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "08b50009a5b37b03e50d28639dab87e41fd627dc34fda134e5059e337518940f",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "test-fixture",
           "affectedSuites": []
         },
@@ -34634,7 +35017,7 @@
           "path": "backend/tests/playwright/acceptance/native-continuation-plan.json",
           "beforeSha256": null,
           "afterSha256": "@approved-plan",
-          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "test-fixture",
           "affectedSuites": []
         },
@@ -34720,8 +35103,8 @@
         {
           "path": "backend/tests/playwright/attorney-v2/invitations.spec.js",
           "beforeSha256": "132290f99328c68fa2203003ac15f7ad711624023609573edf9f38941d82afc0",
-          "afterSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "test-fixture",
           "affectedSuites": [],
           "backendRuntimeImpact": "none-reviewed",
@@ -35112,8 +35495,8 @@
         {
           "path": "frontend/assets/styles/matter-publication.css",
           "beforeSha256": "4ca25d74a3ff876eeb255e54de0c66e6b5daa4c9beb3602fbce66fd09732e101",
-          "afterSha256": "872591dd87fa47395f65f3600cd941c7014cec367e31d03aef3317d270082637",
-          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "afterSha256": "89d6fb558516cab460df3ed806581708c3d1394cb11f1ef8f017f155f64704d6",
+          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
           "kind": "browser-only-product",
           "affectedSuites": [],
           "backendRuntimeImpact": "none-reviewed",
@@ -37603,6 +37986,16 @@
     "postNExactFileReplacementEvidence": {
       "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/O_FOUR_EXACT_FILE_FIVE_CALLBACK_SOURCE_REPLACEMENT_CLASSES.json",
       "sha256": "7d4b0a3fc1519a346144fdbcea2059da290d4fb91f436d75620d26127418140c"
+    },
+    "currentPAdmissionAndBurstEvidence": {
+      "admission": {
+        "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/admission-upload-recovery-p/FINAL_ADMISSION_UPLOAD_RECOVERY_HANDOFF.json",
+        "sha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+      },
+      "burst": {
+        "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/admission-upload-recovery-p/burst-one-fixture/FINAL_ORIGINAL_BURST1_FIXTURE_HANDOFF.json",
+        "sha256": "0c8488006159efe06ff58faacdd62443ccb1a2357208935e199be6943f6b31eb"
+      }
     }
   },
   "partialNativeReuse": {
@@ -37816,17 +38209,19 @@
   ],
   "currentSourceApplicability": {
     "originalCohort": 494,
-    "availableOriginalClasses": 476,
-    "withoutQualifiedOutcome": 18,
-    "selectedAffectedOriginals": 18,
+    "availableOriginalClasses": 492,
+    "withoutQualifiedOutcome": 2,
+    "selectedAffectedOriginals": 6,
     "newRegressions": 0,
-    "selectedCurrent": 18,
+    "selectedCurrent": 6,
     "finalLocalBackendFiles": 20,
     "finalLocalBackendCallbacks": 311,
     "priorJestClass": 538,
     "currentDiscoveryIncludingNewReviewedFiles": 542,
     "wholeProductCurrentPassClaim": false,
-    "priorNNewRegressionsPreserved": 6
+    "priorNNewRegressionsPreserved": 6,
+    "priorOUnchangedSuccessfulCallbacksRetained": 12,
+    "priorOAffectedPassingRechecks": 4
   },
   "continuationAfterActualN": {
     "actualNReadback": {
@@ -37839,5 +38234,27 @@
     "repeatedUnchangedPassingNativeCallbacks": 0,
     "priorNativeUniverseRemains500": true,
     "notAWholeCurrentCatalogueCertification": true
+  },
+  "continuationAfterActualO": {
+    "actualOReadback": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_O_NATIVE6_WHOLE_PLUS10_ORIGINAL_PARTIAL_TWO_FAIL_NONE_UNEXECUTED.json",
+      "sha256": "c1490e25d336b2160bfab08c995ee31e34eadac0668bce7340e0b264fed935ff"
+    },
+    "actualOWholeQualifiedCallbacks": 6,
+    "actualOIndividualOriginalPartialClasses": 10,
+    "actualOFailedCallbacks": 2,
+    "selectedPDiagnosedFailures": 2,
+    "selectedPDirectlyAffectedPriorPasses": 4,
+    "selectedPCurrentOriginals": 6,
+    "repeatedUnchangedPassingNativeCallbacks": 0,
+    "priorNativeUniverseRemains500": true,
+    "notAWholeCurrentCatalogueCertification": true
+  },
+  "currentPSelectedCollection": {
+    "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/p-six-source-collection/ACTUAL_P_SELECTED_SIX_METADATA_ONLY_COLLECTION.json",
+    "sha256": "1e02462ab69293b04e4fdc2d59537f705d0157885cb745a343489eb822d9753e",
+    "selected": 6,
+    "callbacksRun": 0,
+    "globalSetups": 0
   }
 }

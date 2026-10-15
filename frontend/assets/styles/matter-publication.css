@@ -152,9 +152,9 @@ body.lpc-product-clean.lpc-current-draft.theme-dark #previewModal :is(.modal-con
 .lpc-current-draft #caseTitlePreview .value { max-width: 100%; overflow-wrap: anywhere; }
 
 /* Anchor fee help to its full text line so hidden or opened help cannot widen the review. */
-.lpc-current-draft #reviewSummary .summary-content > p { position: relative; }
-.lpc-current-draft #reviewSummary .fee-info { position: static; transform: none; }
-.lpc-current-draft #reviewSummary .fee-info::after {
+.lpc-current-draft :is(#reviewSummary .summary-content > p, label[for="comp"]) { position: relative; }
+.lpc-current-draft .fee-info { position: static; transform: none; }
+.lpc-current-draft .fee-info::after {
   display: none;
   left: 0;
   width: min(300px, 100%);
@@ -162,7 +162,7 @@ body.lpc-product-clean.lpc-current-draft.theme-dark #previewModal :is(.modal-con
   box-sizing: border-box;
   transform: translateY(4px);
 }
-.lpc-current-draft #reviewSummary .fee-info:is(:hover, :focus-visible)::after {
+.lpc-current-draft .fee-info:is(:hover, :focus-visible)::after {
   display: block;
   transform: translateY(0);
 }

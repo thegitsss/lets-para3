@@ -106,23 +106,34 @@ test("an account-change event clears a current dialog while its read is delayed"
   expect(await page.evaluate(() => [...Object.values(localStorage), ...Object.values(sessionStorage)].join(" "))).not.toContain("PRIVATE_ACCOUNT_INVITEE");
 });
 
-test("a changed session during refresh clears both invitation surfaces without reading another account", async ({ page }) => {
-  const id = await matter(page);
+test("a changed session during refresh clears both invitation surfaces without reading another account", async ({ page: setupPage, browser, baseURL }) => {
+  const id = await matter(setupPage);
+  const initialSession = await setupPage.context().storageState();
   for (const current of [false, true]) {
-    await open(page, id, current); let reads = 0, ownerReads = 0, releaseOwner;
-    const ownerGate = new Promise(resolve => { releaseOwner = resolve; });
-    await page.route(pattern(id), route => { reads++; return route.continue(); });
-    // Hold background ownership responses until the deliberate refresh is sent.
-    // Otherwise a correct account boundary can remove the button before its click.
-    await page.route("**/api/auth/me", async route => {
-      ownerReads++; await ownerGate;
-      return fulfill(route, { user: { id: "0".repeat(24), role: "attorney", status: "approved" } });
-    });
+    // Each surface starts from the same valid synthetic session. The V2 loss
+    // deliberately clears client storage and navigates to login; it must not
+    // race the next independent surface's initial navigation.
+    const context = await browser.newContext({ baseURL, storageState: initialSession });
+    const page = await context.newPage();
     try {
-      await refresh(page); await expect.poll(() => ownerReads).toBeGreaterThan(0); releaseOwner();
-      await expect(panel(page)).toHaveCount(0); expect(reads).toBe(0);
+      await open(page, id, current); let reads = 0, ownerReads = 0, releaseOwner;
+      const ownerGate = new Promise(resolve => { releaseOwner = resolve; });
+      await page.route(pattern(id), route => { reads++; return route.continue(); });
+      // Hold background ownership responses until the deliberate refresh is sent.
+      // Otherwise a correct account boundary can remove the button before its click.
+      await page.route("**/api/auth/me", async route => {
+        ownerReads++; await ownerGate;
+        return fulfill(route, { user: { id: "0".repeat(24), role: "attorney", status: "approved" } });
+      });
+      try {
+        await refresh(page); await expect.poll(() => ownerReads).toBeGreaterThan(0); releaseOwner();
+        await expect(panel(page)).toHaveCount(0); expect(reads).toBe(0);
+        if (!current) await page.waitForURL("**/login.html", { waitUntil: "domcontentloaded" });
+      } finally {
+        releaseOwner(); await page.unroute("**/api/auth/me"); await page.unroute(pattern(id));
+      }
     } finally {
-      releaseOwner(); await page.unroute("**/api/auth/me"); await page.unroute(pattern(id));
+      await context.close();
     }
   }
 });

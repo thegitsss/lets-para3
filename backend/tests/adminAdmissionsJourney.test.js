@@ -4,7 +4,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { randomUUID } = require('crypto');
 jest.mock('../utils/email', () => jest.fn(async recipient => ({ accepted: [recipient] })));
-jest.mock('../utils/s3Client', () => ({ createS3Client: jest.fn(() => ({ send: jest.fn(async () => ({ TagSet: [{ Key: 'GuardDutyMalwareScanStatus', Value: 'NO_THREATS_FOUND' }] })) })) }));
+jest.mock('../utils/s3Client', () => ({ S3_REQUEST_TIMEOUT_MS: jest.requireActual('../utils/s3Client').S3_REQUEST_TIMEOUT_MS, createS3Client: jest.fn(() => ({ send: jest.fn(async () => ({ TagSet: [{ Key: 'GuardDutyMalwareScanStatus', Value: 'NO_THREATS_FOUND' }] })) })) }));
 const sendEmail = require('../utils/email');
 const { connect, clearDatabase, closeDatabase } = require('./helpers/db');
 const User = require('../models/User');

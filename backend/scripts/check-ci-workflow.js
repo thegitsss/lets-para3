@@ -134,9 +134,9 @@ const REVIEWED_BROWSER_FIXTURE_AMENDMENTS = Object.freeze([
   },
   {
     "path": "tests/playwright/attorney-v2/invitations.spec.js",
-    "currentSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
-    "handoffSha256": "9ca4df1ca41adae5322ed3d7edf2fedcfd37c293d8014f9fe4bd5bbfa93ce420",
-    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+    "currentSha256": "eb20411a416b960607249f6c6ca5020aef428a24caf2907eaf4190fd1c9c333b",
+    "handoffSha256": "500a9523dfd5c56b8fc1046a5d70684ba85593081a22e1be942f57b3e09cc201",
+    "disposition": "Existing protected-session redirect is awaited before leaving V2; current and legacy surfaces use separate contexts from the same valid pre-loss synthetic session. Original disclosure clearing, zero cross-owner reads, deadlines and assertions remain intact."
   },
   {
     "path": "tests/playwright/attorney-v2/matter-inventory.spec.js",

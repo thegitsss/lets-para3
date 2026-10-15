@@ -13,7 +13,7 @@ const crypto = require("crypto");
 const { resolve: resolveLoginReturnTarget } = require("../../frontend/assets/scripts/utils/login-return-target");
 const { URLSearchParams } = require("url");
 const multer = require("multer");
-const { PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const User = require("../models/User");
 const Notification = require("../models/Notification");
@@ -59,7 +59,9 @@ const {
   policySubmissionMatches,
 } = require("../utils/legalDocuments");
 const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
-const { createS3Client } = require("../utils/s3Client");
+const { createS3Client, S3_REQUEST_TIMEOUT_MS } = require("../utils/s3Client");
+const StorageDeletionTask = require("../models/StorageDeletionTask");
+const { stagePersonalStorageDeletion, cancelPersonalStorageDeletion } = require("../services/personalStorageDeletion");
 const {
   createGoogleOAuthClient,
   verifyTurnstileToken,
@@ -1077,53 +1079,80 @@ router.post(
       user.location = normalizedState;
     }
 
-    // Upload admission documents before saving, then compensate if persistence fails.
-    const uploadedAdmissionKeys = [];
-    if (roleLc === "paralegal" && resumeFile) {
-      const key = protectedUploadKey(`paralegal-resumes/${safeSegment(user._id)}/resume.pdf`);
-      const putParams = {
-        Bucket: BUCKET,
-        Key: key,
-        Body: resumeFile.buffer,
-        ContentType: "application/pdf",
-        ContentLength: resumeFile.size,
-        ...sseParams(),
-      };
-      await s3.send(new PutObjectCommand(putParams));
-      uploadedAdmissionKeys.push(key);
-      user.resumeURL = key;
-    }
-    if (roleLc === "paralegal" && certificateFile) {
-      const key = protectedUploadKey(`paralegal-certificates/${safeSegment(user._id)}/certificate.pdf`);
-      const putParams = {
-        Bucket: BUCKET,
-        Key: key,
-        Body: certificateFile.buffer,
-        ContentType: "application/pdf",
-        ContentLength: certificateFile.size,
-        ...sseParams(),
-      };
-      await s3.send(new PutObjectCommand(putParams));
-      uploadedAdmissionKeys.push(key);
-      user.certificateURL = key;
-    }
-
+    // Reserve recovery before any provider attempt. The worker reconciles an
+    // interrupted held reservation after its existing ten-minute grace period.
+    // Saving the account and cancelling its exact reservations share one
+    // transaction, so a winning cleanup claim can never attach deleted bytes.
+    const admissionUploads = [];
+    if (roleLc === "paralegal" && resumeFile) admissionUploads.push({
+      field: "resumeURL", key: protectedUploadKey(`paralegal-resumes/${safeSegment(user._id)}/resume.pdf`), file: resumeFile,
+    });
+    if (roleLc === "paralegal" && certificateFile) admissionUploads.push({
+      field: "certificateURL", key: protectedUploadKey(`paralegal-certificates/${safeSegment(user._id)}/certificate.pdf`), file: certificateFile,
+    });
+    const admissionTaskIds = await stagePersonalStorageDeletion({
+      ownerId: user._id, keys: admissionUploads.map(upload => upload.key), reason: "registration_upload_recovery",
+    }, { durable: true });
+    let admissionSession, admissionCommitStarted = false;
     try {
-      await user.save();
-    } catch (err) {
-      await Promise.allSettled(uploadedAdmissionKeys.map((key) =>
-        s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
-      ));
-      const duplicateProvider =
-        err?.code === 11000 &&
-        (err?.keyPattern?.["authProviders.providerAccountId"] ||
-          String(err?.message || "").includes("user_auth_provider_unique"));
-      if (duplicateProvider) {
-        return res.status(409).json({
-          msg: "This Google account is already linked. Sign in with Google instead.",
-        });
+      for (const upload of admissionUploads) {
+        await s3.send(new PutObjectCommand({
+          Bucket: BUCKET, Key: upload.key, Body: upload.file.buffer,
+          ContentType: "application/pdf", ContentLength: upload.file.size, ...sseParams(),
+        }), { abortSignal: AbortSignal.timeout(S3_REQUEST_TIMEOUT_MS) });
+        user[upload.field] = upload.key;
       }
-      throw err;
+      if (admissionTaskIds.length) {
+        admissionSession = await mongoose.startSession();
+        admissionSession.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+        const reservations = await StorageDeletionTask.collection.find({ _id: { $in: admissionTaskIds } }, { session: admissionSession }).toArray();
+        const now = new Date();
+        if (reservations.length !== admissionUploads.length || admissionTaskIds.some((taskId, index) => {
+          const task = reservations.find(record => String(record._id) === String(taskId));
+          return !task || String(task.ownerId) !== String(user._id) || task.bucket !== BUCKET
+            || task.key !== admissionUploads[index].key || task.status !== "held" || !(task.eligibleAt > now);
+        })) throw Object.assign(new Error("Admission uploads no longer hold their recovery reservation."), { code: "ADMISSION_UPLOAD_RESERVATION_CHANGED" });
+        await user.save({ session: admissionSession });
+        const cancelled = await cancelPersonalStorageDeletion(admissionTaskIds, { now, session: admissionSession });
+        if (cancelled.cancelled !== admissionTaskIds.length) throw Object.assign(new Error("Admission upload cleanup changed before registration."), { code: "ADMISSION_UPLOAD_RESERVATION_CHANGED" });
+        admissionCommitStarted = true;
+        await admissionSession.commitTransaction();
+      } else {
+        await user.save();
+      }
+    } catch (err) {
+      if (admissionSession?.inTransaction() && !admissionCommitStarted) {
+        await admissionSession.abortTransaction().catch(error => authLogger.warn("[auth] admission transaction abort could not be confirmed", { name: error?.name }));
+      }
+      let recorded = false;
+      if (admissionCommitStarted) {
+        // A commit acknowledgement may be lost. Only our exact allocated user,
+        // attachment references and atomically cancelled reservations establish
+        // the saved outcome; never delete or replay an uncertain provider write.
+        try {
+          const saved = await User.collection.findOne({ _id: user._id, email: user.email, role: user.role, status: "pending",
+            ...Object.fromEntries(admissionUploads.map(upload => [upload.field, upload.key])) }, { readConcern: { level: "majority" } });
+          const reservations = await StorageDeletionTask.collection.find({ _id: { $in: admissionTaskIds } }, { readConcern: { level: "majority" } }).toArray();
+          recorded = Boolean(saved) && reservations.length === admissionTaskIds.length && admissionTaskIds.every((taskId, index) => {
+            const task = reservations.find(record => String(record._id) === String(taskId));
+            return task && String(task.ownerId) === String(user._id) && task.bucket === BUCKET
+              && task.key === admissionUploads[index].key && task.status === "cancelled";
+          });
+        } catch (error) {
+          authLogger.warn("[auth] admission commit outcome remains unconfirmed", { name: error?.name });
+        }
+      }
+      if (!recorded) {
+        // Keep durable held tasks on upload/save failure. Immediate deletion can
+        // race a late provider acknowledgement or a possibly committed account.
+        // Existing reconciliation checks both live User and retained resume refs.
+        const duplicateProvider = err?.code === 11000 &&
+          (err?.keyPattern?.["authProviders.providerAccountId"] || String(err?.message || "").includes("user_auth_provider_unique"));
+        if (duplicateProvider) return res.status(409).json({ msg: "This Google account is already linked. Sign in with Google instead." });
+        throw err;
+      }
+    } finally {
+      await admissionSession?.endSession();
     }
 
     if (googleSignupHandoff) {

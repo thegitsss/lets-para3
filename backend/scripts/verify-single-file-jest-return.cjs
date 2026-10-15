@@ -12,20 +12,149 @@ const PRODUCTS={
  'backend/services/paymentAttentionRecovery.js':['e2bd997ae8e6b92030d34d35eb1d642dac441068510e62b7be86032822af998b','b21daa3468595cf99eaf837225b20555a8e75f94c0ef70bc11e094e325f32782']
 };
 const BACKEND_RUNTIME_CHANGES={
- "backend/ai/config.js":{"pins":["04a1d148851d5636b5afa01191dbc5fb415cddb97795db0786d4ca2003d953eb","7c393d74a8352a0c1d78d8b267b1e551d34a7cc866b2514ae63ba661402132f1"],"affectedSuites":["tests/supportCostBudget.test.js","tests/supportCostBudgetReplica.test.js","tests/supportCostBudgetCeiling.test.js"],"reviewedEvidenceSha256":"494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"},
- "backend/ai/supportCostBudget.js":{"pins":[null,"6a14b5470d0c2e9668c87d9bf2c88b37ed2019353fcfa83db8154fd1059b6377"],"affectedSuites":["tests/supportCostBudget.test.js","tests/supportCostBudgetReplica.test.js","tests/supportCostBudgetCeiling.test.js"],"reviewedEvidenceSha256":"494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"},
- "backend/tests/supportCostBudget.test.js":{"pins":[null,"aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b"],"affectedSuites":["tests/supportCostBudget.test.js"],"reviewedEvidenceSha256":"40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d"},
- "backend/tests/supportCostBudgetReplica.test.js":{"pins":[null,"6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c"],"affectedSuites":["tests/supportCostBudgetReplica.test.js"],"reviewedEvidenceSha256":"40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d"},
- "backend/tests/supportCostBudgetCeiling.test.js":{"pins":[null,"f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e"],"affectedSuites":["tests/supportCostBudgetCeiling.test.js"],"reviewedEvidenceSha256":"494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"},
- 'backend/scripts/ops-monitor.js':{pins:['3507176da4b42f063d4ff25900e78ebc4a4c107ead507e947a878bfad4f353a8','f2a78d9317dae0be10454393a4060f97510c22871e13e1dd7aad994a3b8a4fa7'],affectedSuites:['tests/opsMonitorState.test.js'],reviewedEvidenceSha256:'81aa188a9085da2f0a373a8e880407576bfc1d01f7a7236085e4d0dab98de032'},
- 'backend/tests/opsMonitorState.test.js':{pins:['0830655c380c1a2e955db8e26130d950801a8911def67d7734032256e0cadf81','4e238e87696e7ec88df7336cf1dcc774eb4e53aa23cafbcb366eab97e6076b88'],affectedSuites:['tests/opsMonitorState.test.js'],reviewedEvidenceSha256:'81aa188a9085da2f0a373a8e880407576bfc1d01f7a7236085e4d0dab98de032'},
- 'backend/services/matterFileWrites.js':{pins:['30fe43318b767d32dd106d9bb2710cc6a944ab928d6cceea3cdc1e4b7eb11fe8','60e1d2a2d1d50416af27646f1f815c6f95b2def851a99a0b0d73d3888a0e518a'],affectedSuites:['tests/matterFileWrites.test.js','tests/uploadsDownloads.test.js','tests/matterDownloads.test.js'],reviewedEvidenceSha256:'836ef349db3616c69dea5ae2ff24e65c0029017cae1b5aef742274be7c566761'},
- 'backend/tests/matterFileWrites.test.js':{pins:['7cd1f7890bfc10f60351f0899ca7a38697e67ab404483886d2d33acbe5bee7ea','24a00dc86e8a4179e4e9ce0b2974aaff5bc97c4208f1a7e8dac8bcd0656c73c5'],affectedSuites:['tests/matterFileWrites.test.js'],reviewedEvidenceSha256:'836ef349db3616c69dea5ae2ff24e65c0029017cae1b5aef742274be7c566761'}
+  "backend/ai/config.js": {
+    "pins": [
+      "04a1d148851d5636b5afa01191dbc5fb415cddb97795db0786d4ca2003d953eb",
+      "7c393d74a8352a0c1d78d8b267b1e551d34a7cc866b2514ae63ba661402132f1"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudget.test.js",
+      "tests/supportCostBudgetReplica.test.js",
+      "tests/supportCostBudgetCeiling.test.js"
+    ],
+    "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"
+  },
+  "backend/ai/supportCostBudget.js": {
+    "pins": [
+      null,
+      "6a14b5470d0c2e9668c87d9bf2c88b37ed2019353fcfa83db8154fd1059b6377"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudget.test.js",
+      "tests/supportCostBudgetReplica.test.js",
+      "tests/supportCostBudgetCeiling.test.js"
+    ],
+    "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"
+  },
+  "backend/tests/supportCostBudget.test.js": {
+    "pins": [
+      null,
+      "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudget.test.js"
+    ],
+    "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d"
+  },
+  "backend/tests/supportCostBudgetReplica.test.js": {
+    "pins": [
+      null,
+      "6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudgetReplica.test.js"
+    ],
+    "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d"
+  },
+  "backend/tests/supportCostBudgetCeiling.test.js": {
+    "pins": [
+      null,
+      "f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudgetCeiling.test.js"
+    ],
+    "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"
+  },
+  "backend/scripts/ops-monitor.js": {
+    "pins": [
+      "3507176da4b42f063d4ff25900e78ebc4a4c107ead507e947a878bfad4f353a8",
+      "f2a78d9317dae0be10454393a4060f97510c22871e13e1dd7aad994a3b8a4fa7"
+    ],
+    "affectedSuites": [
+      "tests/opsMonitorState.test.js"
+    ],
+    "reviewedEvidenceSha256": "81aa188a9085da2f0a373a8e880407576bfc1d01f7a7236085e4d0dab98de032"
+  },
+  "backend/tests/opsMonitorState.test.js": {
+    "pins": [
+      "0830655c380c1a2e955db8e26130d950801a8911def67d7734032256e0cadf81",
+      "4e238e87696e7ec88df7336cf1dcc774eb4e53aa23cafbcb366eab97e6076b88"
+    ],
+    "affectedSuites": [
+      "tests/opsMonitorState.test.js"
+    ],
+    "reviewedEvidenceSha256": "81aa188a9085da2f0a373a8e880407576bfc1d01f7a7236085e4d0dab98de032"
+  },
+  "backend/services/matterFileWrites.js": {
+    "pins": [
+      "30fe43318b767d32dd106d9bb2710cc6a944ab928d6cceea3cdc1e4b7eb11fe8",
+      "60e1d2a2d1d50416af27646f1f815c6f95b2def851a99a0b0d73d3888a0e518a"
+    ],
+    "affectedSuites": [
+      "tests/matterFileWrites.test.js",
+      "tests/uploadsDownloads.test.js",
+      "tests/matterDownloads.test.js"
+    ],
+    "reviewedEvidenceSha256": "836ef349db3616c69dea5ae2ff24e65c0029017cae1b5aef742274be7c566761"
+  },
+  "backend/tests/matterFileWrites.test.js": {
+    "pins": [
+      "7cd1f7890bfc10f60351f0899ca7a38697e67ab404483886d2d33acbe5bee7ea",
+      "24a00dc86e8a4179e4e9ce0b2974aaff5bc97c4208f1a7e8dac8bcd0656c73c5"
+    ],
+    "affectedSuites": [
+      "tests/matterFileWrites.test.js"
+    ],
+    "reviewedEvidenceSha256": "836ef349db3616c69dea5ae2ff24e65c0029017cae1b5aef742274be7c566761"
+  },
+  "backend/routes/auth.js": {
+    "pins": [
+      "647bbee6a9e5b758a285357d58d91d78b4d4df56923aae93207b2ea7e3ffd2b7",
+      "2574a1c6533ad012dc7e7ccba4d4dbdada9d3f192348ac65551f4b3e114e7a32"
+    ],
+    "affectedSuites": [
+      "tests/authAdmissionUploadRecovery.test.js",
+      "tests/adminAdmissionsJourney.test.js"
+    ],
+    "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+  },
+  "backend/services/personalStorageDeletion.js": {
+    "pins": [
+      "d160456e6a625071896cd6bfbbf557524350149bd5d3800c18bfe881ca4d921c",
+      "06892c91d11cb4a942371d3064051e1b9e9c6502128e1f5f79057201ca084181"
+    ],
+    "affectedSuites": [
+      "tests/authAdmissionUploadRecovery.test.js",
+      "tests/personalStorageDeletion.test.js"
+    ],
+    "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+  },
+  "backend/tests/authAdmissionUploadRecovery.test.js": {
+    "pins": [
+      null,
+      "0c6ae02713e437046db908cf4374f2bbbfb4a7680ca82a4923b7fe3cb2d16829"
+    ],
+    "affectedSuites": [
+      "tests/authAdmissionUploadRecovery.test.js"
+    ],
+    "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+  },
+  "backend/tests/adminAdmissionsJourney.test.js": {
+    "pins": [
+      "02a4154c135031f787842d89f5e6cf3b56f30f8c0ef75e34c904c8830861462b",
+      "e35e71df8235baeaf7f4806ffe9611bc6798fd2ad1333d6d744ff4dd58e01106"
+    ],
+    "affectedSuites": [
+      "tests/adminAdmissionsJourney.test.js"
+    ],
+    "reviewedEvidenceSha256": "0c8488006159efe06ff58faacdd62443ccb1a2357208935e199be6943f6b31eb"
+  }
 };
-// Exact optional Assistant additions; default-off source bridge preserves existing AI consumers.
+// Exact reviewed backend additions; the default-off Assistant bridge preserves existing AI consumers.
 const ASSISTANT_DEFAULT_OFF_BRIDGE='b712ecbd301730e99cd7630bb814d40b93205f750d37a0a8e899734e6560bfc4';
 const ASSISTANT_PRESERVED_CONSUMERS=['tests/matterDraftSuggestions.test.js','tests/outboundNetworkPolicy.test.js'];
-const ADDED_BACKEND_TESTS=['tests/supportCostBudget.test.js','tests/supportCostBudgetReplica.test.js','tests/supportCostBudgetCeiling.test.js'];
+const ADDED_BACKEND_TESTS=["tests/supportCostBudget.test.js","tests/supportCostBudgetReplica.test.js","tests/supportCostBudgetCeiling.test.js","tests/authAdmissionUploadRecovery.test.js"];
 const EXISTING_CI=['.github/workflows/quality.yml','backend/scripts/check-ci-workflow.js','backend/tests/ciWorkflowContract.test.js','backend/tests/playwright/acceptance/groups.json','backend/scripts/guard-ci-artifact-budget.js','backend/scripts/verify-critical-browser-groups.js'];
 const CI_ADDITIONS=['.github/workflows/backend-acceptance-return.yml','.github/workflows/native-acceptance-return.yml','.github/workflows/backend-single-file-return.yml','backend/scripts/verify-source-bound-backend-return.js','backend/scripts/prepare-linux-audio.cjs','backend/scripts/admin-private-navigation-controls.test.cjs','backend/scripts/legacy-message-link-read-controls.test.cjs','backend/scripts/verify-single-file-jest-return.cjs','backend/scripts/single-file-jest-return-controls.test.cjs','backend/scripts/import-native-continuation-junit.py','backend/scripts/native-continuation-contract.cjs','backend/scripts/native-continuation-controls.test.cjs','backend/scripts/native-continuation-lib.cjs','backend/scripts/prepare-native-browser-continuation.cjs','backend/scripts/run-native-browser-continuation.cjs','backend/tests/playwright/acceptance/native-continuation.config.cjs',PLAN];
 // Exact reviewed browser-only surfaces. Their affected source-contract suites

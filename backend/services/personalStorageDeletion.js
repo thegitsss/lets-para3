@@ -85,7 +85,7 @@ function normalizedKeys(keys, ownerId, env) {
 
 async function stagePersonalStorageDeletion(
   { ownerId, keys, reason, now = new Date() },
-  { env = process.env } = {}
+  { env = process.env, durable = false } = {}
 ) {
   const owner = cleanOwnerId(ownerId);
   if (!owner) throw new Error("A valid ownerId is required to stage personal storage deletion.");
@@ -113,7 +113,7 @@ async function stagePersonalStorageDeletion(
         },
         $setOnInsert: { bucket, key },
       },
-      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, ...(durable ? { writeConcern: { w: "majority", j: true, wtimeout: 10000 } } : {}) }
     );
     taskIds.push(task._id);
   }
@@ -130,7 +130,7 @@ async function activatePersonalStorageDeletion(taskIds, { now = new Date() } = {
   return { activated: Number(result.modifiedCount || 0) };
 }
 
-async function cancelPersonalStorageDeletion(taskIds, { now = new Date() } = {}) {
+async function cancelPersonalStorageDeletion(taskIds, { now = new Date(), session } = {}) {
   const ids = (taskIds || []).filter(Boolean);
   if (!ids.length) return { cancelled: 0 };
   const result = await StorageDeletionTask.updateMany(
@@ -141,7 +141,8 @@ async function cancelPersonalStorageDeletion(taskIds, { now = new Date() } = {})
         eligibleAt: now,
         expiresAt: new Date(now.getTime() + COMPLETED_TASK_RETENTION_MS),
       },
-    }
+    },
+    session ? { session } : undefined
   );
   return { cancelled: Number(result.modifiedCount || 0) };
 }
