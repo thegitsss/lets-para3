@@ -33,6 +33,51 @@ test("reviewed completion records the Matter and exact confirmation together and
   const recovered = await read({ requestId: body.requestId }); expect(recovered.body.operation.status).toBe("recorded"); expect((await send(body)).body.review.operation.status).toBe("recorded"); expect(mockStripe.transfers.create).toHaveBeenCalledTimes(1); expect(await AuditLog.countDocuments({ action: "case.completion.recorded" })).toBe(1); expect(await Payout.countDocuments()).toBe(1);
 });
 test("previously paid evidence completes without another transfer", async () => { await paid(); const review = await read(); expect(review.body.mode).toBe("finish_completion"); expect((await send(await command())).status).toBe(200); expect(mockStripe.transfers.create).not.toHaveBeenCalled(); });
+test("completion retains both receipts with a constrained renderer and replay never repeats payment or document writes", async () => {
+  const previousRenderer = lifecycle.buildReceiptPdfBuffer.getMockImplementation();
+  const previousKey = lifecycle.getReceiptKey.getMockImplementation();
+  let activeRenders = 0;
+  const expectedReceipts = new Map();
+  lifecycle.getReceiptKey.mockImplementation((id, role) => `cases/${id}/receipts/${role}.pdf`);
+  lifecycle.buildReceiptPdfBuffer.mockImplementation(async payload => {
+    if (activeRenders) throw new Error("Synthetic constrained renderer is already occupied");
+    activeRenders++;
+    try {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      const buffer = Buffer.from(`%PDF-1.4\n${JSON.stringify(payload)}`);
+      expectedReceipts.set(payload.title === "Payout Receipt" ? "paralegal" : "attorney", buffer);
+      return buffer;
+    } finally { activeRenders--; }
+  });
+  try {
+    const body = await command();
+    const result = await send(body);
+    expect(result.status).toBe(200);
+    expect(result.body.completionRecorded).toBe(true);
+    expect((await raw()).status).toBe("completed");
+    expect(lifecycle.buildReceiptPdfBuffer).toHaveBeenCalledTimes(2);
+    expect(lifecycle.uploadPdfToS3).toHaveBeenCalledTimes(2);
+    for (const role of ["attorney", "paralegal"]) {
+      expect(lifecycle.uploadPdfToS3).toHaveBeenCalledWith({
+        key: `cases/${matter._id}/receipts/${role}.pdf`,
+        buffer: expectedReceipts.get(role),
+      });
+    }
+    expect(mockStripe.transfers.create).toHaveBeenCalledTimes(1);
+    expect(await Payout.countDocuments()).toBe(1);
+    expect(await PlatformIncome.countDocuments()).toBe(1);
+    const replay = await send(body);
+    expect(replay.status).toBe(200);
+    expect(replay.body.review.operation.status).toBe("recorded");
+    expect(mockStripe.transfers.create).toHaveBeenCalledTimes(1);
+    expect(lifecycle.buildReceiptPdfBuffer).toHaveBeenCalledTimes(2);
+    expect(lifecycle.uploadPdfToS3).toHaveBeenCalledTimes(2);
+    expect(await AuditLog.countDocuments({ action: "case.completion.recorded" })).toBe(1);
+  } finally {
+    lifecycle.buildReceiptPdfBuffer.mockImplementation(previousRenderer);
+    lifecycle.getReceiptKey.mockImplementation(previousKey);
+  }
+});
 test("an ended assignment identifies withdrawal as the current workflow until another paralegal is assigned", async () => {
   await Case.collection.updateOne({ _id: matter._id }, { $set: { status: "paused", paralegal: null, paralegalId: null, withdrawnParalegalId: para._id, pausedReason: "paralegal_withdrew" } });
   let review = await read(); expect(review.status).toBe(200);

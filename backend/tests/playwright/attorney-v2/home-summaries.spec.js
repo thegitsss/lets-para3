@@ -182,10 +182,35 @@ test('positive unread counts without previews never become an empty conversation
   const data = fixtures(); data.unread.count = 1; data.summary.items = [{ caseId: objectId(1), unread: 1 }];
   await install(page, data); await expect(region(page, 'messages')).toHaveAttribute('data-state', 'error');
   await expect(region(page, 'messages')).not.toContainText('No Matter conversations');
+  await expect(region(page, 'messages')).not.toContainText('No messages yet.');
+  await expect(region(page, 'messages')).not.toContainText('Recovered conversation');
   data.threads = { total: 1, threads: [{ id: objectId(1), title: 'Recovered conversation', unread: 1 }] };
-  await region(page, 'messages').getByRole('button', { name: 'Retry', exact: true }).click();
+  // A real background read may already have recovered and hidden Retry.
+  // A native route return requests the current Home data in either case.
+  await page.getByRole('navigation', { name: 'Help', exact: true }).getByRole('link', { name: 'Help', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Help for Attorneys', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: 'Home', exact: true }).click();
   await ready(page, 'messages'); await expect(region(page, 'messages')).toContainText('Recovered conversation');
   await expect(region(page, 'messages')).toContainText('1 unread');
+  await expect(region(page, 'messages')).toContainText('Message preview unavailable.');
+  await expect(region(page, 'messages')).not.toContainText('No messages yet.');
+  const previewControls = await page.evaluate(async () => {
+    const { conversationRow } = await import('/assets/scripts/attorney-v2/home.mjs');
+    const id = '000000000000000000000001';
+    return [
+      { unread: 0, total: 0, mismatch: false, snippet: '' },
+      { unread: 1, total: 1, mismatch: true, snippet: '' },
+      { unread: 1, total: 1, mismatch: false, snippet: 'Saved message preview.' },
+    ].map(value => {
+      const row = conversationRow({ id, unread: value.unread, lastMessageSnippet: value.snippet, title: 'Preview control' }, { mismatch: value.mismatch, byId: new Map([[id, value.total]]) });
+      return { text: row.querySelector('.av2-muted').textContent, unreadBadge: row.querySelector('.av2-unread-label')?.textContent || null };
+    });
+  });
+  expect(previewControls).toEqual([
+    { text: 'No messages yet.', unreadBadge: null },
+    { text: 'Message preview unavailable.', unreadBadge: null },
+    { text: 'Saved message preview.', unreadBadge: '1 unread' },
+  ]);
 });
 
 test('impossible conversation totals show unavailable and recover without stale previews', async ({ page }) => {

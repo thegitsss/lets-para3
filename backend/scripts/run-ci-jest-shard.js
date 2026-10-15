@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), { spawn } = require('node:child_process');
 const { snapshot, assertOriginalConfig, focusedFiles } = require('./verify-ci-jest-coverage');
-const { SHARD_COUNT, validatePlan, expectedJestArgs, verifyShard, hash } = require('./verify-ci-jest-shards');
+const { SHARD_COUNT, validatePlan, expectedJestArgs, verifyShard, hash, discover } = require('./verify-ci-jest-shards');
 const root = path.resolve(__dirname, '../..'), backend = path.join(root, 'backend'), evidence = path.join(backend, 'test-results/jest');
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
@@ -10,7 +10,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv.length !== 2 || argv[0] !== '--shard' || !/^[1-8]$/.test(argv[1])) throw Error('One exact --shard 1..8 is required; no selection or retry overrides.');
   if (process.version !== 'v24.18.0') throw Error('Pinned Node24.18.0 required.');
   const id = Number(argv[1]), planFile = path.join(evidence, 'plan.json'), plan = read(planFile), before = snapshot();
-  validatePlan(plan, before, plan.suites);
+  validatePlan(plan, before, plan.continuation ? discover() : plan.suites);
   assertOriginalConfig(require(path.join(backend, 'jest.config.js')));
   const manifest = read(path.join(backend, 'package.json'));
   if (manifest.scripts.test !== 'node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand') throw Error('Original complete npm test command changed.');

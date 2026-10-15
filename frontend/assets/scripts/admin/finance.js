@@ -1,3 +1,4 @@
+import { initPaymentAttention } from './payment-attention.js';
 import { bindDisputeEvidence } from './dispute-evidence.js';
 import { commissionMoney, commissionPaymentLabel } from '../utils/director-financials.mjs';
 import { replaceEventHandler } from '../utils/event-bindings.mjs';
@@ -324,13 +325,17 @@ function init() {
   exceptionTabs.className = 'admin-tabs';
   exceptionTabs.setAttribute('role', 'group');
   exceptionTabs.setAttribute('aria-label', 'Finance exception source');
-  exceptionTabs.innerHTML = '<button type="button" data-exception-source="disputes" aria-pressed="true">Matter disputes</button><button type="button" data-exception-source="chargebacks" aria-pressed="false">Processor chargebacks</button>';
+  exceptionTabs.innerHTML = '<button type="button" data-exception-source="disputes" aria-pressed="true">Matter disputes</button><button type="button" data-exception-source="chargebacks" aria-pressed="false">Processor chargebacks</button><button type="button" data-exception-source="events" aria-pressed="false">Payment event alerts</button>';
   const disputePanel = el('disputesBody').closest('.panel');
   disputePanel.before(exceptionTabs);
   el('chargebackPanel').hidden = true;
+  const paymentAttention = initPaymentAttention();
+  el('chargebackPanel').after(paymentAttention.panel);
   window.showAdminExceptions = (source = 'disputes') => {
     disputePanel.hidden = source !== 'disputes';
     el('chargebackPanel').hidden = source !== 'chargebacks';
+    paymentAttention.panel.hidden = source !== 'events';
+    if (source === 'events') void paymentAttention.load(); else paymentAttention.clear();
     exceptionTabs.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.exceptionSource === source)));
   };
   replaceEventHandler(exceptionTabs, 'click', e => {

@@ -216,3 +216,61 @@ describe("explicit source/backend evidence dispatch", () => {
     }
   });
 });
+
+describe("reviewed backend continuation workflow binding", () => {
+  const jobs = ["runtime-checks", "backend-tests", "backend-coverage"];
+  const digest = "a".repeat(64);
+  test.each([
+    ["pull_request", "backend-source", digest, ""],
+    ["push", "backend-source", digest, ""],
+    ["workflow_dispatch", "full", digest, ""],
+    ["workflow_dispatch", "unknown", digest, ""],
+    ["workflow_dispatch", "backend-source", "", ""],
+    ["workflow_dispatch", "backend-source", digest, digest],
+  ])("binds the reviewed plan only for %s/%s/%s", (event, scope, supplied, expected) => {
+    const workflow = currentWorkflow();
+    validateWorkflowContract(workflow);
+    for (const name of jobs) {
+      const expression = workflow.jobs[name].env.LPC_JEST_CONTINUATION_PLAN_SHA256.slice(3, -3);
+      const actual = Function("github", "inputs", `return (${expression})`)(
+        { event_name: event }, { execution_scope: scope, continuation_plan_sha256: supplied });
+      expect(actual).toBe(expected);
+    }
+  });
+  test("requires a truly optional empty string default without accepting extra inputs", () => {
+    for (const mutate of [
+      w => { delete w.on.workflow_dispatch.inputs.continuation_plan_sha256; },
+      w => { w.on.workflow_dispatch.inputs.continuation_plan_sha256.required = true; },
+      w => { w.on.workflow_dispatch.inputs.continuation_plan_sha256.default = digest; },
+      w => { w.on.workflow_dispatch.inputs.continuation_plan_sha256.type = "boolean"; },
+      w => { w.on.workflow_dispatch.inputs.continuation_plan_sha256.options = [digest]; },
+    ]) {
+      const workflow = currentWorkflow(); mutate(workflow);
+      expect(() => validateWorkflowContract(workflow)).toThrow(/Only explicit manual/);
+    }
+  });
+  test("rejects unbound hashes and SHA forwarding outside the explicit dispatch", () => {
+    for (const name of jobs) for (const expression of [undefined, digest, "${{ inputs.continuation_plan_sha256 }}"]) {
+      const workflow = currentWorkflow(); workflow.jobs[name].env.LPC_JEST_CONTINUATION_PLAN_SHA256 = expression;
+      expect(() => validateWorkflowContract(workflow)).toThrow(/continuation plan binding/);
+    }
+  });
+  test("limits prior artifact access to preparation and union with exact read-only permissions", () => {
+    for (const name of ["runtime-checks", "backend-coverage"]) for (const mutate of [
+      job => { delete job.env.GH_TOKEN; },
+      job => { job.env.GH_TOKEN = "${{ secrets.PERSONAL_TOKEN }}"; },
+      job => { job.permissions.actions = "write"; },
+      job => { job.permissions.contents = "write"; },
+      job => { job.permissions.issues = "read"; },
+    ]) {
+      const workflow = currentWorkflow(); mutate(workflow.jobs[name]);
+      expect(() => validateWorkflowContract(workflow)).toThrow(/exact read-only/);
+    }
+    for (const mutate of [job => { job.env.GH_TOKEN = "${{ github.token }}"; }, job => { job.permissions = { contents: "read" }; }]) {
+      const workflow = currentWorkflow(); mutate(workflow.jobs["backend-tests"]);
+      expect(() => validateWorkflowContract(workflow)).toThrow(/shards cannot receive/);
+    }
+    const leaked = currentWorkflow(); leaked.jobs["browser-checks"].env.LPC_JEST_CONTINUATION_PLAN_SHA256 = digest;
+    expect(() => validateWorkflowContract(leaked)).toThrow(/Only preparation, shards and union/);
+  });
+});

@@ -47,8 +47,12 @@ describe("Paralegal V2 Home contract", () => {
     expect(source).toMatch(/session === sessionRevision && userId === key\(\)/);
     expect(source).toMatch(/revision === cacheRevision/);
     expect(source).toMatch(/controller\?\.abort\(\)/);
-    expect(source).toMatch(/if \(editing \|\| \(!explicit && !explicitRefresh && interacting\(\)\)\)/);
-    expect(source).toMatch(/const editing =[^;]*dialog\[open\][^;]*input,select,textarea/);
+    // Settled controls retain interaction; a disabled loading placeholder must
+    // still accept its verified result. Editing and open dialogs always defer.
+    expect(source).toMatch(/const retainInteraction = currentRoot\.dataset\.homeLoading !== "true" && interacting\(\)/);
+    expect(source).toMatch(/if \(editing \|\| \(!explicit && !explicitRefresh && retainInteraction\)\)/);
+    expect(source).toMatch(/const editing =[^;]*dialog\[data-v2-route-dialog\]\[open\][^;]*input,select,textarea/);
+    expect(source).toContain('document.querySelector("dialog[open], .support-drawer[aria-hidden=\'false\'], [data-v2-search-panel]:not([hidden]), [data-v2-notifications-panel]:not([hidden])")');
     expect(source).toMatch(/clearProtected\(\)/);
     expect(app).not.toMatch(/outlet\.replaceChildren\(homeView\.createLoadingView\(\)\)/);
     expect(app).not.toMatch(/outlet\.replaceChildren\((?:browseView|workView|settingsView)\.createLoadingView\(\)\)/);

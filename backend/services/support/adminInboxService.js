@@ -274,7 +274,11 @@ async function inboxSummary() {
 
 // The persisted request ID claims a send before contacting the provider. An uncertain
 // send is never automatically retried, including after a lost HTTP response.
-async function replyByEmail({ ticket, adminUser, text, status, requestId, write }) {
+function replyByEmail(options) {
+  const { ticket, adminUser, requestId } = options;
+  return require('../../utils/decisionTurn')(`email:${ticket._id}:${requestId}:${adminUser._id || adminUser.id}`, () => sendReplyByEmail(options));
+}
+async function sendReplyByEmail({ ticket, adminUser, text, status, requestId, write }) {
   if (!/^[a-f0-9-]{36}$/i.test(String(requestId || ''))) throw Object.assign(new Error('A reply request ID is required.'), { statusCode: 400 });
   const existing = value => {
     const prior = value?.emailReplies?.find(r => r.requestId === requestId);

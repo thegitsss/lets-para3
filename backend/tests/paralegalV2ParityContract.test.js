@@ -70,7 +70,9 @@ describe("Paralegal V2 functional parity guardrails", () => {
     expect(app).toMatch(/route\.name === "attorney"/);
     expect(profile).toMatch(/api\.get\(`\/api\/users\/attorneys\/\$\{encodeURIComponent\(id\)\}`/);
     expect(profile).toMatch(/error\.status === 403/);
-    expect(onboarding).toContain('api.get("/api/users/me/onboarding")');
+    expect(onboarding).toContain('api.get("/api/users/me/onboarding", { signal: reader.signal })');
+    expect(onboarding).toContain('readController?.abort()');
+    expect(onboarding).toContain('generation !== ticket || stateRevision !== revision');
     expect(onboarding).toContain('method: "PATCH"');
     expect(onboarding).toContain("paralegalTourCompleted");
     expect(onboarding).toContain("paralegalProfileTourCompleted");

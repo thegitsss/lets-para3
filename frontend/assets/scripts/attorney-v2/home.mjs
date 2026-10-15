@@ -62,7 +62,7 @@ const reviewRow = (title, detail, label, href, kind) => {
 };
 
 export function conversationRow(thread, data) {
-      const preview = reviewRow(thread.title || "Matter messages", thread.lastMessageSnippet || "No messages yet.", "Open conversation", `#/conversations?matter=${id(thread)}`, "messages");
+      const preview = reviewRow(thread.title || "Matter messages", thread.lastMessageSnippet || (thread.unread > 0 || data.byId.get(id(thread)) > 0 ? "Message preview unavailable." : "No messages yet."), "Open conversation", `#/conversations?matter=${id(thread)}`, "messages");
       const copy = preview.querySelector('.av2-review-copy');
       if (thread.lastSenderName) copy.querySelector('.av2-muted').prepend(node('strong', { className: 'av2-message-sender', text: `${thread.lastSenderName}: ` }));
       const unread = data.mismatch ? 0 : data.byId.get(id(thread)) || 0;

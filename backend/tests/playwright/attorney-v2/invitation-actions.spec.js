@@ -52,7 +52,7 @@ test("an invitation locks the shown amount and acceptance becomes an application
   await sendInvitation(page); let value = await storedInvitation(page, id); expect(value).toMatchObject({ canInvite: false, amountLocked: true, amountCents: 40001, invitation: { status: "pending" } });
   await api(para, "post", `/api/cases/${id}/invite/accept`, {}); await reviewInvitation(page); await expect(invitations(page)).toContainText("accepted the invitation");
   const applications = await dto(page, id); expect(applications.caseStatus).toBe("open"); expect(applications.applications[0].status).toBe("submitted");
-  await invitations(page).getByRole("link", { name: "Review this Matter's applications" }).click(); await expect(panel(page)).toHaveAttribute("data-state", "ready"); await expect(panel(page)).toContainText("Accepted invitation");
+  await invitations(page).getByRole("link", { name: "Review this Matter's applications" }).click(); await expect(panel(page)).toHaveAttribute("data-state", "ready"); await panel(page).locator(`[data-application="${paraId}"] > summary`).click(); await expect(panel(page).locator(`[data-application="${paraId}"] .matter-application-letter`)).toBeVisible(); await expect(panel(page)).toContainText("Accepted invitation");
 });
 
 test("decline and accepted-invitation revocation remain visible and are not treated as hires", async ({ page }) => {

@@ -3,6 +3,7 @@ const Case = require('../models/Case');
 const SupportTicket = require('../models/SupportTicket');
 const PaymentOperation = require('../models/PaymentOperation');
 const AuditLog = require('../models/AuditLog');
+const withDecisionTurn = require('../utils/decisionTurn');
 const {
   evaluateAttorneyAccountReadiness,
   evaluateParalegalAdmissionReadiness,
@@ -96,7 +97,11 @@ async function getAccountContext(id) {
     checkedAt: new Date()
   };
 }
-async function requestAdmissionInformation({
+function requestAdmissionInformation(options) {
+  const { id, requestId, adminUser = {} } = options;
+  return withDecisionTurn(`admission:${id}:${requestId}:${adminUser._id || adminUser.id}`, () => sendAdmissionInformation(options));
+}
+async function sendAdmissionInformation({
   id,
   requestId,
   text,

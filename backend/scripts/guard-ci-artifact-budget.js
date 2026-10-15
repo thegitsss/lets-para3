@@ -10,7 +10,7 @@ const sha = value => crypto.createHash("sha256").update(value).digest("hex");
 function fail(message) { throw Error(`[artifact-budget] ${message}`); }
 function catalog(run, attempt, groups = JSON.parse(fs.readFileSync(path.join(ROOT, "backend/tests/playwright/acceptance/groups.json"))).groups) {
   if (!/^[1-9]\d*$/.test(String(run)) || !/^[1-9]\d*$/.test(String(attempt))) fail("Exact positive run ID and attempt required.");
-  if (groups.length !== 32 || new Set(groups.map(g => g.name)).size !== 32 || groups.reduce((n, g) => n + g.expectedIdentities, 0) !== 5933) fail("Complete approved32 browser groups required.");
+  if (groups.length !== 32 || new Set(groups.map(g => g.name)).size !== 32 || groups.reduce((n, g) => n + g.expectedIdentities, 0) !== 5939) fail("Complete approved32 browser groups required.");
   const suffix = `${run}-${attempt}`, rows = [];
   const add = (job, key, name, input, maxBytes) => rows.push({job, key: String(key), name: `${name}-${suffix}`, path: input, maxBytes});
   add("runtime-checks", "", "supply-chain-evidence", "backend/test-results/supply-chain", 16*MIB);

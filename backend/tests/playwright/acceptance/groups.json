@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "selectionAuthority": "Package-declared15critical scopes plus accepted permanent affected regression files; no test/assertion changes.",
   "originalDeclaredCriticalIdentities": 5945,
-  "additionalAffectedIdentities": 102,
+  "additionalAffectedIdentities": 105,
   "equivalentSharedFinancialDuplicateExecutionsRemoved": 114,
-  "expectedUniqueCriticalIdentities": 5933,
+  "expectedUniqueCriticalIdentities": 5939,
   "separateAccessibility": 294,
   "separatePerformance": 12,
-  "expectedOverallUniqueIdentities": 6239,
+  "expectedOverallUniqueIdentities": 6245,
   "sourceBaseCommit": "6ef16ef35e01f3907605a0501c2140b1ebb7c434",
   "groups": [
     {
@@ -178,10 +178,11 @@
         "tests/playwright/attorney-v2/matter-dates.spec.js",
         "tests/playwright/attorney-v2/notifications.spec.js",
         "tests/playwright/attorney-v2/saved-views.spec.js",
-        "tests/playwright/attorney-v2/security-webauthn.chromium.spec.js"
+        "tests/playwright/attorney-v2/security-webauthn.chromium.spec.js",
+        "tests/playwright/attorney-v2/calendar-press-regression.spec.js"
       ],
       "environment": {},
-      "expectedIdentities": 328,
+      "expectedIdentities": 331,
       "workers": 1,
       "retries": 0,
       "resourceLocks": [
@@ -189,7 +190,8 @@
         "legacy-port-5289"
       ],
       "originalAssertionBodiesUnchanged": true,
-      "httpPort": 61006
+      "httpPort": 61006,
+      "approvedAdditiveRegressions": 3
     },
     {
       "name": "attorney-v2-declared-4",
@@ -655,10 +657,11 @@
         "tests/playwright/admin-solo/inbox-reply-authority-actual.spec.js",
         "tests/playwright/admin-solo/inbox-status-triage-authority-actual.spec.js",
         "tests/playwright/admin-solo/information-request-authority-actual.spec.js",
-        "tests/playwright/admin-solo/routine-native-takeover-actual.spec.js"
+        "tests/playwright/admin-solo/routine-native-takeover-actual.spec.js",
+        "tests/playwright/admin-solo/payment-attention-recovery-actual.spec.js"
       ],
       "environment": {},
-      "expectedIdentities": 93,
+      "expectedIdentities": 96,
       "workers": 1,
       "retries": 0,
       "resourceLocks": [],
@@ -737,5 +740,10 @@
   },
   "originalBudgetReferences": [
     "outputs/lpc-accelerated-local-20261014/financial/remaining39-h/selected39.json"
-  ]
+  ],
+  "approvedCalendarRegressionIdentities": 3,
+  "currentDeclaredCriticalIdentities": 5948,
+  "calendarRegressionSourceSha256": "977552abc8772bf14281e608c2eb0a5f2922a0bb4689694a5228eabfade89e2b",
+  "approvedPaymentAttentionRegressionIdentities": 3,
+  "paymentAttentionRegressionSourceSha256": "2887ce49c1d9e226d9ef4dd3be6b614796d9807a1f0ada6031bc4b8e77ba7d1e"
 }

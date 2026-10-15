@@ -8,7 +8,7 @@ describe("Paralegal V2 Phase 8A Matter messaging", () => {
   test("connects text, existing authorized file exchange, and read acknowledgement", () => {
     const controller = read("frontend/assets/scripts/paralegal-v2/matter-messages.mjs");
     expect(controller).toMatch(/clientMessageId: state\.pendingMessage\.id/);
-    expect(controller).toMatch(/api\.post\(`\/api\/messages\/\$\{encodeURIComponent\(state\.matterId\)\}\/read`, \{ upTo \}\)/);
+    expect(controller).toContain('api.post(`/api/messages/${encodeURIComponent(state.matterId)}/read`, { upTo, ...(referenced ? { messageId: referenced.messageId } : {}) }, { signal: state.readController.signal, headers: { "X-LPC-Owner-Id": state.viewerId } })');
     expect(controller).toMatch(/api\.upload\(`\/api\/uploads\/case\/\$\{encodeURIComponent\(state\.matterId\)\}\?presentation=matter`, formData/);
     expect(controller).toMatch(/formData\.append\("file", entry\.file\)/);
     expect(controller).toMatch(/formData\.append\("clientUploadId", entry\.clientUploadId\)/);
@@ -34,7 +34,12 @@ describe("Paralegal V2 Phase 8A Matter messaging", () => {
     expect(controller).not.toMatch(/innerHTML|insertAdjacentHTML/);
     expect(controller).toMatch(/const drafts = new Map\(\)/);
     expect(controller).toMatch(/const readWatermarks = new Map\(\)/);
-    expect(controller).toMatch(/readWatermarks\.get\(matterId\) === upTo/);
+    // Progress belongs to the reviewed owner and Matter, and newer progress
+    // also suppresses an older acknowledgement after a panel remount.
+    expect(controller).toContain('const key = state.draftKey;');
+    expect(controller).toContain('if (Date.parse(readWatermarks.get(key)) >= Date.parse(upTo)) return;');
+    expect(controller).toContain('readWatermarks.set(key, upTo);');
+    expect(controller).toContain('if (readWatermarks.get(key) === upTo) readWatermarks.delete(key);');
     expect(controller).toMatch(/const draftKey = `\$\{viewerId\}:\$\{String\(matterId \|\| ""\)\}`/);
     expect(controller).toMatch(/saveDraft\(current\)/);
   });

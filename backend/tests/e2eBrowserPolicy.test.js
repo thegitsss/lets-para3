@@ -60,8 +60,12 @@ describe("browser runtime and E2E policy", () => {
     const scripts = JSON.parse(read("package.json")).scripts;
     expect(scripts["test:playwright:critical"]).toContain("npm run test:playwright:support");
     expect(scripts["test:playwright:critical"]).toContain("npm run test:playwright:attorney-v2");
-    expect(scripts["test:playwright:attorney-v2"]).toContain("tests/playwright/attorney-v2/playwright.config.js");
-    expect(scripts["test:playwright:attorney-v2"]).toContain("--fail-on-flaky-tests");
+    expect(scripts["test:playwright:attorney-v2"]).toBe("node scripts/run-critical-browser-group.js --suite attorney-v2");
+    const groups = JSON.parse(read("tests/playwright/acceptance/groups.json")).groups
+      .filter(group => group.suite === "test:playwright:attorney-v2");
+    expect(groups.length).toBeGreaterThan(0);
+    expect(groups.every(group => group.baseConfig === "tests/playwright/attorney-v2/playwright.config.js")).toBe(true);
+    expect(read("scripts/run-critical-browser-group.js")).toContain("'--fail-on-flaky-tests'");
     expect(read("tests/playwright/attorney-v2/playwright.config.js")).toContain('buildPlaywrightReporters("playwright-attorney-v2")');
   });
 

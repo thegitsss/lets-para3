@@ -120,3 +120,19 @@ test.each([true, false])("only the signed original request key can recover an un
   else { expect(operation.stripeRefundId).toBe(""); expect(await raw()).toEqual(before); }
   expect(create).toHaveBeenCalledTimes(1); expect((await raw()).status).toBe("disputed");
 });
+
+test("a successful fresh refund retry resolves only its earlier processing failure", async () => {
+  mockStripe.refunds.retrieve.mockRejectedValueOnce(new Error("Synthetic transient processing failure"));
+  expect((await send()).status).toBe(500); expect(await Delivery.findOne({eventId:event.id}).lean()).toMatchObject({status:"failed",attentionRequired:true,attentionCategory:"processing"});
+  expect((await send()).status).toBe(200); expect(await Delivery.findOne({eventId:event.id}).lean()).toMatchObject({status:"processed",attentionRequired:false,attentionCategory:""});
+});
+test("a retained business-audit shortcut cannot dismiss a processing warning without fresh review", async () => {
+  expect((await send()).status).toBe(200); await Delivery.updateOne({eventId:event.id},{$set:{status:"failed",attentionRequired:true,attentionCategory:"processing"}});
+  mockStripe.refunds.retrieve.mockClear(); expect((await send()).status).toBe(200); expect(mockStripe.refunds.retrieve).not.toHaveBeenCalled();
+  expect(await Delivery.findOne({eventId:event.id}).lean()).toMatchObject({status:"processed",attentionRequired:true,attentionCategory:"processing"});
+});
+test("a failed delivery retains an existing substantive alert category", async () => {
+  await Delivery.create({eventId:event.id,type:event.type,stripeMode:"test",status:"failed",attentionRequired:true,attentionCategory:"refund",attempts:1,lastAttemptAt:new Date()});
+  mockStripe.refunds.retrieve.mockRejectedValueOnce(new Error("Synthetic transient processing failure"));
+  expect((await send()).status).toBe(500); expect(await Delivery.findOne({eventId:event.id}).lean()).toMatchObject({status:"failed",attentionRequired:true,attentionCategory:"refund"});
+});

@@ -78,8 +78,6 @@ function init() {
     if(e.key==='ArrowUp'&&index===0)el('adminGlobalSearch').focus();
     else buttons[(index+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length].focus();
   });
-  if(!/Mac|iPhone|iPad/.test(navigator.platform))el('adminSearchOpen').querySelector('kbd').textContent='Ctrl K';
-
   const overview = el('section-overview');
   const grid = document.createElement('div');
   grid.className = 'admin-home-grid';

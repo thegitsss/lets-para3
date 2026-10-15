@@ -15,6 +15,7 @@ const originalAdapters={
  'test:playwright:admin-solo':'tests/playwright/admin-solo/playwright.config.js',
 };
 const additional=[
+ 'admin-solo/payment-attention-recovery-actual.spec.js',
  'admin-solo/inbox-note-authority-actual.spec.js','admin-solo/inbox-status-triage-authority-actual.spec.js',
  'admin-solo/inbox-reply-authority-actual.spec.js','admin-solo/information-request-authority-actual.spec.js',
  'admin-solo/routine-native-takeover-actual.spec.js','financial-lifecycle/financial-native-recovery-actual.spec.js',
@@ -25,6 +26,8 @@ const additional=[
 const scripts=[...pkg.scripts['test:playwright:critical'].matchAll(/npm run ([a-zA-Z0-9:_-]+)/g)].map(m=>m[1]);
 if(scripts.length!==15||new Set(scripts).size!==15)throw Error('Keep all15 declared critical scopes.');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const approvedCalendarRegression={path:'tests/playwright/attorney-v2/calendar-press-regression.spec.js',sha256:'977552abc8772bf14281e608c2eb0a5f2922a0bb4689694a5228eabfade89e2b'};
+if(sha(fs.readFileSync(path.join(backend,approvedCalendarRegression.path)))!==approvedCalendarRegression.sha256)throw Error('Approved additive calendar regression source changed.');
 const safeEnv={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,NODE_ENV:'test',EMAIL_DISABLE:'true',MONGOMS_RUNTIME_DOWNLOAD:'false',AWS_EC2_METADATA_DISABLED:'true'};
 function collect(name,config,env={}){return new Promise((resolve,reject)=>{
  const target=path.join(output,name+'.json'),stderr=[];const fd=fs.openSync(target,'w');
@@ -58,7 +61,7 @@ for(const [file,hash]of Object.entries(reviewedDuplicatePins))if(sha(fs.readFile
  if(missing.length||extraRows.length)throw Error('Group identity union differs: '+missing.length+' missing, '+extraRows.length+' extra.');
  for(const [k,r]of seen){const before=expected.get(k);if(r.expectedStatus!=='passed'||before.expectedStatus!=='passed'||r.timeout>before.timeout)throw Error('Group weakens status or callback deadline '+k);}
 
- if(seen.size!==5933||seen.size!==manifest.expectedUniqueCriticalIdentities)throw Error('Critical union count changed.');
+ if(seen.size!==5939||seen.size!==manifest.expectedUniqueCriticalIdentities)throw Error('Critical union count changed.');
  const summary={status:'EXACT_ORIGINAL_PLUS_ADDITIONAL_GROUPED_COLLECTION_UNION_VERIFIED',collectionOnly:true,executed:0,originalRawIdentities:original.reduce((n,r)=>n+r.rows.length,0),additional:extra.rows.length,qualifiedSharedFinancialDuplicates:duplicates.length,uniqueCritical:seen.size,groups:actual.map(r=>({name:r.name,count:r.rows.length,path:r.path,sha256:r.sha256})),baselineReports:original.map(({rows:_rows,...r})=>r),additionalReport:{path:extra.path,sha256:extra.sha256},reviewedDuplicatePins,manifestSha256:sha(fs.readFileSync(path.join(backend,'tests/playwright/acceptance/groups.json'))),rows:[...seen.values()],missing,extra:extraRows,limits:['Only collection equality is verified; no test pass, current release/device/provider acceptance.','Shared/financial context/fixture equivalence remains explicitly source-pinned in release coverage evidence; config default context dimensions are not equated by title.']};
  fs.writeFileSync(path.join(output,'verified-union.json'),JSON.stringify(summary,null,2)+'\n');console.log(JSON.stringify({status:summary.status,groups:actual.length,uniqueCritical:seen.size,additional:extra.rows.length,duplicates:duplicates.length,output}));
 })().catch(error=>{fs.writeFileSync(path.join(output,'failed.json'),JSON.stringify({status:'COLLECTION_VERIFICATION_FAILED',message:error.message},null,2)+'\n');console.error(error.message);process.exitCode=1;});

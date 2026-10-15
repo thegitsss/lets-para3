@@ -6,6 +6,7 @@ const repositoryRoot = path.resolve(__dirname, "../..");
 const defaultWorkflowPath = path.join(repositoryRoot, ".github/workflows/quality.yml");
 const BROWSER_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source'";
 const BROWSER_GATE_GUARD = "always() && (" + BROWSER_SCOPE_GUARD + ")";
+const CONTINUATION_PLAN_BINDING = "${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'backend-source' && inputs.continuation_plan_sha256 || '' }}";
 const REQUIRED_JOBS = Object.freeze([
   "deployment-blueprint",
   "validate",
@@ -240,8 +241,8 @@ function validatePinnedActions(workflow) {
 function validateGroupedBrowserJobs(jobs, catalog) {
   if (catalog.schemaVersion !== 1 || catalog.groups?.length !== EXPECTED_GROUP_NAMES.length ||
       JSON.stringify(catalog.groups.map(group => group.name).sort()) !== JSON.stringify([...EXPECTED_GROUP_NAMES].sort()) ||
-      catalog.expectedUniqueCriticalIdentities !== 5933 || catalog.expectedOverallUniqueIdentities !== 6239 ||
-      catalog.groups.reduce((sum, group) => sum + group.expectedIdentities, 0) !== 5933) fail("Complete versioned browser groups and exact unique identity totals are required.");
+      catalog.expectedUniqueCriticalIdentities !== 5939 || catalog.expectedOverallUniqueIdentities !== 6245 ||
+      catalog.groups.reduce((sum, group) => sum + group.expectedIdentities, 0) !== 5939) fail("Complete versioned browser groups and exact unique identity totals are required.");
   for (const group of catalog.groups) {
     if (group.workers !== 1 || group.retries !== 0 || group.originalAssertionBodiesUnchanged !== true ||
         (group.name === "director-managed" ? group.baseConfig !== REQUIRED_CRITICAL_CONFIGS["test:playwright:financial-lifecycle"] : REQUIRED_CRITICAL_CONFIGS[group.suite] !== group.baseConfig) || !group.files?.length ||
@@ -273,6 +274,24 @@ function validateGroupedBrowserJobs(jobs, catalog) {
       JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}" }) ||
       final?.run?.trim() !== 'test "$COLLECTION_RESULT" = success\ntest "$CHECKS_RESULT" = success\ntest "$ROLES_RESULT" = success') fail("Browser aggregate must fail closed unless every complete dependency succeeds.");
   return catalog.groups.length;
+}
+
+function validateContinuationBinding(jobs) {
+  const selected = ["runtime-checks", "backend-tests", "backend-coverage"];
+  for (const name of selected) {
+    const job = jobs[name];
+    if (job?.env?.LPC_JEST_CONTINUATION_PLAN_SHA256 !== CONTINUATION_PLAN_BINDING) fail(`${name} must retain the exact manual backend-source continuation plan binding.`);
+    if (name === "backend-tests") {
+      if (job.permissions !== undefined || job.env.GH_TOKEN !== undefined) fail("Backend test shards cannot receive artifact tokens or extra permissions.");
+    } else if (job.env.GH_TOKEN !== "${{ github.token }}" ||
+        JSON.stringify(Object.keys(job.permissions || {}).sort()) !== JSON.stringify(["actions", "contents"]) ||
+        job.permissions.actions !== "read" || job.permissions.contents !== "read") {
+      fail("Only preparation and union may read prior artifacts, with exact read-only contents/actions permissions.");
+    }
+  }
+  for (const [name, job] of Object.entries(jobs)) {
+    if (!selected.includes(name) && (job.env?.LPC_JEST_CONTINUATION_PLAN_SHA256 !== undefined || job.env?.GH_TOKEN !== undefined)) fail("Only preparation, shards and union may receive the backend continuation binding.");
+  }
 }
 
 function validateGroupedBackendJobs(jobs) {
@@ -310,7 +329,12 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   if (!Object.prototype.hasOwnProperty.call(triggers, "push")) fail("main push validation is required.");
   const dispatch = triggers.workflow_dispatch;
   const input = dispatch?.inputs?.execution_scope;
-  if (!dispatch || Object.keys(dispatch).join() !== "inputs" || Object.keys(dispatch.inputs || {}).join() !== "execution_scope" ||
+  const continuationInput = dispatch?.inputs?.continuation_plan_sha256;
+  if (!dispatch || Object.keys(dispatch).join() !== "inputs" ||
+      JSON.stringify(Object.keys(dispatch.inputs || {}).sort()) !== JSON.stringify(["continuation_plan_sha256", "execution_scope"]) ||
+      !continuationInput || continuationInput.type !== "string" || continuationInput.required !== false || continuationInput.default !== "" ||
+      typeof continuationInput.description !== "string" || !continuationInput.description ||
+      Object.keys(continuationInput).some(key => !["type", "required", "default", "description"].includes(key)) ||
       !input || input.type !== "choice" || input.required !== true || input.default !== "full" ||
       JSON.stringify(input.options) !== JSON.stringify(["full", "backend-source"]) ||
       typeof input.description !== "string" || !input.description ||
@@ -329,6 +353,7 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   }
 
   const jobs = workflow.jobs || {};
+  validateContinuationBinding(jobs);
   for (const jobName of REQUIRED_JOBS) {
     if (!jobs[jobName]) fail(`Required job ${jobName} is missing.`);
     if (jobs[jobName].name !== REQUIRED_GATE_NAMES[jobName]) fail(`Required named gate context changed: ${jobName}.`);

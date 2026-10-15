@@ -12,6 +12,11 @@ on:
         required: true
         default: full
         options: [full, backend-source]
+      continuation_plan_sha256:
+        description: Optional reviewed backend continuation plan SHA-256 (backend-source manual dispatch only)
+        type: string
+        required: false
+        default: ""
 
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
@@ -61,7 +66,12 @@ jobs:
     name: Runtime and source checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
     env:
+      GH_TOKEN: ${{ github.token }}
+      LPC_JEST_CONTINUATION_PLAN_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'backend-source' && inputs.continuation_plan_sha256 || '' }}
       CI: "true"
       PUPPETEER_SKIP_DOWNLOAD: "true"
       MONGOMS_DISABLE_POSTINSTALL: "true"
@@ -150,6 +160,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
+      LPC_JEST_CONTINUATION_PLAN_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'backend-source' && inputs.continuation_plan_sha256 || '' }}
       CI: "true"
       PUPPETEER_SKIP_DOWNLOAD: "true"
       MONGOMS_DISABLE_POSTINSTALL: "true"
@@ -223,7 +234,12 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
     env:
+      GH_TOKEN: ${{ github.token }}
+      LPC_JEST_CONTINUATION_PLAN_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'backend-source' && inputs.continuation_plan_sha256 || '' }}
       CI: "true"
       PUPPETEER_SKIP_DOWNLOAD: "true"
       MONGOMS_DISABLE_POSTINSTALL: "true"

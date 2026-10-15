@@ -97,9 +97,12 @@ async function markWebhookEventProcessed(eventId, record) {
 
 async function markWebhookEventFailed(eventId, err, record) {
   try {
+    // A delivery failure must not downgrade an existing substantive review to
+    // a processing-only alert that a later recovery could resolve.
+    const category = record?.attentionCategory && record.attentionCategory !== "processing" ? record.attentionCategory : "processing";
     const result = await WebhookEvent.updateOne(
       processingAttempt(eventId, record),
-      { $set: { status: "failed", lastError: String(err?.message || err || "Unknown error"), attentionRequired: true, attentionCategory: "processing" } },
+      { $set: { status: "failed", lastError: String(err?.message || err || "Unknown error"), attentionRequired: true, attentionCategory: category } },
       { writeConcern: { w: "majority" } }
     );
     // A newer delivery may be active or already complete. A lost acknowledgement

@@ -9,7 +9,7 @@ export function createWorkspaceDates(caseId, { api, signal, ownerId, route, priv
   const today=new Intl.DateTimeFormat("en-CA",{timeZone:displayTimezone,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
   const state = privateState.dateReviews.get(caseId) || { draft: null, pending: null, from: today, to: "", selectedId: null };
   privateState.dateReviews.set(caseId, state); state.busy = false;
-  let review = null, rows = [], cursor = null, reading = false, transfer = null, selectedId = objectId(route.query.get("eventId")) || state.selectedId;
+  let review = null, rows = [], cursor = null, reading = false, quietReading = false, detailSignature = null, transfer = null, selectedId = objectId(route.query.get("eventId")) || state.selectedId;
   const options = { signal, ownerId }, refresh = recoveryButton("Retry calendar", () => void load()), more = button("Show more dates", () => void load({ more: true })), add = button("Add calendar entry", event => state.draft ? renderEditor(event.currentTarget) : openEditor("create",null,event.currentTarget), "av2-button");
   const from = node("input", { id: `av2-date-from-${caseId}`, type: "date", value: state.from }), to = node("input", { id: `av2-date-to-${caseId}`, type: "date", value: state.to });
   const filters = node("div", { className: "av2-date-grid" }, [node("label", { for: from.id, text: "From date" }), from, node("label", { for: to.id, text: "Through date" }), to]);
@@ -29,17 +29,21 @@ export function createWorkspaceDates(caseId, { api, signal, ownerId, route, priv
     add.disabled = !review || reading || state.busy || Boolean(state.pending); add.textContent=state.draft ? "Resume calendar changes" : "Add calendar entry";
     refresh.disabled = reading || state.busy; more.disabled = reading || state.busy; more.hidden = !cursor;
     for (const control of [apply, reset, from, to]) control.disabled = reading || state.busy;
-    for (const control of [...detail.querySelectorAll("button"), ...editor.querySelectorAll("button,input,textarea,select")]) control.disabled = reading || state.busy || Boolean(state.pending) && !recovery.contains(control);
+    for (const control of detail.querySelectorAll("button")) control.disabled = reading && !quietReading || state.busy || Boolean(state.pending);
+    for (const control of editor.querySelectorAll("button,input,textarea,select")) control.disabled = reading || state.busy || Boolean(state.pending) && !recovery.contains(control);
     check.disabled = reading || state.busy; retry.disabled = reading || state.busy || !state.retryReviewed; stop.hidden = !state.busy;
   
     setRecovery(refresh, section);
   }
   function denied() {
-    state.draft = null; state.pending = null; state.selectedId = null; privateState.dateReviews.delete(caseId); rows = []; review = null; cursor = null; list.replaceChildren(); detail.replaceChildren(); closeEditor();editor.replaceChildren(); recovery.replaceChildren(); count.textContent = ""; section.dataset.state = "error";
+    state.draft = null; state.pending = null; state.selectedId = null; privateState.dateReviews.delete(caseId); detailSignature = null; rows = []; review = null; cursor = null; list.replaceChildren(); detail.replaceChildren(); closeEditor();editor.replaceChildren(); recovery.replaceChildren(); count.textContent = ""; section.dataset.state = "error";
   }
   const currentEntry = () => review?.selectedEvent || rows.find(entry => entry.id === selectedId) || null;
   function showDetails() {
-    detail.replaceChildren(); const entry = currentEntry(); if (!entry) { if (selectedId) detail.append(node("p", { text: "This calendar entry is no longer available to your account." })); return; }
+    const entry = currentEntry(), signature = JSON.stringify([selectedId, entry]);
+    // An unchanged passive read must not replace a button during a native press.
+    if (detailSignature === signature) return;
+    detailSignature = signature; detail.replaceChildren(); if (!entry) { if (selectedId) detail.append(node("p", { text: "This calendar entry is no longer available to your account." })); return; }
     detail.append(node("h4", { text: entry.title }), node("p", { text: calendarLabel({...entry,timezone:displayTimezone}) }));
     if (entry.end && !entry.isAllDay && entry.end !== entry.start) detail.append(node("p", { text: `Ends: ${calendarLabel({ ...entry, start: entry.end,timezone:displayTimezone })}` }));
     if (entry.where) detail.append(node("p", { className: "av2-preserve-lines", text: `Location: ${entry.where}` }));
@@ -156,15 +160,15 @@ export function createWorkspaceDates(caseId, { api, signal, ownerId, route, priv
   }
   async function load({ more: append = false, quiet = false } = {}) {
     if (reading || signal.aborted) return;
-    reading = true; const retained = rows; controls(); if (!quiet) { section.dataset.state = "loading"; feedback.textContent = "Loading your calendar…"; }
+    reading = true; quietReading = quiet; const retained = rows; controls(); if (!quiet) { section.dataset.state = "loading"; feedback.textContent = "Loading your calendar…"; }
     try {
       const query = { ...options, ...(selectedId ? { eventId: selectedId } : {}), ...(state.from ? { from: localBoundary(state.from),allDayFrom:`${state.from}T00:00:00.000Z` } : {}), ...(state.to ? { to: localBoundary(state.to,true),allDayTo:`${state.to}T23:59:59.999Z` } : {}) };
       let page = readDates(await api.readWorkspaceDates(caseId, { ...query, ...(append ? { cursor } : {}) }), caseId, ownerId); if (signal.aborted) return;
       const added = [...page.items], seen = new Set();
       while (quiet && added.length < retained.length && page.nextCursor) { if (seen.has(page.nextCursor)) throw new Error("repeated_calendar_page"); seen.add(page.nextCursor); page = readDates(await api.readWorkspaceDates(caseId, { ...query, cursor: page.nextCursor }), caseId, ownerId); if (signal.aborted) return; added.push(...page.items); }
       rows = append ? [...retained, ...added] : added; if (new Set(rows.map(entry => entry.id)).size !== rows.length) throw new Error("repeated_calendar_entry"); review = page; cursor = page.nextCursor; section.dataset.state = "ready"; if (!quiet) feedback.textContent = ""; render();
-    } catch (error) { if (!signal.aborted) { if ([401, 403, 404].includes(error.status)) denied(); else { rows = []; cursor = null; review = null; list.replaceChildren(); detail.replaceChildren(); count.textContent = ""; section.dataset.state = "error"; } feedback.textContent = "Your calendar couldn’t load. Refresh it to try again."; } }
-    finally { reading = false; if (!signal.aborted) controls(); }
+    } catch (error) { if (!signal.aborted) { if ([401, 403, 404].includes(error.status)) denied(); else { rows = []; cursor = null; review = null; detailSignature = null; list.replaceChildren(); detail.replaceChildren(); count.textContent = ""; section.dataset.state = "error"; } feedback.textContent = "Your calendar couldn’t load. Refresh it to try again."; } }
+    finally { reading = false; quietReading = false; if (!signal.aborted) controls(); }
   }
   signal.addEventListener("abort", () => { transfer?.abort();if(editor.open)editor.close(); state.busy = false; section.replaceChildren(); }, { once: true });
   section.sync = () => state.draft || state.pending || state.busy ? Promise.resolve() : load({ quiet: true });

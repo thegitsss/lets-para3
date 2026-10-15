@@ -30,6 +30,7 @@ function discover() {
   return canonical(files.map(file => { const relative = path.relative(backend, file).split(path.sep).join('/'); if (!/^tests\/[A-Za-z0-9_./-]+\.test\.js$/.test(relative) || relative.includes('..')) fail('Invalid original discovery path.'); return relative; }));
 }
 function validatePlan(plan, current, discovered) {
+  if (plan.continuation) return require('./verify-ci-jest-continuation').validateContinuationPlan(plan, current, discovered);
   if (plan.schemaVersion !== 2 || !equal(plan.source, current) || !Number.isFinite(Date.parse(plan.preparedAt)) || !plan.executionId) fail('Plan candidate/source or execution binding changed.');
   const { planId, ...payload } = plan;
   if (planId !== hash(JSON.stringify(payload))) fail('Plan content digest changed.');
@@ -90,17 +91,19 @@ function preparePlan() {
   if (candidate.commit !== source.commit || process.env.GITHUB_SHA && process.env.GITHUB_SHA !== source.commit || manifest.scripts.test !== 'node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand') fail('Clean candidate or original full test script changed.');
   const suites = discover(), required = Object.fromEntries(Object.keys(REQUIRED_SUBSETS).map(name => [name, focusedFiles(manifest, name)]));
   const sizes = Object.fromEntries(suites.map(file => [file, fs.statSync(path.join(backend, file)).size]));
-  const scheduling = balanceSuites(suites, source, read(path.join(backend, 'tests/ci-jest-duration-hints.json')), sizes);
-  const payload = { schemaVersion: 2, preparedAt: new Date().toISOString(), executionId: `${process.env.GITHUB_RUN_ID || 'local-' + Date.now()}:${process.env.GITHUB_RUN_ATTEMPT || '1'}`, source, candidateIdentitySHA256: hash(fs.readFileSync(candidateFile)), originalConfigSHA256: source.files['backend/jest.config.js'], required, suites, ...scheduling };
+  const continuation = process.env.LPC_JEST_CONTINUATION_PLAN_SHA256 ? require('./verify-ci-jest-continuation').prepareContinuation(source, suites) : null;
+  const selectedSuites = continuation ? continuation.execute : suites;
+  const scheduling = balanceSuites(selectedSuites, source, read(path.join(backend, 'tests/ci-jest-duration-hints.json')), sizes);
+  const payload = { schemaVersion: 2, preparedAt: new Date().toISOString(), executionId: `${process.env.GITHUB_RUN_ID || 'local-' + Date.now()}:${process.env.GITHUB_RUN_ATTEMPT || '1'}`, source, candidateIdentitySHA256: hash(fs.readFileSync(candidateFile)), originalConfigSHA256: source.files['backend/jest.config.js'], required, suites: selectedSuites, ...scheduling, ...(continuation ? {continuation} : {}) };
   const plan = { ...payload, planId: hash(JSON.stringify(payload)) }; validatePlan(plan, source, suites); write(path.join(evidence, 'plan.json'), plan);
-  console.log(`[ci-jest-shards] Planned all ${suites.length} original suites in ${SHARD_COUNT} disjoint serial groups; scheduling weights are estimates, not runtime acceptance.`);
+  console.log(continuation ? `[ci-jest-shards] Selected ${selectedSuites.length} affected/unqualified original suites in ${SHARD_COUNT} disjoint serial groups; ${continuation.reuse.length} source-bound prior suite proofs require final union verification.` : `[ci-jest-shards] Planned all ${suites.length} original suites in ${SHARD_COUNT} disjoint serial groups; scheduling weights are estimates, not runtime acceptance.`);
 }
 function verifyArtifacts() {
   const planFile = path.join(evidence, 'plan.json'), plan = read(planFile), current = snapshot(), artifactRoot = path.join(evidence, 'shard-artifacts');
-  const inputs = fs.readdirSync(artifactRoot).map(name => { const directory = path.join(artifactRoot, name); if (!fs.lstatSync(directory).isDirectory() || fs.lstatSync(directory).isSymbolicLink()) fail('Only separate regular shard artifact directories are allowed.'); const parseLines = name => fs.readFileSync(path.join(directory, name), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse); const record = read(path.join(directory, 'shard.json')); for (const name of ['results.json', 'results.xml', 'mongo.jsonl', 'http.jsonl']) if (hash(fs.readFileSync(path.join(directory, name))) !== record.rawSHA256?.[name]) fail('Raw shard evidence hash changed: ' + name); return { record, report: read(path.join(directory, 'results.json')), mongo: parseLines('mongo.jsonl'), http: parseLines('http.jsonl') }; });
-  const result = verifyUnion(plan, inputs, current, discover(), hash(fs.readFileSync(planFile)));
+  const inputs = fs.readdirSync(artifactRoot).map(name => { const directory = path.join(artifactRoot, name); if (!fs.lstatSync(directory).isDirectory() || fs.lstatSync(directory).isSymbolicLink()) fail('Only separate regular shard artifact directories are allowed.'); const parseLines = name => fs.readFileSync(path.join(directory, name), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse); const record = read(path.join(directory, 'shard.json')); for (const name of ['results.json', 'results.xml', 'mongo.jsonl', 'http.jsonl']) if (hash(fs.readFileSync(path.join(directory, name))) !== record.rawSHA256?.[name]) fail('Raw shard evidence hash changed: ' + name); return { record, report: read(path.join(directory, 'results.json')), mongo: parseLines('mongo.jsonl'), http: parseLines('http.jsonl'), raw: Object.fromEntries(['results.json','results.xml','mongo.jsonl','http.jsonl'].map(name=>[name,fs.readFileSync(path.join(directory,name))])) }; });
+  const result = plan.continuation ? require('./verify-ci-jest-continuation').verifyContinuationArtifacts(plan,current,discover(),inputs,hash(fs.readFileSync(planFile))) : verifyUnion(plan, inputs, current, discover(), hash(fs.readFileSync(planFile)));
   write(path.join(evidence, 'required-coverage.json'), { ...result, verifiedAt: new Date().toISOString(), planSHA256: hash(fs.readFileSync(planFile)) });
   console.log(`[ci-jest-shards] Exact raw union qualified: ${result.fullCallbacks} callbacks/${result.fullSuites} suites, auth/payment originals and every owned child cleanup verified.`);
 }
+module.exports = { SHARD_COUNT, balanceSuites, validatePlan, validateOwnedCleanup, expectedJestArgs, verifyShard, verifyUnion, hash, discover };
 if (require.main === module) { try { if (process.argv.length !== 3) fail('Use exactly --prepare or --verify.'); if (process.argv[2] === '--prepare') preparePlan(); else if (process.argv[2] === '--verify') verifyArtifacts(); else fail('Use exactly --prepare or --verify.'); } catch (error) { console.error(error.message); process.exitCode = 1; } }
-module.exports = { SHARD_COUNT, balanceSuites, validatePlan, validateOwnedCleanup, expectedJestArgs, verifyShard, verifyUnion, hash };

@@ -137,6 +137,15 @@ router.put('/drafts/:kind/:recordId', csrfProtection, asyncHandler(async (req,re
   const { saveDraft } = require('../services/adminDraftService');
   res.set('Cache-Control','no-store').json(await saveDraft({ ...req.params, owner:req.user.id || req.user._id },req.body));
 }));
+const paymentAttention = require('../services/paymentAttentionRecovery');
+const paymentAttentionOperation = action => asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  try { res.json(await paymentAttention[action](req, require('../utils/stripe'))); }
+  catch (error) { res.status(error.status || error.statusCode || 503).json({ code: error.publicCode || 'PAYMENT_ATTENTION_UNAVAILABLE', error: error.status || error.statusCode ? error.message : 'The payment alert could not be verified. Refresh to try again.' }); }
+});
+router.get('/finance/payment-alerts', paymentAttentionOperation('list'));
+router.get('/finance/payment-alerts/:receiptId/review', paymentAttentionOperation('review'));
+router.post('/finance/payment-alerts/:receiptId/resolve', csrfProtection, paymentAttentionOperation('resolve'));
 router.get('/finance/records', asyncHandler(async (req, res) => res.set('Cache-Control', 'private, no-store').json(await listFinance(req.query, req))));
 router.get('/finance/export', asyncHandler(async (req, res) => exportFinance(req.query, res, req)));
 router.get('/finance/dispute-preview/:id', asyncHandler(async (req, res) => {

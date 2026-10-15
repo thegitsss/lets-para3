@@ -58,3 +58,30 @@ test('source-matched actual durations balance heavy suites without omitting unkn
 });
 test('shard commands preserve original config, runInBand, full file bodies and actual JUnit/JSON', () => { const args = expectedJestArgs('/candidate/backend', '/evidence', ['tests/a.test.js', 'tests/b.test.js']); expect(args).toContain('--runInBand'); expect(args).toContain('--runTestsByPath'); expect(args).toContain('/candidate/backend/jest.config.js'); expect(args).toContain('--reporters=jest-junit'); expect(args.some(a => /grep|testNamePattern|retry/.test(a))).toBe(false); });
 test('the launcher rejects extra grep/project/retry options and out-of-range shard IDs before any setup', async () => { const { main } = require('../scripts/run-ci-jest-shard'); for (const args of [['--shard', '0'], ['--shard', '9'], ['--shard', '1', '--grep', 'chosen'], ['--shard', '1', '--retries', '2']]) await expect(main(args)).rejects.toThrow(/no selection or retry overrides/); });
+
+test('continuation requires an exact reviewed plan on a clean, source-bound manual backend-only event', () => {
+  const { validateExecutionContext } = require('../scripts/verify-ci-jest-continuation');
+  const current = { commit: 'a'.repeat(40) }, spec = { schemaVersion: 1, mode: 'whole-file-source-bound-backend-continuation', currentCommit: '@checked-out-head' }, bytes = Buffer.from(JSON.stringify(spec)), approved = hash(bytes);
+  const env = { LPC_JEST_CONTINUATION_PLAN_SHA256: approved, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: current.commit }, event = { inputs: { execution_scope: 'backend-source', continuation_plan_sha256: approved } };
+  expect(validateExecutionContext(current, env, event, '', bytes)).toEqual({ spec, approved });
+  for (const [changedEnv, changedEvent, dirty, changedBytes] of [
+    [{ ...env, LPC_JEST_CONTINUATION_PLAN_SHA256: '' }, event, '', bytes],
+    [{ ...env, GITHUB_EVENT_NAME: 'pull_request' }, event, '', bytes],
+    [{ ...env, GITHUB_SHA: 'b'.repeat(40) }, event, '', bytes],
+    [env, { inputs: { ...event.inputs, execution_scope: 'full' } }, '', bytes],
+    [env, { inputs: { ...event.inputs, continuation_plan_sha256: '0'.repeat(64) } }, '', bytes],
+    [env, event, ' M backend/routes/cases.js', bytes],
+    [env, event, '', Buffer.from(JSON.stringify({ ...spec, currentCommit: current.commit }))],
+  ]) expect(() => validateExecutionContext(current, changedEnv, changedEvent, dirty, changedBytes)).toThrow();
+});
+test('browser-only source disposition cannot conceal backend code or certify its unexecuted browser behavior', () => {
+  const { validateBridge } = require('../scripts/verify-ci-jest-continuation');
+  const files = { 'backend/jest.config.js': '1'.repeat(64), 'backend/package-lock.json': '2'.repeat(64), 'backend/package.json': '3'.repeat(64), '.node-version': '4'.repeat(64), 'backend/tests/filler.test.js': '5'.repeat(64) };
+  const prior = { commit: 'a'.repeat(40), files }, current = { commit: 'b'.repeat(40), files: { ...files, 'frontend/assets/scripts/changed.js': '6'.repeat(64) } };
+  const entry = { path: 'frontend/assets/scripts/changed.js', beforeSha256: null, afterSha256: '6'.repeat(64), kind: 'browser-only-product', backendRuntimeImpact: 'none-reviewed', browserAcceptanceRequired: true, affectedSuites: [], reviewedEvidenceSha256: '7'.repeat(64) };
+  const bridge = { schemaVersion: 1, mode: 'explicit-source-bound-jest-continuation', priorCommit: prior.commit, currentCommit: current.commit, priorSourceSha256: hash(JSON.stringify(prior)), currentSourceSha256: hash(JSON.stringify(current)), changes: [entry] };
+  expect([...validateBridge(prior, current, ['tests/filler.test.js'], bridge, hash(JSON.stringify(bridge)))]).toEqual([]);
+  for (const field of ['backendRuntimeImpact', 'browserAcceptanceRequired']) { const changed = { ...bridge, changes: [{ ...entry, [field]: false }] }; expect(() => validateBridge(prior, current, ['tests/filler.test.js'], changed, hash(JSON.stringify(changed)))).toThrow(); }
+  const backendCurrent = { ...current, files: { ...files, 'backend/services/changed.js': '6'.repeat(64) } }, hidden = { ...bridge, currentSourceSha256: hash(JSON.stringify(backendCurrent)), changes: [{ ...entry, path: 'backend/services/changed.js' }] };
+  expect(() => validateBridge(prior, backendCurrent, ['tests/filler.test.js'], hidden, hash(JSON.stringify(hidden)))).toThrow();
+});

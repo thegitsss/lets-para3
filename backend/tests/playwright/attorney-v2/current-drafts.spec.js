@@ -121,7 +121,13 @@ test('current account departure removes private draft rows and a delayed refresh
   const { state, data } = await install(page);await page.goto('/dashboard-attorney.html#cases:draft',{waitUntil:'commit'});await ready(page);
   const user=(await (await page.request.get('/api/auth/me')).json()).user,owner=user.id||user._id;
   let release,arrived;const gate=new Promise(resolve=>release=resolve),pending=new Promise(resolve=>arrived=resolve);
-  state.respond=async(route,url)=>{const value=await inventoryFixture(data,owner,url.searchParams);arrived();await gate;await route.fulfill({contentType:'application/json',body:JSON.stringify(value)}).catch(()=>{});};
+  // Background reads may precede the native Refresh press. Only hold reads
+  // after that actual click, preserving the reviewed late-response premise.
+  await page.evaluate(() => {
+    window.__draftDepartureRefreshStarted = false;
+    document.addEventListener('click', event => { if (event.target.closest?.('[data-drafts-refresh]')) window.__draftDepartureRefreshStarted = true; }, true);
+  });
+  state.respond=async(route,url)=>{const value=await inventoryFixture(data,owner,url.searchParams);if(await page.evaluate(()=>window.__draftDepartureRefreshStarted===true)){arrived();await gate;}await route.fulfill({contentType:'application/json',body:JSON.stringify(value)}).catch(()=>{});};
   try{
     await page.getByRole('button',{name:'Refresh drafts',exact:true}).click();await pending;
     await page.evaluate(()=>window.dispatchEvent(new CustomEvent('lpc:user-updated',{detail:{id:'f'.repeat(24),role:'attorney'}})));

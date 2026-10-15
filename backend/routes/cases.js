@@ -951,10 +951,10 @@ async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLa
 
   const attorneyKey = getReceiptKey(caseDoc._id, "attorney");
   const paralegalKey = getReceiptKey(caseDoc._id, "paralegal");
-  const [attorneyPdf, paralegalPdf] = await Promise.all([
-    buildReceiptPdfBuffer(attorneyPayload),
-    buildReceiptPdfBuffer(paralegalPayload),
-  ]);
+  // Each receipt owns a full browser. Keep the two renders within the hosted
+  // service's CPU allowance; both retain the same PDF and navigation deadlines.
+  const attorneyPdf = await buildReceiptPdfBuffer(attorneyPayload);
+  const paralegalPdf = await buildReceiptPdfBuffer(paralegalPayload);
 
   await Promise.all([
     uploadPdfToS3({ key: attorneyKey, buffer: attorneyPdf }),

@@ -91,14 +91,13 @@ function associations({ event, target, refunds, view, references, intent, charge
   return { result, problem: "" };
 }
 
-async function record({ event, receiptFilter, stripe, ip, ua }) {
+// Shared read-only provider/association verification. Admin recovery must use
+// the same authoritative rules as a real refund delivery, never replay writes.
+async function inspectRefundEvidence(event, stripe) {
   const object = event.data?.object || {}, chargeEvent = event.type === "charge.refunded";
-  const eventHash = fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, object]);
-  const auditId = new mongoose.Types.ObjectId(fingerprint(["stripe_refund_event", event.id]).slice(0, 24));
   let problem = !types.has(event.type) ? "unsupported_refund_event" : typeof event.livemode !== "boolean" ? "invalid_mode" : event.account ? "unsupported_connected_account_refund" : !external(object.id, chargeEvent ? "ch" : "re") || object.object !== (chargeEvent ? "charge" : "refund") ? "invalid_refund_event" : "";
   let view, target, charge, intent, refunds = [], references = [], matched = [];
-  const alreadyRecorded = await Audit.collection.findOne({ _id: auditId }, { readConcern: { level: "majority" } });
-  if (!alreadyRecorded && !problem) {
+  if (!problem) {
     target = chargeEvent ? null : await stripe.refunds.retrieve(object.id);
     const chargeId = chargeEvent ? object.id : id(target?.charge);
     if (!external(chargeId, "ch") || target && target.id !== object.id) problem = "invalid_refund_reference";
@@ -121,10 +120,41 @@ async function record({ event, receiptFilter, stripe, ip, ua }) {
       }
     }
   }
+  return { problem, view, target, charge, intent, refunds, references, matched };
+}
+function refundProjection(view, charge, refunds) {
+  const confirmedTotal = refunds.filter(refund => refund.status === "succeeded").reduce((sum, refund) => sum + refund.amount, 0);
+  const pending = refunds.some(refund => ["pending", "requires_action"].includes(refund.status));
+  const paymentStatus = confirmedTotal === charge.amount ? "refunded" : confirmedTotal > 0 ? "partially_refunded" : pending ? "refund_pending" : "refund_failed";
+  const knownPaymentStatuses = [null, undefined, "", "pending", "succeeded", "refunded", "partially_refunded", "refund_pending", "refund_failed", "refund_canceled", "requires_payment_method", "requires_confirmation", "requires_action", "processing", "requires_capture", "canceled", "verification_failed"];
+  const protectedStatus = !knownPaymentStatuses.includes(view.raw.paymentStatus) || view.operations.some(row => row.kind === "chargeback" && ["pending_review", "acknowledged"].includes(row.administrativeStatus));
+  return { confirmedTotal, paymentStatus, protectedStatus, needsReview: refunds.some(refund => negative.has(refund.status)) || Boolean(charge.disputed) || protectedStatus };
+}
+async function verifyRefundSources(review, session) {
+  if (review.view && fingerprint(await inventory(id(review.charge.payment_intent), session)) !== fingerprint(review.view)) throw new Error("The Matter refund records changed during provider verification.");
+  if (!review.problem && fingerprint(await refundReferences(review.refunds, session)) !== fingerprint(review.references)) throw new Error("The refund references changed during verification.");
+}
+async function reviewAttention({ event, stripe }) {
+  const review = await inspectRefundEvidence(event, stripe);
+  if (review.problem) return { ...review, ready: false, reason: review.problem };
+  const projected = refundProjection(review.view, review.charge, review.refunds);
+  let reason = projected.needsReview ? "refund_needs_review" : review.refunds.some(refund => refund.status !== "succeeded") ? "refund_not_settled" : review.view.raw.paymentStatus !== projected.paymentStatus ? "projection_not_reconciled" : "";
+  if (!reason && review.matched.some(({ refund, operation }) => !operation || operation.refundEvidenceStatus !== "verified" || operation.refundStatus !== "succeeded" || operation.refundAmount !== refund.amount || operation.stripeRefundId !== refund.id || operation.stripePaymentIntentId !== review.intent.id || operation.stripeChargeId !== review.charge.id || operation.currency !== refund.currency || operation.stripeMode !== (event.livemode ? "live" : "test"))) reason = "operation_not_reconciled";
+  return { ...review, projected, ready: !reason, reason };
+}
+
+async function record({ event, receiptFilter, stripe, ip, ua }) {
+  const object = event.data?.object || {};
+  const eventHash = fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, object]);
+  const auditId = new mongoose.Types.ObjectId(fingerprint(["stripe_refund_event", event.id]).slice(0, 24));
+  const alreadyRecorded = await Audit.collection.findOne({ _id: auditId }, { readConcern: { level: "majority" } });
+  const verification = alreadyRecorded ? { problem: "", refunds: [], references: [], matched: [] } : await inspectRefundEvidence(event, stripe);
+  let { problem, view, charge, intent, refunds, references, matched } = verification;
   const session = await mongoose.startSession();
   try {
     session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
-    if (!await Delivery.collection.findOne(receiptFilter, { session })) throw new Error("The refund delivery attempt is no longer current.");
+    const currentDelivery = await Delivery.collection.findOne(receiptFilter, { session });
+    if (!currentDelivery) throw new Error("The refund delivery attempt is no longer current.");
     const previous = await Audit.collection.findOne({ _id: auditId }, { session });
     let result = { caseId: view?.raw?._id || null, needsReview: Boolean(problem), outcome: problem ? "needs_review" : "observed" };
     if (previous) {
@@ -148,25 +178,24 @@ async function record({ event, receiptFilter, stripe, ip, ua }) {
             if (saved.matchedCount !== 1) throw new Error("The retained refund operation could not be updated.");
           }
         }
-        confirmedTotal = refunds.filter(refund => refund.status === "succeeded").reduce((sum, refund) => sum + refund.amount, 0);
-        const pending = refunds.some(refund => ["pending", "requires_action"].includes(refund.status));
-        const paymentStatus = confirmedTotal === charge.amount ? "refunded" : confirmedTotal > 0 ? "partially_refunded" : pending ? "refund_pending" : "refund_failed";
+        const projected = refundProjection(view, charge, refunds);
+        confirmedTotal = projected.confirmedTotal;
+        const { paymentStatus, protectedStatus } = projected;
         // A refund to the attorney does not undo a separate paralegal transfer,
         // reopen the Matter, or restore its remaining amount.
-        const knownPaymentStatuses = [null, undefined, "", "pending", "succeeded", "refunded", "partially_refunded", "refund_pending", "refund_failed", "refund_canceled", "requires_payment_method", "requires_confirmation", "requires_action", "processing", "requires_capture", "canceled", "verification_failed"];
-        const protectedStatus = !knownPaymentStatuses.includes(view.raw.paymentStatus) || view.operations.some(row => row.kind === "chargeback" && ["pending_review", "acknowledged"].includes(row.administrativeStatus));
         const values = !protectedStatus && view.raw.paymentStatus !== paymentStatus ? { paymentStatus } : {};
         const saved = await Case.collection.updateOne({ _id: view.raw._id }, { $set: { ...values, updatedAt: now }, $inc: { __v: 1 } }, { session });
         if (saved.matchedCount !== 1) throw new Error("The Matter refund projection could not be updated.");
         result.outcome = paymentStatus;
-        result.needsReview = refunds.some(refund => negative.has(refund.status)) || Boolean(charge.disputed) || protectedStatus;
+        result.needsReview = projected.needsReview;
       }
       await Audit.create([{
         _id: auditId, actor: null, actorRole: "system", action: event.type, targetType: "payment", case: result.caseId, ip, ua, method: "POST", path: "/api/webhooks/stripe",
         meta: { eventId: event.id, eventHash, kind: "refund_observation", externalRef: typeof object.id === "string" ? object.id.slice(0, 220) : null, outcome: result.outcome, associationProblem: problem || null, confirmedRefundAmount: confirmedTotal, refundCount: refunds.length, currency: intent?.currency || null },
       }], { session });
     }
-    const finalized = await Delivery.updateOne(receiptFilter, { $set: { status: "processed", lastError: "", ...(result.needsReview ? { attentionRequired: true, attentionCategory: "refund" } : {}) } }, { session });
+    const recoveredProcessing = !previous && !problem && !result.needsReview && refunds.length > 0 && refunds.every(refund => refund.status === "succeeded") && currentDelivery.attentionCategory === "processing";
+    const finalized = await Delivery.updateOne(receiptFilter, { $set: { status: "processed", lastError: "", ...(result.needsReview ? { attentionRequired: true, attentionCategory: "refund" } : recoveredProcessing ? { attentionRequired: false, attentionCategory: "" } : {}) } }, { session });
     if (!finalized.matchedCount) throw new Error("The refund delivery attempt changed before commit.");
     await session.commitTransaction();
     return result;
@@ -174,4 +203,4 @@ async function record({ event, receiptFilter, stripe, ip, ua }) {
   finally { await session.endSession(); }
 }
 
-module.exports = { record };
+module.exports = { record, reviewAttention, verifyRefundSources };

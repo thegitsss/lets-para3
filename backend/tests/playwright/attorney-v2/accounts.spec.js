@@ -180,7 +180,18 @@ test("notification preferences write a single explicit leaf and reload accuratel
   const model=await setup(page);await open(page,"preferences");await page.getByLabel("Email Matter updates",{exact:true}).uncheck();await expect.poll(()=>model.profile.notificationPrefs.emailCase).toBe(false);expect(model.writes[0].body).toEqual({emailCase:false,expectedValues:{emailCase:true},expectedOwnerId:id});expect(model.profile.notificationPrefs.emailMessages).toBe(true);await page.reload();await expect(page.getByLabel("Email Matter updates",{exact:true})).not.toBeChecked();
 });
 test("failure after a populated load is unavailable and does not show stale private fields",async({page})=>{
-  const model=await setup(page);await open(page);await page.getByRole("navigation",{name:"Profile settings"}).getByRole("link",{name:"Preferences",exact:true}).click();model.profileFail=true;await page.getByRole("navigation",{name:"Profile settings"}).getByRole("link",{name:"Profile",exact:true}).click();await expect(page.getByText(/Your account couldn’t load/)).toBeVisible();await expect(page.getByLabel("First name")).toHaveCount(0);model.profileFail=false;await page.getByRole("button",{name:"Try again",exact:true}).click();await expect(page.getByLabel("First name")).toHaveValue("Morgan");
+  const model=await setup(page);await open(page);await page.getByRole("navigation",{name:"Profile settings"}).getByRole("link",{name:"Preferences",exact:true}).click();
+  // The native link changes the hash before owner verification and the next
+  // account read finish. Inject the failure only into the intended Profile
+  // entry, after Preferences actually rendered, rather than its pending read.
+  await expect(page).toHaveURL(/#\/settings\?tab=preferences$/);
+  await expect(page.getByLabel("Theme",{exact:true})).toHaveValue("light");
+  await expect(page.locator("[data-account-content]")).toHaveAttribute("aria-busy","false");
+  model.profileFail=true;await page.getByRole("navigation",{name:"Profile settings"}).getByRole("link",{name:"Profile",exact:true}).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.getByText(/Your account couldn’t load/)).toBeVisible();await expect(page.getByLabel("First name")).toHaveCount(0);model.profileFail=false;await page.getByRole("button",{name:"Try again",exact:true}).click();await expect(page.getByLabel("First name")).toHaveValue("Morgan");
+  expect(model.writes).toHaveLength(0);
+  expect(model.profile).toEqual(initial());
 });
 test("account replacement while a write is pending clears prior content and cannot alter the replacement",async({page})=>{
   const model=await setup(page);await open(page);let resolve;model.delaySave=new Promise(r=>{resolve=r;});await page.getByLabel("Firm",{exact:true}).fill("Old account edit");await page.getByRole("button",{name:"Save changes",exact:true}).click();await expect.poll(()=>model.writes.length).toBe(1);model.owner=other;resolve();await expect(page).toHaveURL(/login\.html|dashboard-attorney\.html/);expect(model.profile.lawFirm).toBe("Ellis Legal");await expect(page.getByText("Old account edit")).toHaveCount(0);

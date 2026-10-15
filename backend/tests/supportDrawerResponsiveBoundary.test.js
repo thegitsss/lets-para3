@@ -1,5 +1,7 @@
 'use strict';
-const { test } = require('node:test');
+// The same source-derived checks run in Jest's complete backend suite and
+// directly under node --test. Register with the active runner, never both.
+const test = typeof globalThis.test === 'function' ? globalThis.test : require('node:test').test;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

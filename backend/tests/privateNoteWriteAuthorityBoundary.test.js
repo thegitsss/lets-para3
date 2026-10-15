@@ -285,7 +285,7 @@ test.each(operations)('real managed-session expiry after the actual %s write abo
       await new Promise(resolve => setTimeout(resolve, Math.max(1, expiresAt.getTime() - Date.now() + 1)));
       expect(Date.now()).toBeGreaterThan(expiresAt.getTime()); record.injection.actualExpiryCrossedAfterWriteAt = new Date().toISOString();
     });
-    const response = await save(operation, body); record.response = { status: response.status, body: response.body }; record.dataWrites = writes; expect(writes).toBe(1); expect(response.status).toBe(403);
+    const response = await save(operation, body); record.response = { status: response.status, body: response.body }; record.dataWrites = writes; expect(writes).toBe(1); expect({ status: response.status, body: response.body }).toMatchObject({ status: 403 }); expect(response.status).toBe(403);
     expect(await readCases()).toEqual(record.before.cases); expect(await readWeeks()).toEqual(record.before.weeklyNotes); expect(await readAudit()).toEqual(record.before.audit); expect(await readUsers()).toEqual(record.injection.actualSnapshotBeforeArbitration.users);
     const sid = await AuthSession.collection.findOne({ sessionId: owner.session.sessionId });
     if (sid) { expect(sid.expiresAt).toEqual(expiresAt); expect(sid.__v).toBe(record.injection.actualSnapshotBeforeArbitration.sessions.find(value => String(value._id) === owner.sessionRecordId).__v); }
