@@ -41,7 +41,7 @@ jobs:
               const expected={'jest-single-final-recovery':['single-file-final-recovery',32*1024**2],'supply-chain-evidence':['runtime-checks',16*1024**2],'candidate-identity':['runtime-checks',4*1024**2],'jest-plan':['runtime-checks',16*1024**2],'secret-scan-evidence':['secrets',8*1024**2]};
               assert.equal(extras.length,5);assert.deepEqual(extras.map(b=>b.prefix).sort(),Object.keys(expected).sort());
               for(const b of extras){assert(Number.isSafeInteger(b.maxBytes)&&b.maxBytes>0);assert.equal(b.key,'');assert.deepEqual([b.job,b.maxBytes],expected[b.prefix]);}
-              assert.equal(evidence.priorRetainedBytes,1422137874);assert(native.every(b=>b.maxBytes>=256*1024**2));assert.equal(native.find(b=>b.scope==='attorney-v2-actual-shared-1')?.maxBytes,512*1024**2);
+              assert.equal(evidence.priorRetainedBytes,1429866271);assert(native.every(b=>b.maxBytes>=256*1024**2));assert.equal(native.find(b=>b.scope==='attorney-v2-actual-shared-1')?.maxBytes,512*1024**2);
               const optional=evidence.optionalDependencyReviewSummary;
               assert.equal(optional?.name,'dependency-review-summary');assert.equal(optional?.maximumBytes,8*1024**2);assert.equal(optional?.retentionDays,1);
               assert.equal(native.reduce((n,b)=>n+b.maxBytes,0)+extras.reduce((n,b)=>n+b.maxBytes,0)+optional.maximumBytes,maximum);

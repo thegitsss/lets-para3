@@ -270,3 +270,14 @@ test("authenticated-cache settlement: unknown usage keeps full hold and cannot r
   const journal=memoryJournal();await call(create(journal,async()=>response({usage:undefined}),cachedAuthority()));assert.equal(journal.records[0].state,"unknown_hold_retained");assert.equal(journal.remaining,CAP-RESERVE);
   await call(create(journal,async()=>response({usage:{input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:900}}}),cachedAuthority()));assert.equal(journal.records[0].state,"unknown_hold_retained");assert.equal(journal.remaining,CAP-RESERVE-1630000);assert.equal(journal.records.length,2);
 });
+
+// Use the actual model/validator files: a mocked readFile cannot detect stale
+// trusted literals after a source correction in either dependency.
+test("trusted internal policy validates actual on-disk source pins and denies the prior policy manifest", () => {
+  const a = internalAuthority();
+  assert.equal(guard.validateInternalControlPolicy(a), true);
+  assert.equal(guard.validateAuthority(a, env), a);
+  assert.throws(() => guard.validateInternalControlPolicy({ ...a, internalValidationControls: {
+    ...a.internalValidationControls, manifestSha256: "acd2f8dc18060484856b2076bf73a4185e626244bab4ef4482ff53933f85b0f9"
+  } }), /trusted internal control authority differs/);
+});
