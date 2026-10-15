@@ -234,3 +234,39 @@ test("short-tier settlement: settled plus remaining and all full reservations st
   const journal=memoryJournal(),a=authority({shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT}});let release;const barrier=new Promise(r=>{release=r;});let sent=0;
   const f=create(journal,async()=>{sent++;await barrier;return response();},a);const calls=Array.from({length:3},()=>call(f)), settled=Promise.allSettled(calls);await new Promise(r=>setImmediate(r));assert.equal(sent,2);assert.equal(journal.remaining,CAP-2*RESERVE);release();const outcomes=await settled;assert.equal(outcomes.filter(x=>x.status==='fulfilled').length,2);assert.equal(journal.records.length,2);assert.equal(journal.remaining,CAP-2*3700000);assert.equal(journal.remaining+journal.records.reduce((n,r)=>n+r.actualNanoUsd,0),CAP);
 });
+
+function cachedAuthority(extra = {}) {
+  return authority({ shortContextSettlement: { ...guard.SHORT_CONTEXT_SETTLEMENT }, authenticatedCacheReadSettlement: { ...guard.AUTHENTICATED_CACHE_READ_SETTLEMENT }, ...extra });
+}
+const cachedBound = (usage, outputCeiling = 1800) => guard.ceilingUsageUpperBound(result({ usage }), outputCeiling, guard.SHORT_CONTEXT_SETTLEMENT, guard.AUTHENTICATED_CACHE_READ_SETTLEMENT);
+test("authenticated-cache settlement: exact opt-in evidence and pinned context tiers are mandatory", () => {
+  guard.validateAuthority(cachedAuthority(), env);
+  for (const key of Object.keys(guard.AUTHENTICATED_CACHE_READ_SETTLEMENT)) assert.throws(() => guard.validateAuthority(cachedAuthority({ authenticatedCacheReadSettlement: { ...guard.AUTHENTICATED_CACHE_READ_SETTLEMENT, [key]: "changed" } }), env));
+  assert.throws(() => guard.validateAuthority(cachedAuthority({ shortContextSettlement: undefined }), env));
+  assert.throws(() => guard.validateAuthority(cachedAuthority({ billingMode: "exact_counter", counterBilling: { confirmed: true, flatNanoUsdPerAttempt: 0, evidenceSha256: "1".repeat(64) } }), env));
+});
+test("authenticated-cache settlement: exact272000/272001 threshold uses200/400 cache-read rates and maximum remainder rates", () => {
+  assert.equal(cachedBound({ input_tokens: 272000, output_tokens: 100, input_tokens_details: { cached_tokens: 200000, cache_write_tokens: 10000 } }), 72000*2500+200000*200+100*12000);
+  assert.equal(cachedBound({ input_tokens: 272001, output_tokens: 100, input_tokens_details: { cached_tokens: 200000, cache_write_tokens: 10000 } }), 72001*5000+200000*400+100*18000);
+  assert.equal(cachedBound({ input_tokens: 922000, output_tokens: 1800, input_tokens_details: { cached_tokens: 922000, cache_write_tokens: 0 } }), 922000*400+1800*18000);
+});
+test("authenticated-cache settlement: missing cache reads never infer a discount; known writes stay within highest input category", () => {
+  for (const details of [undefined, {}, { cache_write_tokens: 1000 }, { cached_tokens: 0 }, { cached_tokens: 0, cache_write_tokens: 1000 }]) assert.equal(cachedBound({ input_tokens: 1000, output_tokens: 100, input_tokens_details: details }), 3700000);
+  const knownRead={ input_tokens: 1000, output_tokens: 100, input_tokens_details: { cached_tokens: 900 } };
+  assert.equal(cachedBound(knownRead),100*2500+900*200+100*12000);
+  assert.equal(guard.ceilingUsageUpperBound(result({usage:knownRead}),1800,guard.SHORT_CONTEXT_SETTLEMENT),3700000);
+  assert.equal(cachedBound({input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:900,cache_write_tokens:100}}),1630000);
+});
+test("authenticated-cache settlement: forged, malformed, overlapping or excessive cache/usage and model/tier mismatches fail closed", () => {
+  for(const details of [null,[],{cached_tokens:-1},{cached_tokens:"900"},{cached_tokens:0.5},{cached_tokens:1001},{cached_tokens:900,cache_write_tokens:101},{cached_tokens:900,cache_write_tokens:-1}])assert.throws(()=>cachedBound({input_tokens:1000,output_tokens:100,input_tokens_details:details}));
+  for(const extra of [{model:"other"},{service_tier:"priority"},{usage:{input_tokens:1000,output_tokens:1801}},{usage:{input_tokens:1000,output_tokens:100,total_tokens:1000}}])assert.throws(()=>guard.ceilingUsageUpperBound(result(extra),1800,guard.SHORT_CONTEXT_SETTLEMENT,guard.AUTHENTICATED_CACHE_READ_SETTLEMENT));
+});
+test("authenticated-cache settlement: every physical request reserves full4.6424 before unchanged wire and conservative cache settlement", async () => {
+  const journal=memoryJournal(),init=request({service_tier:"default"}),original=init.body;let sent=0;
+  const transport=async(url,options)=>{sent++;assert.equal(url,"https://api.openai.com/v1/responses");assert.equal(options.body,original);assert.equal(journal.remaining,CAP-RESERVE);assert.equal(journal.records[0].reservedNanoUsd,RESERVE);return response({usage:{input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:900}}});};
+  await call(create(journal,transport,cachedAuthority()),init);assert.equal(sent,1);assert.equal(journal.records[0].actualNanoUsd,1630000);assert.equal(journal.remaining,CAP-1630000);assert.equal(journal.records[0].details.costBasis,"conservative_upper_bound");assert.equal(journal.records[0].details.actualBillingKnown,false);assert.equal(journal.records[0].details.authenticatedCachedReadTokens,900);assert.equal(journal.records[0].details.cacheReadSettlementPolicySha256,guard.digest(guard.AUTHENTICATED_CACHE_READ_SETTLEMENT));assert.equal(init.body,original);
+});
+test("authenticated-cache settlement: unknown usage keeps full hold and cannot refund an earlier attempt", async () => {
+  const journal=memoryJournal();await call(create(journal,async()=>response({usage:undefined}),cachedAuthority()));assert.equal(journal.records[0].state,"unknown_hold_retained");assert.equal(journal.remaining,CAP-RESERVE);
+  await call(create(journal,async()=>response({usage:{input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:900}}}),cachedAuthority()));assert.equal(journal.records[0].state,"unknown_hold_retained");assert.equal(journal.remaining,CAP-RESERVE-1630000);assert.equal(journal.records.length,2);
+});

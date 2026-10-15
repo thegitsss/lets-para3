@@ -24,6 +24,18 @@ function validateShortContextSettlement(policy) {
   need(policy && Object.keys(policy).length === Object.keys(SHORT_CONTEXT_SETTLEMENT).length && Object.entries(SHORT_CONTEXT_SETTLEMENT).every(([key, value]) => policy[key] === value), "short-context settlement evidence/rates differ");
   return true;
 }
+// Authenticated cache READ quantity only; every other input token still uses
+// the highest category, including any unknown cache-write classification.
+const AUTHENTICATED_CACHE_READ_SETTLEMENT = Object.freeze({
+  schemaVersion: 1, confirmed: true,
+  shortCachedInputNanoUsdPerToken: 200, longCachedInputNanoUsdPerToken: 400,
+  pricingEvidenceSha256: CEILING_BILLING.pricingEvidenceSha256,
+  cacheUsageEvidenceSha256: "22a81c5b1806d51823166f3d35047ac497fdf1703ad2363ad007f34745fa10c8",
+});
+function validateAuthenticatedCacheReadSettlement(policy) {
+  need(policy && Object.keys(policy).length === Object.keys(AUTHENTICATED_CACHE_READ_SETTLEMENT).length && Object.entries(AUTHENTICATED_CACHE_READ_SETTLEMENT).every(([key, value]) => policy[key] === value), "authenticated cache-read evidence/rates differ");
+  return true;
+}
 // Exact source-coded manager control; optional synthetic acceptance authority only.
 // Original request bytes are never rewritten. Error text cannot carry user data.
 const TRUSTED_INTERNAL_CONTROL = Object.freeze({
@@ -83,6 +95,7 @@ function validateAuthority(authority, env = process.env, now = Date.now()) {
     need(new Set(profiles.map(profile => profile.entrySha256)).size === profiles.length && profiles.some(profile => profile.mode === "hosted") && profiles.some(profile => profile.mode === "curated"), "ambiguous/incomplete execution allowlist");
   }
   if (authority.shortContextSettlement !== undefined) { need(authority.billingMode === "full_model_ceiling", "short-context settlement requires full ceiling reservation"); validateShortContextSettlement(authority.shortContextSettlement); }
+  if (authority.authenticatedCacheReadSettlement !== undefined) { need(authority.billingMode === "full_model_ceiling" && authority.shortContextSettlement !== undefined, "cached-read settlement requires full ceiling and pinned context tiers"); validateAuthenticatedCacheReadSettlement(authority.authenticatedCacheReadSettlement); }
   if (authority.internalValidationControls !== undefined) validateInternalControlPolicy(authority);
   return authority;
 }
@@ -187,9 +200,10 @@ function usageCost(usage, input, outputCeiling) {
   if (!integer(cached) || !integer(written) || cached + written > usage.input_tokens) return null;
   return (usage.input_tokens - cached - written) * 2000 + cached * 200 + written * 2500 + usage.output_tokens * PRICES.output;
 }
-function ceilingUsageUpperBound(result, outputCeiling, shortContextSettlement) {
+function ceilingUsageUpperBound(result, outputCeiling, shortContextSettlement, authenticatedCacheReadSettlement) {
   need(result?.model === MODEL && result.service_tier === "default", "provider model/tier differs");
   if (shortContextSettlement !== undefined) validateShortContextSettlement(shortContextSettlement);
+  if (authenticatedCacheReadSettlement !== undefined) { need(shortContextSettlement !== undefined, "cached-read settlement requires pinned context tiers"); validateAuthenticatedCacheReadSettlement(authenticatedCacheReadSettlement); }
   const usage = result.usage;
   if (usage?.input_tokens === undefined || usage?.output_tokens === undefined) return null;
   need(integer(usage.input_tokens, 0, CEILING_BILLING.inputCeilingTokens) && integer(usage.output_tokens, 0, outputCeiling), "provider usage exceeds full-model/output ceiling");
@@ -198,11 +212,14 @@ function ceilingUsageUpperBound(result, outputCeiling, shortContextSettlement) {
   need(details === undefined || (details !== null && typeof details === "object" && !Array.isArray(details)), "provider cache detail invalid");
   const cached = details?.cached_tokens, written = details?.cache_write_tokens;
   need((cached === undefined || integer(cached, 0, usage.input_tokens)) && (written === undefined || integer(written, 0, usage.input_tokens)) && (cached ?? 0) + (written ?? 0) <= usage.input_tokens, "provider cache usage differs");
-  // All input uses the highest documented category for the authenticated context tier.
+  // Only explicitly opted-in, authenticated cache reads use the read category.
+  // All remaining input uses the highest category for the authenticated tier.
   // Unknown usage retains the full reserve. This remains an upper bound, never an invoice.
   const rates = shortContextSettlement && usage.input_tokens <= shortContextSettlement.inputThresholdTokens
     ? shortContextSettlement : CEILING_BILLING;
-  return usage.input_tokens * rates.inputNanoUsdPerToken + usage.output_tokens * rates.outputNanoUsdPerToken;
+  const cachedRead = authenticatedCacheReadSettlement ? cached ?? 0 : 0;
+  const cachedReadRate = rates === shortContextSettlement ? authenticatedCacheReadSettlement?.shortCachedInputNanoUsdPerToken : authenticatedCacheReadSettlement?.longCachedInputNanoUsdPerToken;
+  return (usage.input_tokens - cachedRead) * rates.inputNanoUsdPerToken + cachedRead * (cachedReadRate ?? rates.inputNanoUsdPerToken) + usage.output_tokens * rates.outputNanoUsdPerToken;
 }
 function createGuardedFetch({ authority, env, journal, journalLease, transport = globalThis.fetch, now = Date.now }) {
   validateAuthority(authority, env, now());
@@ -243,9 +260,9 @@ function createGuardedFetch({ authority, env, journal, journalLease, transport =
       try {
         const result = await response.clone().json();
         let upperBound;
-        try { upperBound = ceilingUsageUpperBound(result, request.body.max_output_tokens, authority.shortContextSettlement); }
+        try { upperBound = ceilingUsageUpperBound(result, request.body.max_output_tokens, authority.shortContextSettlement, authority.authenticatedCacheReadSettlement); }
         catch (error) { halted = true; await journal.halt?.(); throw error; }
-        await journal.observe(reservation, { outcome: "response", status: response.status, providerRequestId: response.headers.get("x-request-id"), sdkRetry: retry, usage: result.usage, billingMode: "full_model_ceiling", costBasis: "conservative_upper_bound", conservativeUpperBoundNanoUsd: upperBound, actualBillingKnown: false, ...(authority.shortContextSettlement ? { settlementPolicySha256: digest(authority.shortContextSettlement), authenticatedResponseModel: result.model, authenticatedResponseServiceTier: result.service_tier, pricingContextTier: result.usage?.input_tokens === undefined ? "unknown" : result.usage.input_tokens <= authority.shortContextSettlement.inputThresholdTokens ? "short" : "long" } : {}) }, upperBound);
+        await journal.observe(reservation, { outcome: "response", status: response.status, providerRequestId: response.headers.get("x-request-id"), sdkRetry: retry, usage: result.usage, billingMode: "full_model_ceiling", costBasis: "conservative_upper_bound", conservativeUpperBoundNanoUsd: upperBound, actualBillingKnown: false, ...(authority.shortContextSettlement ? { settlementPolicySha256: digest(authority.shortContextSettlement), authenticatedResponseModel: result.model, authenticatedResponseServiceTier: result.service_tier, pricingContextTier: result.usage?.input_tokens === undefined ? "unknown" : result.usage.input_tokens <= authority.shortContextSettlement.inputThresholdTokens ? "short" : "long" } : {}), ...(authority.authenticatedCacheReadSettlement ? { cacheReadSettlementPolicySha256: digest(authority.authenticatedCacheReadSettlement), authenticatedCachedReadTokens: result.usage?.input_tokens_details?.cached_tokens ?? null } : {}) }, upperBound);
       } catch (error) { deny("ceiling usage/journal reconciliation failed; full reservation retained"); }
       return response;
     }
@@ -301,4 +318,4 @@ function fromEnvironment(apiKey) {
   environmentAuthority = authority;
   return environmentFetch;
 }
-module.exports = { MODEL, FEATURES, COLLECTION, TRUSTED_INTERNAL_CONTROL, validateInternalControlPolicy, CEILING_BILLING, SHORT_CONTEXT_SETTLEMENT, validateShortContextSettlement, sha, digest, validateAuthority, resolveExecution, initialDocument, mongoJournal, metadataJournalLease, envelope, usageCost, ceilingUsageUpperBound, createGuardedFetch, fromEnvironment };
+module.exports = { MODEL, FEATURES, COLLECTION, TRUSTED_INTERNAL_CONTROL, validateInternalControlPolicy, CEILING_BILLING, SHORT_CONTEXT_SETTLEMENT, validateShortContextSettlement, AUTHENTICATED_CACHE_READ_SETTLEMENT, validateAuthenticatedCacheReadSettlement, sha, digest, validateAuthority, resolveExecution, initialDocument, mongoJournal, metadataJournalLease, envelope, usageCost, ceilingUsageUpperBound, createGuardedFetch, fromEnvironment };

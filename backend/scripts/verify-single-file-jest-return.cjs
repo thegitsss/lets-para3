@@ -27,14 +27,14 @@ const BACKEND_RUNTIME_CHANGES={
   "backend/ai/supportCostBudget.js": {
     "pins": [
       null,
-      "fd8cbc397c92c397f3caa5a4c5bf7ec19f9b5fc2509984ece171f43b8a2634ff"
+      "c71c54f5311151c11ee347a69241aab3193440a85da740b088b71a57db97d6d4"
     ],
     "affectedSuites": [
       "tests/supportCostBudget.test.js",
       "tests/supportCostBudgetReplica.test.js",
       "tests/supportCostBudgetCeiling.test.js"
     ],
-    "reviewedEvidenceSha256": "9c37e7b83e16fb3d191ece315877123d68676d0049301df2b4cb71972371b4cd"
+    "reviewedEvidenceSha256": "8b6b6ef84a6d3a77295ab8ffa8d8563296a1cdf954ce59befb07e13b91719871"
   },
   "backend/tests/supportCostBudget.test.js": {
     "pins": [
@@ -59,12 +59,12 @@ const BACKEND_RUNTIME_CHANGES={
   "backend/tests/supportCostBudgetCeiling.test.js": {
     "pins": [
       null,
-      "fbbbd5e736c8e5df10f65f73bdfa3e8b8bbce3d0de72030f265c606781527ad4"
+      "7b8e0a3b85ee12b8937a270a74499d875ac21a4ff651b83903487b824767032f"
     ],
     "affectedSuites": [
       "tests/supportCostBudgetCeiling.test.js"
     ],
-    "reviewedEvidenceSha256": "9c37e7b83e16fb3d191ece315877123d68676d0049301df2b4cb71972371b4cd"
+    "reviewedEvidenceSha256": "8b6b6ef84a6d3a77295ab8ffa8d8563296a1cdf954ce59befb07e13b91719871"
   },
   "backend/scripts/ops-monitor.js": {
     "pins": [
