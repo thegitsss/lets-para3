@@ -544,6 +544,88 @@ describe("support manager agent", () => {
     expect(audit.errors).toContain("claimed_data_unavailable_despite_available_evidence");
   });
 
+  describe("profile completion blocked by policy", () => {
+    const profileTrace = (overrides = {}) => ({
+      name: "get_attorney_account_snapshot",
+      result: {
+        ok: true, available: true, profileComplete: null,
+        missingProfileFields: ["law firm", "state", "practice areas", "bio"],
+        profileAssessment: { evidenceState: "blocked_policy", reason: "profile_completion_definitions_conflict", assistantMinimumFieldsPresent: false },
+        ...overrides,
+      },
+    });
+    const auditProfile = (reply, options = {}) => auditManagerReply(managerReply({
+      reply, suggestions: [], primaryAsk: "profile_completion",
+    }), { messageText: "Is my profile complete?", toolOutputs: [profileTrace()], ...options });
+
+    test.each([
+      "I cannot confirm whether your profile is complete. Your law firm, state, practice areas, and bio are missing.",
+      "Your overall profile completion status is not available. Your law firm is missing.",
+      "I can’t verify your overall profile completion status. Your bio is missing.",
+    ])("accepts an honest field limitation without calling the available account data unavailable: %s", reply => {
+      expect(auditProfile(reply)).toEqual(expect.objectContaining({ valid: true, errors: [] }));
+    });
+
+    test.each([
+      "No, your profile isn’t complete. Add your law firm, state, practice areas, and bio to finish the missing profile details.",
+      "Your profile is complete.",
+      "Your profile is incomplete.",
+      "Your profile is ready.",
+      "Yes, your profile is finished.",
+      "Your profile is not yet complete.",
+      "Your profile remains incomplete.",
+      "Your profile has not been completed.",
+      "You haven’t completed your profile.",
+      "Add your law firm to complete your profile.",
+    ])("rejects an overall completion claim while that field is blocked: %s", reply => {
+      expect(auditProfile(reply).errors).toContain("unverified_evidence_presented_as_verified");
+    });
+
+    test.each([
+      "I cannot confirm whether your profile is complete. Your billing data is not available.",
+      "I cannot verify your notification settings.",
+      "I don't have your account information available.",
+    ])("keeps unrelated available evidence protected: %s", reply => {
+      expect(auditProfile(reply).errors).toContain("claimed_data_unavailable_despite_available_evidence");
+    });
+
+    test("does not infer a policy block from a null or absent field alone", () => {
+      for (const result of [{ profileComplete: null }, { profileComplete: false }, { profileComplete: true }]) {
+        const trace = profileTrace({ ...result, profileAssessment: undefined });
+        expect(auditProfile("I cannot confirm whether your profile is complete.", { toolOutputs: [trace] }).errors)
+          .toContain("claimed_data_unavailable_despite_available_evidence");
+      }
+    });
+
+    test("does not apply a profile exception to a settings question", () => {
+      expect(auditProfile("I cannot verify your notification settings.", { messageText: "What are my notification settings?" }).errors)
+        .toContain("claimed_data_unavailable_despite_available_evidence");
+    });
+
+    test("keeps an unrelated unavailable claim in the same sentence visible", () => {
+      expect(auditProfile("I cannot confirm whether your profile is complete, and your billing data is not available.").errors)
+        .toContain("claimed_data_unavailable_despite_available_evidence");
+    });
+
+    test("a truthful limitation cannot hide a later definitive completion claim", () => {
+      expect(auditProfile("I cannot confirm whether your profile is complete. Your profile is incomplete.").errors)
+        .toContain("unverified_evidence_presented_as_verified");
+    });
+
+    test("returns the truthful blocked-field answer through the manager without a validation retry", async () => {
+      mockGetSupportManagerToolDefinitions.mockReturnValueOnce([{ type: "function", name: "get_attorney_account_snapshot", description: "Account fields", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true }]);
+      mockExecuteSupportManagerTool.mockResolvedValue(profileTrace().result);
+      const reply = "I cannot confirm whether your profile is complete. Your law firm, state, practice areas, and bio are missing.";
+      const parse = jest.fn().mockResolvedValueOnce({
+        id: "resp_profile_tool", output: [{ type: "function_call", call_id: "profile_tool", name: "get_attorney_account_snapshot", arguments: "{}", parsed_arguments: {} }],
+      }).mockResolvedValueOnce({ id: "resp_profile_answer", output: [], output_parsed: managerReply({ reply, suggestions: [], primaryAsk: "profile_completion" }) });
+      const result = await generateSupportManagerReply({ messageText: "Is my profile complete?", user: { _id: OVERVIEW_OWNER, role: "attorney" }, client: { responses: { parse } } });
+      expect(result.reply).toBe(reply);
+      expect(result.telemetry).toEqual(expect.objectContaining({ managerAvailable: true, validationFailures: [], validationRetries: 0, validationExhausted: false, retryOutcome: "not_needed" }));
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+  });
+
   test("requires the authoritative workflow tool for payment prerequisites", () => {
     const audit = auditManagerReply(
       managerReply({

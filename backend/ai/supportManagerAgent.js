@@ -247,6 +247,7 @@ function buildManagerInstructions(role = "unknown") {
     "- For recent receipts across matters, use get_attorney_receipt_history. For the attorney's profile or account settings, use get_attorney_account_snapshot.",
     "- LPC exposes Matter payment history and receipts, not invoice records. If an attorney asks for invoices, say that LPC does not create invoice records and direct them to Payments for payment history and receipts.",
     "- Distinguish absent evidence from an unknown field and a temporarily unavailable dependency. Never turn an outage into 'none'.",
+    "- An available account snapshot does not make every field known. When profileComplete is null and profileAssessment is blocked_policy, say that you cannot confirm overall profile completion; you may still report the verified missing profile fields. Do not declare the profile complete, incomplete, finished, or ready, or infer a completion requirement from the missing-field list.",
     "- Keep matter completion, payment release, bank deposit, and confirmed bank receipt distinct. A verified release does not prove the money reached the paralegal's bank.",
     "- Explain blockers in plain language: say what remains and what the user can do next. Do not use system phrasing such as 'completion is blocked' when 'there is still one unfinished task' conveys the meaning.",
     "- Do not repeat workflow policy already established in the conversation unless it is needed to answer the current follow-up.",
@@ -343,6 +344,29 @@ function isLimitationReply(reply = "") {
   return /\b(?:temporarily unavailable|could not access|couldn't access|couldn’t access|unable to access|could not verify|couldn't verify|couldn’t verify|could not produce|couldn't produce|couldn’t produce|not represented|not available right now|try again)\b/i.test(
     String(reply || "")
   );
+}
+
+function profileCompletionAudit({ messageText, reply, toolOutputs }) {
+  const blocked = toolOutputs.some(entry =>
+    entry?.name === "get_attorney_account_snapshot" &&
+    entry.result?.ok === true && entry.result?.available === true &&
+    entry.result.profileComplete === null &&
+    entry.result.profileAssessment?.evidenceState === "blocked_policy" &&
+    entry.result.profileAssessment?.reason === "profile_completion_definitions_conflict"
+  );
+  if (!blocked) return { unavailableClaimText: reply, unsupportedCompletionClaim: false };
+  const completionTopic = text => /\bprofile\b/i.test(text) && /\b(?:complet(?:e|ed|ion|eness)|incomplete|finished|ready|done|status)\b/i.test(text);
+  const requested = completionTopic(messageText);
+  const clauses = String(reply).split(/(?<=[.!?;])/u);
+  const honestLimitation = clause => completionTopic(clause) &&
+    /\b(?:cannot|can['’]t|could not|couldn['’]t)\s+(?:yet\s+)?(?:confirm|verify|determine|assess|tell)\b|\b(?:not available|unknown|unconfirmed|not yet determined)\b/i.test(clause) &&
+    !/\b(?:billing|cards?|payments?|invoices?|receipts?|cases?|matters?|payouts?|notifications?|security|two[ -]?factor|2fa)\b/i.test(clause);
+  const completionClaim = /\bprofile(?:\s+completion(?:\s+status)?)?\s+(?:is|isn['’]t|was|wasn['’]t|looks|seems|appears|remains|has\s+(?:not\s+)?been)\s+(?:(?:now|fully|still|not|yet)\s+)*(?:complete|completed|incomplete|finished|ready|done)\b|\b(?:complete|completed|finish|finished)\s+(?:your|the|this)\s+profile\b/i;
+  const unsupportedCompletionClaim = clauses.some(clause => !honestLimitation(clause) && completionClaim.test(clause));
+  return {
+    unavailableClaimText: requested ? clauses.filter(clause => !honestLimitation(clause)).join("") : reply,
+    unsupportedCompletionClaim,
+  };
 }
 
 function auditFinancialAnswer(reply = "", messageText = "", conversationState = {}, relevantEvidence = []) {
@@ -568,9 +592,11 @@ function auditManagerReply(
   ) {
     errors.push("unavailable_evidence_reported_as_absent");
   }
+  const profileAudit = profileCompletionAudit({ messageText, reply: data.reply, toolOutputs: relevantSuccessfulEvidence });
+  if (profileAudit.unsupportedCompletionClaim) errors.push("unverified_evidence_presented_as_verified");
   if (
     hasAvailableEvidence &&
-    /\b(?:i (?:do not|don't|don’t) have|not available|cannot confirm|can't confirm|can’t confirm|could not confirm|couldn't confirm|couldn’t confirm|cannot verify|can't verify|can’t verify|could not verify|couldn't verify|couldn’t verify|could not produce|couldn't produce|couldn’t produce)\b/i.test(data.reply)
+    /\b(?:i (?:do not|don't|don’t) have|not available|cannot confirm|can't confirm|can’t confirm|could not confirm|couldn't confirm|couldn’t confirm|cannot verify|can't verify|can’t verify|could not verify|couldn't verify|couldn’t verify|could not produce|couldn't produce|couldn’t produce)\b/i.test(profileAudit.unavailableClaimText)
   ) {
     errors.push("claimed_data_unavailable_despite_available_evidence");
   }
