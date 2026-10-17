@@ -13,6 +13,13 @@ const APPROVED_LICENSES = new Set([
   "MIT",
   "MIT-0",
 ]);
+// These exact SPDX alternatives offer MIT, already approved above. Keep the
+// original SBOM expression and report our selected option; do not approve the
+// other alternative or reinterpret arbitrary AND/WITH expressions.
+const REVIEWED_LICENSE_CHOICES = new Map([
+  ["(MIT OR WTFPL)", "MIT"],
+  ["(BSD-2-Clause OR MIT OR Apache-2.0)", "MIT"],
+]);
 
 function fail(message) {
   const error = new Error(`[licenses] ${message}`);
@@ -43,6 +50,7 @@ function validateProductionLicenses(sbom) {
   const missing = [];
   const unapproved = [];
   const counts = new Map();
+  const licenseChoices = [];
   for (const component of sbom.components) {
     const labels = licenseLabels(component);
     if (!labels.length) {
@@ -51,7 +59,10 @@ function validateProductionLicenses(sbom) {
     }
     for (const license of labels) {
       counts.set(license, (counts.get(license) || 0) + 1);
-      if (!APPROVED_LICENSES.has(license)) {
+      const selected = REVIEWED_LICENSE_CHOICES.get(license);
+      if (selected && APPROVED_LICENSES.has(selected)) {
+        licenseChoices.push({ component: componentLabel(component), expression: license, selected });
+      } else if (!APPROVED_LICENSES.has(license)) {
         unapproved.push(`${componentLabel(component)} (${license})`);
       }
     }
@@ -66,6 +77,7 @@ function validateProductionLicenses(sbom) {
   return {
     components: sbom.components.length,
     licenses: Object.fromEntries([...counts].sort(([left], [right]) => left.localeCompare(right))),
+    ...(licenseChoices.length ? { licenseChoices } : {}),
   };
 }
 
@@ -92,6 +104,9 @@ function main() {
     .map(([license, count]) => `${license}=${count}`)
     .join(", ");
   process.stdout.write(`[licenses] ${result.components} production components passed (${licenseSummary}).\n`);
+  for (const choice of result.licenseChoices || []) {
+    process.stdout.write(`[licenses] ${choice.component}: selected ${choice.selected} from ${choice.expression}.\n`);
+  }
 }
 
 if (require.main === module) {

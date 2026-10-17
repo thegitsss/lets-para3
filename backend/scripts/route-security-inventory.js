@@ -42,6 +42,7 @@ const mountByFile = {
   "paymentsWebhook.js": "/api/webhooks/stripe",
   "performance.js": "/api/performance",
   "public.js": "/api/public and /public",
+  "resumeImport.js": "/api/users and /api/paralegals/me/resume-import",
   "stripe.js": "/api/stripe",
   "support.js": "/api/support",
   "uploads.js": "/api/uploads",
@@ -51,6 +52,14 @@ const mountByFile = {
 // This configured child router inherits authentication and approval at its
 // actual mount. Its own role guard remains authoritative for the role column.
 function inheritedGuards(file) {
+  if (file === "resumeImport.js") {
+    const parent = fs.readFileSync(path.join(routesDir, "users.js"), "utf8");
+    const mount = parent.indexOf('router.use("/me/resume-import", require("./resumeImport").createResumeImportRouter(');
+    if (mount < 0 || !/router\.use\(verifyToken\)/.test(parent.slice(0, mount))) {
+      throw new Error("Resume import authenticated mount changed; review its security inventory.");
+    }
+    return parent.slice(0, mount);
+  }
   if (file !== "matterPostings.js") return "";
   const parent = fs.readFileSync(path.join(routesDir, "cases.js"), "utf8");
   const mount = parent.indexOf('router.use("/posting", require("./matterPostings")');
@@ -136,6 +145,12 @@ function hasBefore(src, line, pattern) {
 
 function classify(file, call, beforeLineText) {
   const whole = `${beforeLineText}\n${call}`;
+  if (file === "resumeImport.js") {
+    if (!/authorize = \[require\("\.\.\/middleware\/requireApprovedUser"\), require\("\.\.\/middleware\/requireRole"\)\("paralegal"\)\]/.test(beforeLineText)) {
+      throw new Error("Resume import default approval/role guards changed; review its security inventory.");
+    }
+    return "paralegal-only";
+  }
   if (file === "paymentsWebhook.js") return "webhook/system-only";
   if (file === "performance.js" && /^\/vitals$/.test(firstRoutePath(call))) return "public/telemetry";
   if (/requireRole\(["'`]admin/.test(whole)) return "admin-only";
@@ -206,7 +221,7 @@ for (const file of files) {
     const approved = !publicTelemetry && /requireApproved|requireApprovedUser|router\.use\(requireApproved/.test(`${inherited}\n${beforeLineText}\n${call}`)
       ? "yes"
       : "no/public-or-special";
-    const roleMatch = `${beforeLineText}\n${call}`.match(/requireRole\(([^)]*)\)/);
+    const roleMatch = `${beforeLineText}\n${call}`.match(/(?:requireRole|require\(["']\.\.\/middleware\/requireRole["']\))\(([^)]*)\)/);
     const role = roleMatch ? roleMatch[1].replace(/\s+/g, " ").trim() : "none/implicit";
     const csrf = /csrfProtection|protectMutations|mutatingGuards|csrfMiddleware/.test(call) || hasBefore(src, line, /router\.use\(protectMutations\)/);
     const rateLimit =
