@@ -417,6 +417,8 @@ async function buildNotifications(userDoc) {
 
 // all routes require auth
 router.use(verifyToken);
+// Extraction never writes a profile or replaces its protected attachment.
+router.use("/me/resume-import", require("./resumeImport").createResumeImportRouter({ loadExisting: require("./resumeImport").loadExisting }));
 paralegalRouter.use(verifyToken);
 
 router.get(

@@ -95,17 +95,17 @@ Self-serve account deactivation is an access and participation control, not eras
 
 The workflow must never delete completed Matters, messages, Matter files, tasks, payouts, platform income, disputes, or audit logs merely because an account is removed. Admin and director accounts cannot use this bulk path; they require separately approved operational offboarding. The admin UI reports “minimized” and “fully removed” separately and does not call minimization “permanent deletion.”
 
-Before launch, counsel and the data owner must approve the record-category retention matrix and legal-hold procedure. Test one unused account and one account with completed financial history, verify the returned mode and audit event, and confirm no retained ledger count changes. Any destructive cascade into a matter or financial record is stop-ship.
+Before launch, Samantha must approve the record-category retention matrix and preservation procedure after the substantive factual checks. A counsel appointment is not required by her October 14 direction. Use the [privacy operations procedure](privacy-operations.md) to record request deadlines, vendor actions and preservation custody. Test one unused account and one account with completed financial history, verify the returned mode and audit event, and confirm no retained ledger count changes. Any destructive cascade into a matter or financial record is stop-ship.
 
 ## Legal-document deployment gate
 
-Production web startup verifies that the Terms and Privacy files exactly match the counsel-approved SHA-256 digests. Set these Render secrets only from the signed approval record:
+Production web startup verifies that the Terms and Privacy files exactly match the SHA-256 digests approved by Samantha. Set these Render secrets only from her actual exact-document approval record:
 
 - `LEGAL_COUNSEL_APPROVAL_ID`
 - `LEGAL_APPROVED_TERMS_SHA256`
 - `LEGAL_APPROVED_PRIVACY_SHA256`
 
-The version variables in `render.yaml` must match `backend/utils/legalDocuments.js`. Run `npm run check:legal` to print the candidate versions and hashes. After counsel approves those exact files, store the reference and digests, then run `npm run certify:legal` from an authorized environment. Changing either document invalidates the digest and intentionally prevents production startup until the new version is reviewed, recorded, and configured.
+The version variables in `render.yaml` must match `backend/utils/legalDocuments.js`. Run `npm run check:legal` to print the candidate versions and hashes. After Samantha approves those exact files, store the reference and digests, then run `npm run certify:legal` from an authorized environment. `LEGAL_COUNSEL_APPROVAL_ID` is the retained compatibility key for that owner decision; it does not assert counsel approval. Changing either document invalidates the digest and intentionally prevents production startup until the new version is reviewed, recorded, and configured.
 
 Do not put privileged legal advice or the approval document itself in application logs or source control. The launch record should contain the approval reference, versions, hashes, approver role, and approval time.
 

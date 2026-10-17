@@ -290,6 +290,7 @@ router.get(
     message: { error: "Too many directory requests. Please slow down." },
   }),
   verifyToken.optional,
+  require("../utils/directoryAccess"),
   asyncHandler(async (req, res) => {
     const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
     const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
