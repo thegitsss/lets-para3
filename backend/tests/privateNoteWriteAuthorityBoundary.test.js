@@ -58,11 +58,12 @@ const readSessions = () => AuthSession.collection.find({}, { projection: { userI
 const readAudit = () => AuditLog.collection.find({}).sort({ _id: 1 }).toArray();
 async function snapshot() { return { cases: await readCases(), weeklyNotes: await readWeeks(), users: await readUsers(), sessions: await readSessions(), audit: await readAudit() }; }
 async function evidence(record) {
-  if (!process.env.LPC_PRIVATE_NOTE_AUTHORITY_EVIDENCE) return;
+  const directory = process.env.LPC_PRIVATE_NOTE_AUTHORITY_EVIDENCE || (process.env.CI === 'true' ? path.resolve(__dirname, '../test-results/private-note-authority') : null);
+  if (!directory) return;
   const title = expect.getState().currentTestName, filename = crypto.createHash('sha256').update(title).digest('hex') + '.json';
   const value = { title, ...record, after: await snapshot(), actorIds: { owner: String(owner.user._id), other: String(other.user._id), paralegal: String(paralegal.user._id), admin: String(admin.user._id) }, managedSessionRecordIds: [owner, other, paralegal, admin].map(person => person.sessionRecordId) };
-  await fs.mkdir(process.env.LPC_PRIVATE_NOTE_AUTHORITY_EVIDENCE, { recursive: true, mode: 0o700 });
-  await fs.writeFile(path.join(process.env.LPC_PRIVATE_NOTE_AUTHORITY_EVIDENCE, filename), JSON.stringify(value, null, 2), { mode: 0o600 });
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  await fs.writeFile(path.join(directory, filename), JSON.stringify(value, null, 2), { mode: 0o600 });
 }
 function winningWriteHook(operation, inject) {
   const collection = operation === 'case-save' ? Case.collection : WeeklyNote.collection;
@@ -282,10 +283,14 @@ test.each(operations)('real managed-session expiry after the actual %s write abo
       record.injection.actualUncommittedDataAfterWrite = saved; record.injection.actualWriteAt = new Date().toISOString();
       // This barrier waits only for the actual stored expiry being tested. It
       // changes no product clock or original30s deadline and performs no retry.
-      await new Promise(resolve => setTimeout(resolve, Math.max(1, expiresAt.getTime() - Date.now() + 1)));
+      const waitStarted = process.hrtime.bigint();
+      while (Date.now() <= expiresAt.getTime()) {
+        if (process.hrtime.bigint() - waitStarted > 3_000_000_000n) throw Error('Actual stored session expiry did not advance within the bounded barrier');
+        await new Promise(resolve => setTimeout(resolve, Math.max(1, Math.min(25, expiresAt.getTime() - Date.now() + 2))));
+      }
       expect(Date.now()).toBeGreaterThan(expiresAt.getTime()); record.injection.actualExpiryCrossedAfterWriteAt = new Date().toISOString();
     });
-    const response = await save(operation, body); record.response = { status: response.status, body: response.body }; record.dataWrites = writes; expect(writes).toBe(1); expect({ status: response.status, body: response.body }).toMatchObject({ status: 403 }); expect(response.status).toBe(403);
+    const response = await save(operation, body); record.response = { status: response.status, body: response.body }; record.dataWrites = writes; expect(writes).toBe(1); if (response.status !== 403) throw Error('Expected expired-session403 after one actual write: ' + JSON.stringify({ status: response.status, body: response.body, injection: record.injection })); expect(response.status).toBe(403);
     expect(await readCases()).toEqual(record.before.cases); expect(await readWeeks()).toEqual(record.before.weeklyNotes); expect(await readAudit()).toEqual(record.before.audit); expect(await readUsers()).toEqual(record.injection.actualSnapshotBeforeArbitration.users);
     const sid = await AuthSession.collection.findOne({ sessionId: owner.session.sessionId });
     if (sid) { expect(sid.expiresAt).toEqual(expiresAt); expect(sid.__v).toBe(record.injection.actualSnapshotBeforeArbitration.sessions.find(value => String(value._id) === owner.sessionRecordId).__v); }

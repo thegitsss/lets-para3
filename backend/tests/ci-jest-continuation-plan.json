@@ -2,619 +2,126 @@
   "schemaVersion": 1,
   "mode": "whole-file-source-bound-backend-continuation",
   "currentCommit": "@checked-out-head",
-  "priorRunId": 38677811432,
+  "priorRunId": 39076828223,
   "priorAttempt": 1,
-  "priorHead": "c0d2fddd9f0a1a7024833a4b308fe9533d5e1657",
-  "priorPlanSha256": "a02c37f575ed118f301b95c17f9f179570e29b0d9a058a66ef18e485b6e8781b",
+  "priorHead": "c3ee5566fbaf562d22ee7536807c4da2bf248006",
+  "priorPlanSha256": "8062ba0fc37920e1e6e90d371e6b9f436120af291f21748ea7415e0cbf0284dd",
   "artifacts": [
     {
-      "id": 11946995671,
-      "name": "jest-plan-38677811432-1",
-      "sha256": "754484bc5c6ebf22e093220a34f44cee02c1b50569c3d28d7ef6e4eb7c172117",
-      "bytes": 126157,
+      "id": 12117875580,
+      "name": "jest-shard-39076828223-1-5",
+      "bytes": 478521,
+      "sha256": "9a1ba513c3ad84b017216cf546eb5e6ed2d2627db01adf7bbca8ca8ca6164755",
+      "kind": "shard"
+    },
+    {
+      "id": 12117706220,
+      "name": "jest-shard-39076828223-1-1",
+      "bytes": 457618,
+      "sha256": "fbd32c426a2013b8ffd18aca381d07f7eba445d9e7a9c542398f2800265c63c1",
+      "kind": "shard"
+    },
+    {
+      "id": 12117575877,
+      "name": "jest-shard-39076828223-1-4",
+      "bytes": 486886,
+      "sha256": "fe994ee0f352592cfc9677908c56dfe9fa67b1d80a55e16c93ab882a08afe1dd",
+      "kind": "shard"
+    },
+    {
+      "id": 12117427253,
+      "name": "jest-shard-39076828223-1-7",
+      "bytes": 490820,
+      "sha256": "0c225a4fead92fe5f90976c7cc6f9b783e171ebdb554d8db6f7eece1ba721814",
+      "kind": "shard"
+    },
+    {
+      "id": 12117346192,
+      "name": "jest-plan-39076828223-1",
+      "bytes": 128921,
+      "sha256": "10d83a208c77f3b3e9f2d7ed17e8779ef74a39c39ba8e319f0055caa0811af07",
       "kind": "plan"
     },
     {
-      "id": 11947825750,
-      "name": "jest-shard-38677811432-1-1",
-      "sha256": "72c66fbfcb5e272bad7f6a69327dd18b6dd2a2f84681815c79599888dbedb6ee",
-      "bytes": 445506,
+      "id": 12117203218,
+      "name": "jest-shard-39076828223-1-8",
+      "bytes": 488666,
+      "sha256": "ced14ef3b54d90b6a9bc0575a6a6f3bf160d91a15ec04570506f0da79ee667d7",
       "kind": "shard"
     },
     {
-      "id": 11947510838,
-      "name": "jest-shard-38677811432-1-2",
-      "sha256": "53a1bebe0dc5eeafc35ba1683e1f08820da8cae7dfed4c8559534c70beef7ce1",
-      "bytes": 491405,
+      "id": 12117108600,
+      "name": "jest-shard-39076828223-1-6",
+      "bytes": 469145,
+      "sha256": "c0d4c345353246d5011fd4cebd29fd70e6d15544137037fc791c8ee56e83b70b",
       "kind": "shard"
     },
     {
-      "id": 11947485858,
-      "name": "jest-shard-38677811432-1-3",
-      "sha256": "42e64103ce8af9325e87100cba1e73f4c6bd9a4bac37f9b2bde2ddd94d537124",
-      "bytes": 427517,
+      "id": 12117073679,
+      "name": "jest-shard-39076828223-1-2",
+      "bytes": 489717,
+      "sha256": "9cbd4305e9e3ff1e4375704a794ce3a533e2c216cfc077b5b6ebbe2df77e1f9b",
       "kind": "shard"
     },
     {
-      "id": 11947710608,
-      "name": "jest-shard-38677811432-1-4",
-      "sha256": "4418b6e7b7e2fdebcfafa024a3d66f69a457884e148ee0fc5fa39e9fcb6ed7b8",
-      "bytes": 464203,
-      "kind": "shard"
-    },
-    {
-      "id": 11947171296,
-      "name": "jest-shard-38677811432-1-5",
-      "sha256": "740be063f87e654ce57fa4ade75aa1777dbb33f3ef62fb52a0ef10c0557ef589",
-      "bytes": 436002,
-      "kind": "shard"
-    },
-    {
-      "id": 11947690700,
-      "name": "jest-shard-38677811432-1-6",
-      "sha256": "02cf2e322e8fb3b4f535e4fda5334b877e3afb4342af1d0a85fb221b275c7509",
-      "bytes": 445609,
-      "kind": "shard"
-    },
-    {
-      "id": 11947361016,
-      "name": "jest-shard-38677811432-1-7",
-      "sha256": "c99deae21e977cf537f82071a8f63f7dd69c15e4e6d497a3fb4582767e10736f",
-      "bytes": 627999,
-      "kind": "shard"
-    },
-    {
-      "id": 11947690683,
-      "name": "jest-shard-38677811432-1-8",
-      "sha256": "6e1d1992727b436a545ef7c252529abbb5089cf3397ee0733e77d8e42b48269a",
-      "bytes": 445548,
+      "id": 12117049055,
+      "name": "jest-shard-39076828223-1-3",
+      "bytes": 445743,
+      "sha256": "aa17c3e9a64c167efea7f845e74fba96180591bcbdd8d65c2d631a31cdc85fc5",
       "kind": "shard"
     }
   ],
   "changes": [
     {
-      "path": ".github/workflows/quality.yml",
-      "beforeSha256": "e2249a1958d7c0a4747eafa2dbc16dbd00bef24bbdb73669f53a4b1d88235622",
-      "afterSha256": "de6b6d5dbd98677762becbfa3530bdecab031ab1b241565c95d10949e603560f",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciWorkflowContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "abe7bff2a133a2fcd3a794279e8105e13821ab1b57001118db0c9dabc2d08817",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": ".gitleaksignore",
-      "beforeSha256": "20b6823cb087f0b106732d0dd7b9c2629875872f5fc863b5d62b0a50498fc8a6",
-      "afterSha256": "5d54200e8ae721d12a1b9a6f3993bb7025d634b8a8d71efa3d2940896766c667",
-      "kind": "ci-control",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "07c521ae41d0b98566961f50d82b78ba3b416e772cfba1c84628ebfd3bc729bf",
-      "applicability": "Exact historical non-secret fingerprints only; same full history/pinned scanner pass and same-file new-commit negative canary retained."
-    },
-    {
-      "path": "backend/routes/adminWorkspace.js",
-      "beforeSha256": "a5bb2d4329ff7998c7567666457390afd129e15bce001c0c3e0b35cc178ae886",
-      "afterSha256": "a845b3376a1c12bb7abe79f15dc4c17bcfe73d2c4ca1598bc3317f36acc92548",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/adminOperations.test.js",
-        "tests/paymentAttentionRecovery.test.js"
-      ],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Additive three finance/payment-alert routes; every original route declaration and handler is byte-conserved. Current managed Admin route and original information-request consumers execute."
-    },
-    {
-      "path": "backend/routes/cases.js",
-      "beforeSha256": "ee05cf4b01428093dd2b723e2b544b79fe5d1af3c1c2aab3767ba7322fc8b3cc",
-      "afterSha256": "f2b2bba295d31bb005dc0956745eb8ad2815d50291f17fe2d8993b22b8d9487b",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/attorneyCompletion.test.js"
-      ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Only the two PDF generation calls become sequential; unchanged money, intent, claim, IDs, payload and unrelated handler bytes conserve unaffected route consumers."
-    },
-    {
-      "path": "backend/routes/paymentsWebhook.js",
-      "beforeSha256": "2b13bec4f6b27745128a80b3f847f1fe4c0014211bb3ee9abe2afd1556906a5f",
-      "afterSha256": "4b459bb02a81467ca4ab0da18c94f22ccb2a7e3fa09d205b222fb5744e416367",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/attorneyRefundEvents.test.js",
-        "tests/attorneyWebhookDelivery.test.js",
-        "tests/webhookHandling.test.js"
-      ],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Only existing failed-delivery category preservation changed. Full original failure/delivery and refund consumers execute; unchanged funding/chargeback/checkout/transfer handler branches retain exact byte contracts."
-    },
-    {
-      "path": "backend/scripts/check-ci-workflow.js",
-      "beforeSha256": "ebeade1fa20e6aa978747542ed085d81852f24e215f764119d905f46acfbbcd8",
-      "afterSha256": "38e3fe13e8932aaee9926d71c012d19e1ea4b1ec546ad7cdec8fa05a5367433a",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciWorkflowContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "abe7bff2a133a2fcd3a794279e8105e13821ab1b57001118db0c9dabc2d08817",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/scripts/guard-ci-artifact-budget.js",
-      "beforeSha256": "26b15c444207be819717d2511fe131452f91d316b173fd3d395556e0e409bae4",
-      "afterSha256": "baa9f28f63aa813c56a1de46605de2bae2176caffe8f72c3cd869def89b4ffc3",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciArtifactBudget.test.js",
-        "tests/ciWorkflowContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
       "path": "backend/scripts/import-ci-jest-prior.js",
-      "beforeSha256": null,
-      "afterSha256": "7758bb534f59fde855698f167284a86bc093377e0ba12ba3a78654e15f7c20e2",
+      "beforeSha256": "7758bb534f59fde855698f167284a86bc093377e0ba12ba3a78654e15f7c20e2",
+      "afterSha256": "38e367ab376aaddd0af99f32761b332d294b540f3ba82e4b1d76b56e83f57bea",
       "kind": "ci-control",
       "affectedSuites": [
         "tests/ciJestShards.test.js"
       ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/scripts/import-ci-jest-prior.py",
-      "beforeSha256": null,
-      "afterSha256": "2d064ea5fc3e6251ac2c1f1e8d9bca4416f42fb3ba5e49d7a7d1cebc1559e617",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciJestShards.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/scripts/lib/stagingCanaryCleanup.js",
-      "beforeSha256": null,
-      "afterSha256": "c956bfb711be8d20ea36a97a2ee696667fb0edac73b1a61cc6da7e695c57186e",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/stagingCanaryCleanup.test.js"
-      ],
-      "reviewedEvidenceSha256": "679da0b02f1319080fe75f1c2f47da9d1ceeda1c69f054f961e3da4cf0924b74",
-      "applicability": "Exact original published helper bytes; previously ignored lib path is now explicitly tracked."
-    },
-    {
-      "path": "backend/scripts/run-ci-jest-shard.js",
-      "beforeSha256": "fe771e98900d96b7fb8debfb6bbf3e5f952063fcf1a8f6bef877584988336ac6",
-      "afterSha256": "a3f9abc2e44601deaac014066f45431c11ec0d1926677bbba5f1eeb639fa7f08",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciJestShards.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/scripts/verify-ci-jest-continuation.js",
-      "beforeSha256": null,
-      "afterSha256": "2d7b874222a1e55d3639e3e904ac8b24d11cfe7a4cf2f72fd8f56a58e81b5318",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciJestShards.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/scripts/verify-ci-jest-shards.js",
-      "beforeSha256": "e5240d197765a8904884b5ab963c68cd210a932c1cd5009036ad4bf3b386605b",
-      "afterSha256": "be331a1746077dda1c74a830f1ab7d5490c52c87b4e13a8af4d6692c74f0c3d5",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciJestShards.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/scripts/verify-critical-browser-groups.js",
-      "beforeSha256": "2f4ce4459538d35850d10168a756bfec7e9e8caff588d24a177edd9a9ffb29bf",
-      "afterSha256": "251786c24ce6d0d1dc986bfa9a6f59b04460ab8871f0a683c230ea385e109beb",
-      "kind": "ci-control",
-      "affectedSuites": [
-        "tests/ciArtifactBudget.test.js",
-        "tests/ciWorkflowContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Fail-closed optional source-bound continuation or exact approved identity constants; default full execution and original commands/deadlines retained."
-    },
-    {
-      "path": "backend/services/adminAccountService.js",
-      "beforeSha256": "6d58b6e4d2ef3c5604e093ec70af449f9cee50c8e0eb380fa27dd53936a91544",
-      "afterSha256": "ba87ceb39fd75add9f0b77e9b62f8f595e609b20e77d049552fb4f6a418db13f",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/adminCommunications.test.js",
-        "tests/adminInbox.test.js",
-        "tests/adminOperations.test.js"
-      ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Same-key process turns wrap information-request submission; all original durable receipt/reservation/provider outcome paths retained and fresh authority remains per turn."
-    },
-    {
-      "path": "backend/services/attorneyRefundEvents.js",
-      "beforeSha256": "30b2ed25a646cf765b1c34981841cd48e8996d14fd9bfc8f41e775278230d20e",
-      "afterSha256": "fb52cf41a725709ac049bc4b906e20698a7bd0358670b9670f4d0ad5334919ac",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/attorneyFinancialHistory.test.js",
-        "tests/attorneyRefundEvents.test.js",
-        "tests/attorneyRefundRetention.test.js",
-        "tests/paymentAttentionRecovery.test.js"
-      ],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Refund provider-read extraction, settled processing-only recovery and read-only review affect these exact original saved-refund consumers plus the new actual managed recovery suite."
-    },
-    {
-      "path": "backend/services/paymentAttentionRecovery.js",
-      "beforeSha256": null,
-      "afterSha256": "e2bd997ae8e6b92030d34d35eb1d642dac441068510e62b7be86032822af998b",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/paymentAttentionRecovery.test.js"
-      ],
-      "reviewedEvidenceSha256": "5f8c2e01fdb71468de0aae0aaecea6cef6d34c0d6a783a7ada55a473bb5fa896",
-      "applicability": "New managed Admin review/resolve transaction; synthetic provider evidence and actual saved records exercised by full suite."
-    },
-    {
-      "path": "backend/services/support/adminInboxService.js",
-      "beforeSha256": "b8e1c86ca8efdff5d80c8633be67451f203688cb907280f6682d352f2f8581b6",
-      "afterSha256": "f754fa3f7e442e677441fae26ee934cc324017f0b46bae421987df05e043a27a",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/adminCommunications.test.js",
-        "tests/adminInbox.test.js",
-        "tests/adminOperations.test.js"
-      ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Same-key email decision turn; focused mounted consumers execute in full. Existing cross-process durable receipt contract is retained, no distributed both201 claim."
-    },
-    {
-      "path": "backend/tests/attorneyCompletion.test.js",
-      "beforeSha256": "9191328e5e6db982f0993a9b4f95ade5c88445e6d5fe916cf46c6e95f0f673c7",
-      "afterSha256": "1856624100202477904d9ccc6d1ea33544c16701a38f64c07b147231328a88c9",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/attorneyCompletion.test.js"
-      ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/attorneyRefundEvents.test.js",
-      "beforeSha256": "4c39a21d0c82658ed4da57cc7bbe33593dd5326635812e31c79108a9e7eddca1",
-      "afterSha256": "b4eefea601dff37bfff578fa1cde72d8e2271da2fc1df08ccadc3a87a74fa580",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/attorneyRefundEvents.test.js"
-      ],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
     },
     {
       "path": "backend/tests/ciJestShards.test.js",
-      "beforeSha256": "2484e32613654079643d6666d5e24e9f606a4d75aeb72f152e347b075e874790",
-      "afterSha256": "639e17c9dfce5ebc35eff722f85d94643e0c5de0f3dca7d84a4c3271b36ec0e0",
+      "beforeSha256": "639e17c9dfce5ebc35eff722f85d94643e0c5de0f3dca7d84a4c3271b36ec0e0",
+      "afterSha256": "c7e2f178157cd8db7d0fe5469ebc9369373c7ba275498a618a36b61d455a6814",
       "kind": "test-fixture",
       "affectedSuites": [
         "tests/ciJestShards.test.js"
       ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/ciWorkflowContract.test.js",
-      "beforeSha256": "706faaddd6059647cf9ede859d87d6624697b8c17fac40aa3c550e1a626c40a0",
-      "afterSha256": "d16f9fb3b7c4c2c3f4a67a492fdb3359f9134677cc023698c3ee98acd7faa381",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/ciWorkflowContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "abe7bff2a133a2fcd3a794279e8105e13821ab1b57001118db0c9dabc2d08817",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/e2eBrowserPolicy.test.js",
-      "beforeSha256": "eaa6b02265b6675b9cdc5435d1bbf3e5517f160b04df663068d5fda62a5234e4",
-      "afterSha256": "1edce4f5b3457f00268e77b8e0a55101664e8b81a983d4d1c095391a5698b46f",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/e2eBrowserPolicy.test.js"
-      ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/frontendBuild.test.js",
-      "beforeSha256": "f8d0edcb31e8b1058f8585a28e6814488e37243d69f4a5c81ad097072cb91760",
-      "afterSha256": "a6ad9d44b430b3f78e8734a7894539216e1bbca145b561b428365320302594c1",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/frontendBuild.test.js"
-      ],
-      "reviewedEvidenceSha256": "679da0b02f1319080fe75f1c2f47da9d1ceeda1c69f054f961e3da4cf0924b74",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/helpers/paymentAttentionFixture.js",
-      "beforeSha256": null,
-      "afterSha256": "9ca98c9abdda3206b851b9c1ed6cc7adf32b05823a38c1245031d0a9f11f6ee8",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/paralegalV2HomeContract.test.js",
-      "beforeSha256": "43c58604fd1593203e1a5eb53a3837218bd85b5d5714b4bd9a2ea1867c6eb2cc",
-      "afterSha256": "7af2dec85eebc89c6853c25b7cdf12d20612436f25f9088d55a3dbf1961ae9ae",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/paralegalV2HomeContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "82eaecd0f6d40cc8f01ed15484abb5cd78495d14321721fb0e927fc340d03403",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/paralegalV2MessagingContract.test.js",
-      "beforeSha256": "2bae42709e7721d49a3f57d2b5f179cdc5e0f4c5b1c48a3fb9857d3a827592e0",
-      "afterSha256": "15f61e3b164d8335581707f5121c0ed20f2a50dcc58897ef97f6ea77c3c1b7bf",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/paralegalV2MessagingContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "82eaecd0f6d40cc8f01ed15484abb5cd78495d14321721fb0e927fc340d03403",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/paralegalV2ParityContract.test.js",
-      "beforeSha256": "84b5c4659ad6992d7de9c0f1728c25dac1355172222bb6a3a0e66b0dfffabd11",
-      "afterSha256": "5e411f9a67b3f7bbf2f180bbb75360fcd27f60c57f5cfc01d48114e4c73fc553",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/paralegalV2ParityContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "82eaecd0f6d40cc8f01ed15484abb5cd78495d14321721fb0e927fc340d03403",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/paymentAttentionRecovery.test.js",
-      "beforeSha256": null,
-      "afterSha256": "76990b1b7ac5b8dd6127b42d2e6f5fc50664580db45b102cf08a4be72dd0af07",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/paymentAttentionRecovery.test.js"
-      ],
-      "reviewedEvidenceSha256": "5f8c2e01fdb71468de0aae0aaecea6cef6d34c0d6a783a7ada55a473bb5fa896",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/acceptance/groups.json",
-      "beforeSha256": "ed03b7c89153f5d2388fbe7ffb97bf741e50cc482ade16f4b1fddb0b15eeb56d",
-      "afterSha256": "e17994881651dd7823b1a0ce4fdaad30b9ed7e05df0d06a3b5849ee69bcee20c",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/ciArtifactBudget.test.js",
-        "tests/ciWorkflowContract.test.js"
-      ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "Exact original identity inventory plus approved calendar3 and attention3; no former identity removed."
-    },
-    {
-      "path": "backend/tests/playwright/admin-solo/payment-attention-recovery-actual.spec.js",
-      "beforeSha256": null,
-      "afterSha256": "2887ce49c1d9e226d9ef4dd3be6b614796d9807a1f0ada6031bc4b8e77ba7d1e",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/attorney-v2/accounts.spec.js",
-      "beforeSha256": "7b711fd856ff6b1322d42fe0935bfa79db0834c4998b2554320afdb5b7c31e59",
-      "afterSha256": "b171d46c1b8f24dd9a1b2f43368417d1a579cf981d5ae40e12c877a54191e150",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "71a551092f45063f1da129e99be2c5f6418630208d3ddb8f9fb6411477116570",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/attorney-v2/calendar-press-regression.spec.js",
-      "beforeSha256": null,
-      "afterSha256": "977552abc8772bf14281e608c2eb0a5f2922a0bb4689694a5228eabfade89e2b",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "93a47a7919851189ae1b542ffe8880cd0133edda7bc265b914d73ccdf51e98bc",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/attorney-v2/current-drafts.spec.js",
-      "beforeSha256": "7226138294d45310a57b827f45b4db29eae6dca92e47b1e66934e6dacae210ce",
-      "afterSha256": "c0666a4fdaa63543c3d233e9b6ca71db204f9b61b728f9b2bdd6f323e0652311",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "8295b4042331130628b90c89f8e72924d37641669262d8e5500c5d6e1f75cb17",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/attorney-v2/disputes.spec.js",
-      "beforeSha256": "4ce2f5a5cfd426d76c57424ffccd1bb0d107b953e37ac4f000ac0839ca2bcee8",
-      "afterSha256": "2f5c5ba6918ebb732e2bc1933367b8e315235f75f05753e281a835be62e5fdeb",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "b1619570782851d22c6bb49ba58255660aa4d5673e7b1bc5d81e010ad9c86701",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/attorney-v2/home-summaries.spec.js",
-      "beforeSha256": "914e93ccb840eff926043e29046bdeb6dbd253bf603faedde1ed0a9414b2aa1f",
-      "afterSha256": "a0d8878e7238f209c4e5990320ea548236db24edccc4b82141d34ba5e38200cf",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "8295b4042331130628b90c89f8e72924d37641669262d8e5500c5d6e1f75cb17",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/playwright/attorney-v2/invitation-actions.spec.js",
-      "beforeSha256": "38eb46d5e06ac33bda23f2daac082f5ad6a26d86afe03aab22c78d196c0fca6d",
-      "afterSha256": "3c731b57d709555b086f966c0e18b8695f9eabd52e44f257ba76895e113d04b4",
-      "kind": "test-fixture",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "aee0aa668280df55226c69fbdc4e7865ef127df2975f5a893665a470171227ae",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
     },
     {
       "path": "backend/tests/privateNoteWriteAuthorityBoundary.test.js",
-      "beforeSha256": "89d0b404600b38da0e1dc5ee0feb4119af195c78b5fee1d5e76614ca48fbcae9",
-      "afterSha256": "d59e7914ba50c8d8c718d2da31caad86daf48f5928c5a72599be01b403df8179",
+      "beforeSha256": "d59e7914ba50c8d8c718d2da31caad86daf48f5928c5a72599be01b403df8179",
+      "afterSha256": "d59dfae8ee3568794dd9f18fc98e591316319d76367cbd91616ee18b5e7d3212",
       "kind": "test-fixture",
       "affectedSuites": [
         "tests/privateNoteWriteAuthorityBoundary.test.js"
       ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/releaseCandidate.test.js",
-      "beforeSha256": "d54af80cd0fd9aaedbbab58f9646399978c0dce7d5d6aa9a3b402960132461fd",
-      "afterSha256": "e1519045661333cb300af5ce48ca45c8c2ba5985814637dde1ce98f158ffc670",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/releaseCandidate.test.js"
-      ],
-      "reviewedEvidenceSha256": "679da0b02f1319080fe75f1c2f47da9d1ceeda1c69f054f961e3da4cf0924b74",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/tests/supportDrawerResponsiveBoundary.test.js",
-      "beforeSha256": "5cf94af43a614767f13902b1f344f1e7f1c22337d1a730fa515221b98ba56302",
-      "afterSha256": "8dc00bd4766006a71cd6dd32d3296764870cb4f9a673ea647a1e31e2264575ac",
-      "kind": "test-fixture",
-      "affectedSuites": [
-        "tests/supportDrawerResponsiveBoundary.test.js"
-      ],
-      "reviewedEvidenceSha256": "82eaecd0f6d40cc8f01ed15484abb5cd78495d14321721fb0e927fc340d03403",
-      "applicability": "Approved test/fixture applicability correction or explicit additive control, preserving original assertions and deadlines; changed whole Jest files execute."
-    },
-    {
-      "path": "backend/utils/decisionTurn.js",
-      "beforeSha256": null,
-      "afterSha256": "8d90594aa913cb6ba654206ec73a540c285cfbc74c20f5c95baea87ca72224e3",
-      "kind": "product-change",
-      "affectedSuites": [
-        "tests/adminCommunications.test.js",
-        "tests/adminInbox.test.js",
-        "tests/adminOperations.test.js"
-      ],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "New process-only same-key turn used only by the two above services."
-    },
-    {
-      "path": "docs/LPC_ROUTE_SECURITY_INVENTORY.md",
-      "beforeSha256": "38a5153d9051fe7555a7ebb7a7ae15b00940cffa70fce88ad2acd3ccd30e599d",
-      "afterSha256": "2bb6fea1dcc3543dfc5d986330d6356514822ed9475cb31a3c22948c2c89f90b",
-      "kind": "documentation-only",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "398aa7fb2780f016acf94b5dd864b16a24e27b36ce24badd4ddcbd03751f1c6b",
-      "applicability": "Unchanged generator refreshes the one new managed-Admin CSRF-protected payment-alert resolve route and exact evidence line numbers;248 routes,241 verified,7 exemptions,0 open. No route/policy/handler changed."
-    },
-    {
-      "path": "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json",
-      "beforeSha256": "12f7023b67ef9c03ab0f0412b8670a0ed57eef9612297fa8685ee95d7087aa8b",
-      "afterSha256": "b3377ca492a04cb375a44c1af47d449176bdbc7bfa432faafce91480142c8908",
-      "kind": "ci-control",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "07c521ae41d0b98566961f50d82b78ba3b416e772cfba1c84628ebfd3bc729bf",
-      "applicability": "Exact historical non-secret fingerprints only; same full history/pinned scanner pass and same-file new-commit negative canary retained."
-    },
-    {
-      "path": "frontend/assets/scripts/admin/communications.js",
-      "beforeSha256": "e2208645ee32321e941024f4e9cf8bfc184c691908dd9f8eb384caf3a1b27094",
-      "afterSha256": "9da4bb28ae380ed47bd35d4980cb6f99fdb4eacb613ee018c08f5a294d906e9b",
-      "kind": "browser-only-product",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Frontend is not imported by backend Jest runtime; native acceptance remains explicitly required. No current browser completion is granted by this backend source bridge.",
-      "backendRuntimeImpact": "none-reviewed",
-      "browserAcceptanceRequired": true
-    },
-    {
-      "path": "frontend/assets/scripts/admin/experience.js",
-      "beforeSha256": "b1b0b09016604575195c1f703f405bf3b75ddf60d3205d6ca63d0a34c770dcb7",
-      "afterSha256": "8f048b21496ab42e341f65ab6bd3c434ef1be217c509c4c25f78f1dcae196384",
-      "kind": "browser-only-product",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "c53b732c7fa42056c480770e4c611419e75818cfd286b6b06180e78d51211587",
-      "applicability": "Frontend is not imported by backend Jest runtime; native acceptance remains explicitly required. No current browser completion is granted by this backend source bridge.",
-      "backendRuntimeImpact": "none-reviewed",
-      "browserAcceptanceRequired": true
-    },
-    {
-      "path": "frontend/assets/scripts/admin/finance.js",
-      "beforeSha256": "670ef0ad0e70843c29454a96b659f4a0fbb199f6aef8a52e2faebde3e63f1f26",
-      "afterSha256": "5211ea74dfd531d797a06c20f312d635bf1327ff9ba784eebf9d409ecea03a13",
-      "kind": "browser-only-product",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Frontend is not imported by backend Jest runtime; native acceptance remains explicitly required. No current browser completion is granted by this backend source bridge.",
-      "backendRuntimeImpact": "none-reviewed",
-      "browserAcceptanceRequired": true
-    },
-    {
-      "path": "frontend/assets/scripts/admin/payment-attention.js",
-      "beforeSha256": null,
-      "afterSha256": "75fbae5f4ec9fe292d442dd2aea961a33e998a57d8164c28a25d8a217f0f44e6",
-      "kind": "browser-only-product",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "fa7a68f3d954bd43d1692ad7ee58c5551927a04aec56fdaf5951bee9b39e4f8a",
-      "applicability": "Frontend is not imported by backend Jest runtime; native acceptance remains explicitly required. No current browser completion is granted by this backend source bridge.",
-      "backendRuntimeImpact": "none-reviewed",
-      "browserAcceptanceRequired": true
-    },
-    {
-      "path": "frontend/assets/scripts/attorney-v2/home.mjs",
-      "beforeSha256": "2194508bb3a60b701bbf4a6d8c433583a4cffa2e9c8e9dcacdfb3f6998996221",
-      "afterSha256": "103ce3b306e5791c7ce0b7f76c5fa1e39d7962f9513d0ca029c9fcfa8a3b6bbf",
-      "kind": "browser-only-product",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "8295b4042331130628b90c89f8e72924d37641669262d8e5500c5d6e1f75cb17",
-      "applicability": "Frontend is not imported by backend Jest runtime; native acceptance remains explicitly required. No current browser completion is granted by this backend source bridge.",
-      "backendRuntimeImpact": "none-reviewed",
-      "browserAcceptanceRequired": true
-    },
-    {
-      "path": "frontend/assets/scripts/attorney-v2/workspace-dates.mjs",
-      "beforeSha256": "7a346cf1a43c8f6482e86fefbbe6bd8e0424007c5a28b6b093978d9c7a4aca2c",
-      "afterSha256": "1834d6a2cb0d4fd872436fe71a566c0d5584823d961c4c36788cd0ff4b861a00",
-      "kind": "browser-only-product",
-      "affectedSuites": [],
-      "reviewedEvidenceSha256": "93a47a7919851189ae1b542ffe8880cd0133edda7bc265b914d73ccdf51e98bc",
-      "applicability": "Frontend is not imported by backend Jest runtime; native acceptance remains explicitly required. No current browser completion is granted by this backend source bridge.",
-      "backendRuntimeImpact": "none-reviewed",
-      "browserAcceptanceRequired": true
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
     },
     {
       "path": "backend/tests/ci-jest-continuation-plan.json",
-      "beforeSha256": null,
+      "beforeSha256": "58dfb36e9b854e7a4e989bb4e66b17785451a21316d88e0e2fb8b584ea02f22a",
       "afterSha256": "@approved-plan",
       "kind": "test-fixture",
       "affectedSuites": [
-        "tests/ciJestShards.test.js"
+        "tests/privateNoteWriteAuthorityBoundary.test.js",
+        "tests/ciJestShards.test.js",
+        "tests/ciJestCoverage.test.js",
+        "tests/ciWorkflowContract.test.js",
+        "tests/ciArtifactBudget.test.js",
+        "tests/releaseCandidate.test.js",
+        "tests/releaseIdentity.test.js",
+        "tests/runtimePolicy.test.js"
       ],
-      "reviewedEvidenceSha256": "b96fd66c969d82014009135ef28e005c2ee7a89eaed61c74b7cb11d3517da629",
-      "applicability": "The sole fixed plan bytes are externally SHA-approved manual-dispatch input. No self-declared arbitrary plan path or unreviewed source bridge is accepted."
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
     }
-  ],
-  "scope": "Complete current original Jest discovery with exact failed/new/affected full files executed and source-bound eligible prior passing file fragments retained. No synthetic complete Jest report; native/provider/final approval separate."
+  ]
 }

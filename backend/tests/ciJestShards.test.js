@@ -85,3 +85,15 @@ test('browser-only source disposition cannot conceal backend code or certify its
   const backendCurrent = { ...current, files: { ...files, 'backend/services/changed.js': '6'.repeat(64) } }, hidden = { ...bridge, currentSourceSha256: hash(JSON.stringify(backendCurrent)), changes: [{ ...entry, path: 'backend/services/changed.js' }] };
   expect(() => validateBridge(prior, backendCurrent, ['tests/filler.test.js'], hidden, hash(JSON.stringify(hidden)))).toThrow();
 });
+
+ test('prior artifact import rejects unknown runs, attempts and mismatched exact source before network access', () => {
+  const { validatePriorIdentity } = require('../scripts/import-ci-jest-prior');
+  const accepted = [
+    { priorRunId: 38677811432, priorAttempt: 1, priorHead: 'c0d2fddd9f0a1a7024833a4b308fe9533d5e1657' },
+    { priorRunId: 39076828223, priorAttempt: 1, priorHead: 'c3ee5566fbaf562d22ee7536807c4da2bf248006' },
+  ];
+  for (const spec of accepted) {
+    expect(() => validatePriorIdentity(spec)).not.toThrow();
+    for (const changed of [{ ...spec, priorRunId: 39076828224 }, { ...spec, priorRunId: String(spec.priorRunId) }, { ...spec, priorAttempt: 2 }, { ...spec, priorHead: '0'.repeat(40) }]) expect(() => validatePriorIdentity(changed)).toThrow();
+  }
+});
