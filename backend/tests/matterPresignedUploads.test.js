@@ -39,3 +39,34 @@ test("the installed SDK signs the condition, size, type and optional provider he
   const source = `const assert=require('node:assert/strict');const {PutObjectCommand}=require('@aws-sdk/client-s3');const {createS3Client,buildS3ClientConfig}=require('./utils/s3Client');const {getSignedUrl}=require('@aws-sdk/s3-request-presigner');const service=require('./services/matterPresignedUploads');(async()=>{const env={S3_REGION:'us-east-1',S3_ACCESS_KEY:'SYNTHETIC_LOCAL_TEST',S3_SECRET_KEY:'synthetic-only'};assert.equal(buildS3ClientConfig(env).requestChecksumCalculation,undefined);const client=createS3Client(env,{requestChecksumCalculation:'WHEN_REQUIRED'});const ordinary={Bucket:'synthetic-local-test',Key:'sample.txt',ContentType:'text/plain',ContentLength:9,IfNoneMatch:'*'};const unsignedBodyUrl=new URL(await getSignedUrl(client,new PutObjectCommand(ordinary),{expiresIn:60,signableHeaders:new Set(['if-none-match','content-type'])}));assert.equal(unsignedBodyUrl.searchParams.has('x-amz-checksum-crc32'),false);assert.equal(unsignedBodyUrl.searchParams.has('x-amz-sdk-checksum-algorithm'),false);assert.deepEqual(service.requiredHeaders(unsignedBodyUrl.href,ordinary),{'content-type':'text/plain','if-none-match':'*'});const params={Bucket:'synthetic-local-test',Key:'cases/'+'a'.repeat(24)+'/documents/sample.txt',ContentType:'text/plain',ContentLength:9,IfNoneMatch:'*',ContentDisposition:'attachment',ServerSideEncryption:'aws:kms',SSEKMSKeyId:'synthetic-kms-id',ACL:'private',ChecksumSHA256:Buffer.alloc(32).toString('base64')};const url=await getSignedUrl(client,new PutObjectCommand(params),{expiresIn:60,signableHeaders:new Set(['if-none-match','content-type'])});const headers=service.requiredHeaders(url,params),names=new URL(url).searchParams.get('X-Amz-SignedHeaders').split(';');assert.equal(headers['if-none-match'],'*');assert.equal(headers['content-type'],'text/plain');assert.equal(headers['x-amz-server-side-encryption'],'aws:kms');assert.equal(headers['x-amz-server-side-encryption-aws-kms-key-id'],'synthetic-kms-id');for(const name of names)assert.ok(['host','content-length'].includes(name)||Object.hasOwn(headers,name));assert.throws(()=>service.requiredHeaders('https://synthetic.invalid?X-Amz-SignedHeaders=host',params));client.destroy();process.stdout.write('verified local signature');})().catch(error=>{console.error(error.message);process.exitCode=1;});`;
   expect(execFileSync(process.execPath, ["--eval", source], { cwd: path.resolve(__dirname, ".."), encoding: "utf8", timeout: 15000 })).toBe("verified local signature");
 });
+
+// Real hosted S10 found that scan states escaped as generic HTTP500.
+// Keep the storage/lease transaction unchanged until the scan is clean.
+test.each(["attach", "replace"].flatMap(operation => [
+  [operation, undefined, 423, "FILE_SCAN_PENDING"],
+  [operation, "THREATS_FOUND", 422, "FILE_SECURITY_BLOCKED"],
+  [operation, "FAILED", 503, "FILE_SCAN_ERROR"],
+]))("signed %s with scan %s returns %s and preserves all references", async (operation, result, status, code) => {
+  process.env.S3_MALWARE_SCAN_REQUIRED = "true";
+  try {
+    const original = operation === "replace" ? await CaseFile.create({ caseId: matter._id, userId: owner._id, originalName: "Retained.txt", storageKey: `cases/${matter._id}/documents/prior.txt`, mimeType: "text/plain", size: 9, uploadedByRole: "attorney", securityStatus: "clean" }) : null;
+    const link = await issued(owner), before = await Case.collection.findOne({ _id: matter._id }), leaseBefore = await Lease.collection.findOne(), fileBefore = original ? await CaseFile.collection.findOne({ _id: original._id }) : null;
+    const base = mockStorage.getMockImplementation();
+    mockStorage.mockImplementation(async command => command.constructor.name === "GetObjectTaggingCommand" ? { TagSet: result ? [{ Key: "GuardDutyMalwareScanStatus", Value: result }] : [] } : base(command));
+    const route = `/api/cases/${matter._id}/files${original ? `/${original._id}/replace` : ""}`;
+    const response = await request(app).post(route).set("Cookie", cookie(owner)).send({ key: link.key, original: "Lease.txt", mime: "text/plain", size: 9 });
+    expect(response.status).toBe(status); expect(response.body.code).toBe(code); expect(response.body.error).toMatch(/security scanning/);
+    expect(await CaseFile.countDocuments()).toBe(original ? 1 : 0); expect(await Case.collection.findOne({ _id: matter._id })).toEqual(before); expect(await Lease.collection.findOne()).toEqual(leaseBefore);
+    if (original) expect(await CaseFile.collection.findOne({ _id: original._id })).toEqual(fileBefore);
+  } finally { process.env.S3_MALWARE_SCAN_REQUIRED = "false"; }
+});
+test("pending signed attachment can be explicitly retried after the real scan contract becomes clean", async () => {
+  process.env.S3_MALWARE_SCAN_REQUIRED = "true";
+  try {
+    const link = await issued(owner); let clean = false; const base = mockStorage.getMockImplementation();
+    mockStorage.mockImplementation(async command => command.constructor.name === "GetObjectTaggingCommand" ? { TagSet: clean ? [{ Key: "GuardDutyMalwareScanStatus", Value: "NO_THREATS_FOUND" }] : [] } : command.constructor.name === "HeadObjectCommand" ? { ContentLength: 9, ContentType: "text/plain", ETag: '"synthetic-retained-identity"', VersionId: "synthetic-version-1" } : base(command));
+    const submit = () => request(app).post(`/api/cases/${matter._id}/files`).set("Cookie", cookie(owner)).send({ key: link.key, original: "Lease.txt", mime: "text/plain", size: 9 });
+    const pending = await submit(); expect(pending.status).toBe(423); expect(pending.body.code).toBe("FILE_SCAN_PENDING"); expect(await CaseFile.countDocuments()).toBe(0); expect((await Lease.collection.findOne()).status).toBe("issued");
+    clean = true; expect((await submit()).status).toBe(201); expect(await CaseFile.countDocuments()).toBe(1); expect((await Lease.collection.findOne()).status).toBe("attached");
+  } finally { process.env.S3_MALWARE_SCAN_REQUIRED = "false"; }
+});

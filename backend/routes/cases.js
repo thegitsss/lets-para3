@@ -1665,6 +1665,18 @@ function requireMatterDocumentWorkspace(caseDoc, res) {
   return false;
 }
 
+function sendCaseDocumentScanError(res, error) {
+  const states = {
+    FILE_SCAN_PENDING: [423, "This file is still undergoing security scanning. Try again shortly."],
+    FILE_SECURITY_BLOCKED: [422, "This file is unavailable because it did not pass security scanning."],
+    FILE_SCAN_ERROR: [503, "This file is unavailable because security scanning could not complete."],
+  };
+  if (!Object.hasOwn(states, error?.code)) return false;
+  const [status, message] = states[error.code];
+  res.status(status).json({ error: message, code: error.code });
+  return true;
+}
+
 async function verifyCaseDocumentObject({ caseId, key, declaredSize, declaredMime }) {
   const normalizedKey = normalizeCaseStorageKey(key);
   if (!isCaseDocumentStorageKey(caseId, normalizedKey)) {
@@ -3909,6 +3921,7 @@ router.post(
     try {
       objectMetadata = await verifyCaseDocumentObject({ caseId: doc._id, key: storageKey, declaredSize: size, declaredMime: mime });
     } catch (err) {
+      if (sendCaseDocumentScanError(res, err)) return;
       if ([
         "INVALID_CASE_FILE_KEY",
         "CASE_FILE_METADATA_MISMATCH",
@@ -4287,6 +4300,7 @@ router.post(
     try {
       objectMetadata = await verifyCaseDocumentObject({ caseId: doc._id, key: storageKey, declaredSize: size, declaredMime: mime });
     } catch (err) {
+      if (sendCaseDocumentScanError(res, err)) return;
       if ([
         "INVALID_CASE_FILE_KEY",
         "CASE_FILE_METADATA_MISMATCH",
