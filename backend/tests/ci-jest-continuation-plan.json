@@ -122,6 +122,36 @@
       ],
       "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
       "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
+    },
+    {
+      "path": "backend/ai/paralegalResponseValidator.js",
+      "beforeSha256": "1dc11d72e11eae16278d6107a2cd47489eeeaa108148762e3a75453d5ccf1900",
+      "afterSha256": "448e681b49fba136d3b064b8fc791d191c452399619e28c01e6169d90b518b90",
+      "kind": "product-change",
+      "affectedSuites": [
+        "tests/paralegalResponseValidator.test.js",
+        "tests/paralegalResponsePipeline.test.js",
+        "tests/paralegalResponseUiPolicy.test.js",
+        "tests/paralegalEvidenceContract.test.js",
+        "tests/paralegalSupportManagerAgent.test.js",
+        "tests/paralegalSupportAgentTools.test.js",
+        "tests/paralegalSupportDatabaseIntegration.test.js",
+        "tests/paralegalSupportReliability.test.js",
+        "tests/paralegalSupportLiveEval.test.js"
+      ],
+      "reviewedEvidenceSha256": "8e094926e52fbb9a99e442e91ca82145482f1b24b3d2512d312a00176f29a601",
+      "applicability": "Accept only exact percentage present in verified authorized explicitly policy-scoped P31 knowledge answer facts; titles/URLs/unavailable/unauthorized/other capability evidence cannot authorize it. Existing actual Matter financial snapshots retain typed evidence and cannot be replaced by current policy. Fees, policies, accounting and permission boundaries unchanged."
+    },
+    {
+      "path": "backend/tests/paralegalResponseValidator.test.js",
+      "beforeSha256": "3ceb890d482acd3f41e16b170de3f5b537aa4daa6cdc0097227c6a3699ee0680",
+      "afterSha256": "ae4630d5b8c71d78525827cf3fdc2859feede69f1533a7690820c034fada1599",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/paralegalResponseValidator.test.js"
+      ],
+      "reviewedEvidenceSha256": "8e094926e52fbb9a99e442e91ca82145482f1b24b3d2512d312a00176f29a601",
+      "applicability": "Accept only exact percentage present in verified authorized explicitly policy-scoped P31 knowledge answer facts; titles/URLs/unavailable/unauthorized/other capability evidence cannot authorize it. Existing actual Matter financial snapshots retain typed evidence and cannot be replaced by current policy. Fees, policies, accounting and permission boundaries unchanged."
     }
   ]
 }
