@@ -152,6 +152,51 @@
       ],
       "reviewedEvidenceSha256": "8e094926e52fbb9a99e442e91ca82145482f1b24b3d2512d312a00176f29a601",
       "applicability": "Accept only exact percentage present in verified authorized explicitly policy-scoped P31 knowledge answer facts; titles/URLs/unavailable/unauthorized/other capability evidence cannot authorize it. Existing actual Matter financial snapshots retain typed evidence and cannot be replaced by current policy. Fees, policies, accounting and permission boundaries unchanged."
+    },
+    {
+      "path": "backend/ai/supportManagerAgent.js",
+      "beforeSha256": "adcc0d58ffe85638dabad7deadfced9d0058770223c7504578db1c771ebfc8fa",
+      "afterSha256": "3281f110e509c467a34b69b0c42e1045c3bd125f7fe18df73090f71183f17402",
+      "kind": "product-change",
+      "affectedSuites": [
+        "tests/attorneyAggregateOverviewGrounding.test.js",
+        "tests/attorneyResponseValidator.test.js",
+        "tests/attorneyEvidenceContract.test.js",
+        "tests/supportManagerAgent.test.js",
+        "tests/attorneySupportDatabaseIntegration.test.js",
+        "tests/supportCostBudgetCeiling.test.js",
+        "tests/supportCostBudget.test.js"
+      ],
+      "reviewedEvidenceSha256": "3e7151d16c2f543622846c4387f537ecf4178761d28965365bae60108c95391b",
+      "applicability": "Clarify per-field known bool versus feature availability versus blocked profile completion in production manager instructions; update the required exact manager source fingerprint. No validator, critical classification, threshold, stored record, fee or permission rule changes."
+    },
+    {
+      "path": "backend/ai/supportCostBudget.js",
+      "beforeSha256": "50097f61aab0c975d0487230339e11171436c7b02630d0e08c9d980354c1119b",
+      "afterSha256": "7159940f47fb975e7afe24ce8fb5e54e673b3e91e352267f93f30c69a7dd3514",
+      "kind": "product-change",
+      "affectedSuites": [
+        "tests/attorneyAggregateOverviewGrounding.test.js",
+        "tests/attorneyResponseValidator.test.js",
+        "tests/attorneyEvidenceContract.test.js",
+        "tests/supportManagerAgent.test.js",
+        "tests/attorneySupportDatabaseIntegration.test.js",
+        "tests/supportCostBudgetCeiling.test.js",
+        "tests/supportCostBudget.test.js"
+      ],
+      "reviewedEvidenceSha256": "3e7151d16c2f543622846c4387f537ecf4178761d28965365bae60108c95391b",
+      "applicability": "Clarify per-field known bool versus feature availability versus blocked profile completion in production manager instructions; update the required exact manager source fingerprint. No validator, critical classification, threshold, stored record, fee or permission rule changes."
+    },
+    {
+      "path": "backend/tests/supportManagerAgent.test.js",
+      "beforeSha256": "7374d6d8e6a107fc8d746f90ebd5cee876a4a0cac7fbf356d760e4dc16051c60",
+      "afterSha256": "fbc78cfbb01d5a4edf721d21af54da52d1b14b12f1e9f58128f6aa90811c8f72",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/supportManagerAgent.test.js"
+      ],
+      "reviewedEvidenceSha256": "3e7151d16c2f543622846c4387f537ecf4178761d28965365bae60108c95391b",
+      "applicability": "Clarify per-field known bool versus feature availability versus blocked profile completion in production manager instructions; update the required exact manager source fingerprint. No validator, critical classification, threshold, stored record, fee or permission rule changes."
     }
   ]
 }

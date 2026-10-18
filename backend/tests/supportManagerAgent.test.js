@@ -99,6 +99,24 @@ describe("support manager agent", () => {
     else process.env.OPENAI_ATTORNEY_MANAGER_ALLOWLIST = originalAttorneyAllowlist;
   });
 
+  test("separates known two-factor configuration from feature availability and blocked profile assessment", () => {
+    const instructions = buildManagerInstructions("attorney");
+    expect(instructions).toContain("false does not mean the configured value is unavailable");
+    expect(instructions).toContain("A missing or null configured value still requires a truthful limitation");
+    expect(instructions).toContain("blocked profile-completion assessment does not make security");
+  });
+
+  test.each([false, true])("verified two-factor configured=%s remains answerable while profile assessment is blocked and the feature is unavailable", configured => {
+    const trace = { name: "get_attorney_account_snapshot", result: { ok: true, available: true,
+      profileComplete: null, profileAssessment: { evidenceState: "blocked_policy", reason: "profile_completion_definitions_conflict" },
+      twoFactor: { featureAvailable: false, configured, method: "" },
+    } };
+    const result = auditManagerReply(managerReply({ reply: configured ? "Yes, two-factor authentication is configured." : "No, two-factor authentication is not configured.", suggestions: [], primaryAsk: "two_factor_configuration" }), {
+      messageText: "Is two-factor configured?", toolOutputs: [trace],
+    });
+    expect(result.valid).toBe(true); expect(result.errors).toEqual([]);
+  });
+
   test("lets the model select a live tool, continues the Responses loop, and grounds the final answer", async () => {
     mockExecuteSupportManagerTool.mockResolvedValue(overviewResult());
     const parse = jest
