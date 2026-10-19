@@ -66,6 +66,6 @@
     background: #07131f;
     margin-bottom: 0;
     padding-bottom: max(18px, env(safe-area-inset-bottom));
-    box-shadow: none;
+    box-shadow: 0 -1px 0 #07131f;
   }
 }
