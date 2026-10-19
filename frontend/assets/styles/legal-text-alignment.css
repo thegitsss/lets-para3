@@ -22,3 +22,11 @@ body.accessibility-mode :is(.legal-document, .accessibility-content, .security-c
   text-align: left;
   hyphens: manual;
 }
+
+/* Optically align the street number with the other mobile address lines. */
+@media (max-width: 767px) {
+  .privacy-page #contact address .privacy-contact-street {
+    position: relative;
+    left: -1px;
+  }
+}

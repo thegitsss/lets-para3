@@ -4,4 +4,3 @@ body.public-page-refresh { --utility-gold: #416eaf; --help-gold: #416eaf; --help
 .public-page-refresh .utility-hero__copy { background: none; }
 .public-page-refresh :is(.utility-hero__eyebrow, .help-eyebrow) { color: #416eaf; }
 .public-page-refresh .utility-content a { color: #416eaf; }
-.public-page-refresh .home-footer summary { color: #a8c8ff; }
