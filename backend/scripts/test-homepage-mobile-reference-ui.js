@@ -21,7 +21,7 @@ const browsers = require('playwright');
           await page.waitForTimeout(2200);
           assert.equal(await page.locator('.editorial-hero__inner').evaluate(e=>getComputedStyle(e).opacity),'1');
           assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No document overflow');
-          const mountain = page.locator('.home-brand__mountain');
+          const mountain = page.locator('.home-header .home-brand__mountain');
           assert.equal(await mountain.count(),1,'Header keeps its mountain icon');
           assert.equal(await mountain.getAttribute('stroke-width'),'.8','Keep the original thin mountain stroke');
           assert.equal(await mountain.getAttribute('viewBox'),'7 20 50 22','Keep the original mountain proportions');
@@ -103,6 +103,31 @@ const browsers = require('playwright');
           assert.equal(await page.locator(`${preview} [data-state="3"] .workflow-review b`).evaluate(e=>getComputedStyle(e).whiteSpace), 'nowrap');
           assert.equal(await page.locator(`${preview} [data-state="4"] .workflow-completed-tasks li`).count(), 3);
           assert.ok((await page.locator(`${preview} [data-state="4"]`).textContent()).includes('via Stripe'));
+          await page.close();
+        }
+        // Short phone landscape must allow reading the entire demo before changing steps.
+        for (const viewport of [{width:926,height:428},{width:844,height:390},{width:667,height:375}]) {
+          const page = await browser.newPage({viewport,isMobile:true,hasTouch:true});
+          const errors = [];
+          page.on('pageerror', error => errors.push(error.message));
+          await page.route('**/api/**', route => route.fulfill({contentType:'application/json',body:'{"user":null,"states":[],"total":0}'}));
+          await page.goto(origin,{waitUntil:'domcontentloaded'});
+          await page.evaluate(() => document.fonts.ready);
+          const film = page.locator('#matter-film');
+          assert.equal(await film.evaluate(e=>getComputedStyle(e).position),'relative','Landscape demo is not pinned above the viewport');
+          await film.evaluate(e=>scrollTo({top:scrollY+e.getBoundingClientRect().top,behavior:'instant'}));
+          const headingTop = await film.locator('.film-heading').evaluate(e=>e.getBoundingClientRect().top);
+          const headerBottom = await page.locator('.home-header').evaluate(e=>e.getBoundingClientRect().bottom);
+          assert.ok(headingTop>=headerBottom-1,'Landscape heading clears the fixed header');
+          await film.locator('.sheet-action').evaluate(e=>e.scrollIntoView({block:'center',behavior:'instant'}));
+          await page.waitForTimeout(250);
+          assert.equal(await film.getAttribute('data-stage'),'0','Reading the landscape notes does not advance them');
+          await film.locator('.sheet-action').tap();
+          await page.waitForFunction(()=>document.querySelector('#matter-film').dataset.stage==='1');
+          await page.waitForFunction(()=>!document.querySelector('#matter-film').dataset.transitioning);
+          await page.setViewportSize({width:viewport.height,height:viewport.width});
+          await page.waitForFunction(()=>getComputedStyle(document.querySelector('#matter-film')).position==='sticky');
+          assert.deepEqual(errors,[],'Landscape and portrait rotation do not throw page errors');
           await page.close();
         }
         for (const mode of ['reduced','no-script','failed-entrance','slow-fonts']) {
