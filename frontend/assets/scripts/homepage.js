@@ -1,6 +1,18 @@
 (() => {
   "use strict";
 
+  // Mobile footer navigation should open documents at the top, including revisits.
+  document.querySelector(".home-footer__directory")?.addEventListener("click", (event) => {
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    const link = event.target.closest("a[href]");
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const destination = new URL(link.href, window.location.href);
+    if (destination.origin !== window.location.origin || destination.hash) return;
+    destination.hash = "top";
+    event.preventDefault();
+    window.location.assign(destination.href);
+  });
+
   const header = document.querySelector("[data-home-header]");
   const headerHero = document.querySelector(".editorial-hero");
   const firstDarkSurface = document.querySelector('[data-header-tone="dark"]');
@@ -18,6 +30,96 @@
 
   syncFooterDirectories();
   footerDirectoryMedia.addEventListener?.("change", syncFooterDirectories);
+
+  // Keep content rendered until its closing animation finishes (including WebKit).
+  const accordionMedia = window.matchMedia("(max-width: 900px)");
+  const animatedAccordions = Array.from(document.querySelectorAll(".home-faq details, .home-footer__directory details"));
+  const accordionStates = new Map();
+  const animateAccordion = (item, expanding) => {
+    const state = accordionStates.get(item);
+    const start = item.getBoundingClientRect().height;
+    state.animation?.cancel();
+    state.expanding = expanding;
+    item.style.height = "";
+    item.style.overflow = "hidden";
+    item.open = true;
+    const fullHeight = item.getBoundingClientRect().height;
+    const style = getComputedStyle(item);
+    const closedHeight = item.querySelector("summary").getBoundingClientRect().height +
+      parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) +
+      parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+    const finish = () => {
+      item.open = expanding;
+      item.style.height = "";
+      item.style.overflow = "";
+      state.animation = null;
+    };
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      finish();
+      return;
+    }
+    const animation = item.animate([
+      { height: `${start}px` },
+      { height: `${expanding ? fullHeight : closedHeight}px` },
+    ], { duration: 380, easing: "cubic-bezier(0.4, 0, 0.2, 1)" });
+    state.animation = animation;
+    animation.onfinish = finish;
+    item.dispatchEvent(new Event("lpc-accordion-motion"));
+  };
+  animatedAccordions.forEach((item) => {
+    const state = { animation: null, expanding: item.open, name: item.getAttribute("name") };
+    accordionStates.set(item, state);
+    const sync = () => {
+      state.animation?.cancel();
+      state.animation = null;
+      item.style.height = "";
+      item.style.overflow = "";
+      item.classList.toggle("mobile-smooth-accordion", accordionMedia.matches);
+      if (state.name) {
+        if (accordionMedia.matches) item.removeAttribute("name");
+        else item.setAttribute("name", state.name);
+      }
+    };
+    sync();
+    accordionMedia.addEventListener?.("change", sync);
+    item.querySelector("summary")?.addEventListener("click", (event) => {
+      if (!accordionMedia.matches || event.defaultPrevented) return;
+      event.preventDefault();
+      const expanding = state.animation ? !state.expanding : !item.open;
+      if (expanding && state.name) animatedAccordions.forEach((other) => {
+        const otherState = accordionStates.get(other);
+        if (other !== item && otherState.name === state.name && other.open &&
+            (!otherState.animation || otherState.expanding)) animateAccordion(other, false);
+      });
+      animateAccordion(item, expanding);
+    });
+  });
+
+  // Follow the expanding list each frame so scrolling ends with the expansion.
+  document.querySelectorAll(".home-footer__directory details").forEach((category) => {
+    let revealFrame = 0;
+    const scheduleReveal = () => {
+      window.cancelAnimationFrame(revealFrame);
+      const reveal = () => {
+        revealFrame = 0;
+        const state = accordionStates.get(category);
+        if (!category.open || !accordionMedia.matches || (state.animation && !state.expanding)) return;
+        const viewport = window.visualViewport;
+        const viewportTop = viewport?.offsetTop || 0;
+        const viewportBottom = viewportTop + (viewport?.height || window.innerHeight) - 16;
+        const headerBottom = document.querySelector(".home-header")?.getBoundingClientRect().bottom || 0;
+        const topLimit = Math.max(viewportTop, headerBottom) + 12;
+        const bounds = category.getBoundingClientRect();
+        const distance = Math.min(bounds.bottom - viewportBottom, bounds.top - topLimit);
+        if (distance > 0) window.scrollBy({ top: distance, behavior: "instant" });
+        if (state.animation && state.expanding) revealFrame = window.requestAnimationFrame(reveal);
+      };
+      revealFrame = window.requestAnimationFrame(reveal);
+    };
+    category.addEventListener("toggle", scheduleReveal);
+    category.addEventListener("lpc-accordion-motion", scheduleReveal);
+  });
+
 
   // Retain the initial mobile hero geometry while browser toolbars change height.
   // A real width change (including rotation) remeasures the responsive design.
@@ -51,8 +153,17 @@
   };
   measureMobileViewport();
   measureHeroLayout();
+  // Chrome can finish opening its toolbars after the initial measurement.
+  // Accept that startup correction, then retain the geometry once scrolling begins.
+  let heroLayoutScrolled = scrollY > 0;
+  addEventListener('scroll', () => {
+    if (scrollY > 0) heroLayoutScrolled = true;
+  }, { passive: true });
   addEventListener('resize', () => {
-    if (innerWidth === heroLayoutWidth) return;
+    if (innerWidth === heroLayoutWidth) {
+      if (innerWidth <= 767 && !heroLayoutScrolled && scrollY === 0) measureHeroLayout();
+      return;
+    }
     heroLayoutWidth = innerWidth;
     measureMobileViewport();
     measureHeroLayout();

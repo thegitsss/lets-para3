@@ -96,3 +96,12 @@
 @media (min-width: 721px) and (max-width: 767px) {
   body.lpc-home .assistant-demo { height: 650px; }
 }
+
+/* A tall pinned demo must remain readable on a short phone landscape viewport. */
+@media (max-width: 1024px) and (max-height: 500px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  body.lpc-home .matter-scroll-journey { height: auto; }
+  body.lpc-home .matter-scroll-journey .matter-film { position: relative; top: auto; }
+  body.lpc-home .matter-scroll-journey .stage-arrow { width: 44px; height: 44px; padding: 12px; }
+  body.lpc-home .matter-scroll-journey .stage-arrow-prev { left: 12px; }
+  body.lpc-home .matter-scroll-journey .stage-arrow-next { right: 12px; }
+}

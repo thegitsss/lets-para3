@@ -4,10 +4,6 @@
 .faq-page :is(h1,h2,p){margin-top:0}
 .faq-page a{color:inherit}
 .faq-page :is(a,summary):focus-visible{outline:2px solid #6495ed;outline-offset:5px}
-.faq-page.public-site-chrome .home-header{background:rgba(237,240,243,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:0;box-shadow:none;transition:background 200ms ease}
-.faq-page.public-site-chrome .home-header.is-past-hero{background:rgba(255,255,255,.78)}
-.faq-page.public-site-chrome .home-header.is-open{background:#fff}
-.faq-page.public-site-chrome .home-footer summary{color:#a8c8ff}
 .faq-page.public-site-chrome > .hero-banner{width:100%;height:auto;margin:0;padding:calc(var(--header-height,72px) + 72px) var(--page-gutter) 64px;background:transparent;border:0}
 .faq-page .hero-banner__title{width:min(100%,1200px);margin:auto;text-align:center}
 .faq-page :is(.faq-hero__eyebrow,.faq-eyebrow){margin-bottom:20px;color:#4775bd;font:400 12px/1.5 "Sarabun",sans-serif;text-transform:uppercase;letter-spacing:.16em}
