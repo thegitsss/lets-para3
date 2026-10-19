@@ -69,3 +69,15 @@
     box-shadow: 0 -1px 0 #07131f;
   }
 }
+
+/* Paint across the phone-only fractional-pixel join, without moving either section. */
+@media (max-width: 767px) {
+  body.lpc-home .home-footer::before {
+    content: "";
+    position: absolute;
+    inset: -2px 0 auto;
+    height: 3px;
+    background: #07131f;
+    pointer-events: none;
+  }
+}
