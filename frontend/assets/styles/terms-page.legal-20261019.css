@@ -7,8 +7,7 @@
 :is(.terms-page, .privacy-page, .security-page) .legal-document h3 { line-height: 1.25; }
 :is(.terms-page, .privacy-page, .security-page) .legal-document a { color: #416eaf; text-decoration-color: currentColor; }
 :is(.terms-page, .privacy-page, .security-page) .document-toc { background: #f1f5fc; border-color: #d5dff1; border-radius: 20px; }
-:is(.terms-page, .privacy-page, .security-page) .home-footer summary { color: #a8c8ff; }
-:is(.terms-page, .privacy-page, .security-page) .home-footer__statement, /* Document headings use Sarabun; hero titles retain the admissions serif. */
+/* Document headings use Sarabun; hero titles retain the admissions serif. */
 :is(.terms-page, .privacy-page, .security-page) .legal-document :is(h2, h3) {
   font-family: "Sarabun", sans-serif;
   font-weight: 400;
