@@ -70,15 +70,10 @@
   }
 }
 
-/* Paint across the phone-only fractional-pixel join, without moving either section. */
+/* Overlap the opaque footer backing; compensate padding to keep its content fixed. */
 @media (max-width: 767px) {
-  body.lpc-home .home-footer::before {
-    content: "";
-    position: absolute;
-    inset: -2px 0 auto;
-    z-index: 2;
-    height: 3px;
-    background: #07131f;
-    pointer-events: none;
+  body.lpc-home .home-footer {
+    margin-top: -2px;
+    padding-top: 2px;
   }
 }
