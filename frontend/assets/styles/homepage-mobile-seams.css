@@ -76,6 +76,7 @@
     content: "";
     position: absolute;
     inset: -2px 0 auto;
+    z-index: 2;
     height: 3px;
     background: #07131f;
     pointer-events: none;
