@@ -1,36 +1,80 @@
+const { protectedUploadKey } = require("../utils/uploadQuarantine");
+const { letterEmail, escape: escapeEmailValue } = require("../email/layout");
+const accountEmails = require("../email/accountTemplates");
+const { accountEmailFooter } = require("../email/accountFooter");
+const signupReviewNotices = require("../services/signupReviewNotifications");
 // backend/routes/auth.js
 const express = require("express");
 const router = express.Router();
+router.use("/legal", require("./legalPolicies"));
 const bcrypt = require("bcryptjs");
+const argon2 = require("argon2");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
-const path = require("path");
-const axios = require("axios");
+const crypto = require("crypto");
+const { resolve: resolveLoginReturnTarget } = require("../../frontend/assets/scripts/utils/login-return-target");
 const { URLSearchParams } = require("url");
 const multer = require("multer");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const User = require("../models/User");
+const EmailVerificationToken = require("../models/EmailVerificationToken");
 const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
-const { router: googleRouter, installGoogleCallback, linkPendingIdentity } = require("./googleAuth");
-const { SIGNUP_COOKIE, cookieOptions: googleCookieOptions, verifyContext: verifyGoogleContext, equal: googleEqual } = require("../utils/googleOAuth");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { ensureApprovedUserAuthReady, isApprovedUser } = require("../utils/authReady");
+const { createLogger } = require("../utils/logger");
+const verifyToken = require("../utils/verifyToken");
+const { requireGuardedSupportReset } = require("../utils/supportAccountBoundary");
+const { validateNewPassword } = require("../utils/passwordPolicy");
+const { withActiveAccountWrite } = require("../utils/activeAccountWrite");
+const { normalizeHttpUrl } = require("../utils/httpUrl");
+const { validateMatterFileBuffer } = require("../utils/fileSecurity");
+const {
+  ACCESS_SESSION_TTL_MS,
+  createAuthSession,
+  revokeAllUserSessions,
+  revokeSession,
+} = require("../services/authSessionService");
+const PasskeyCredential = require("../models/PasskeyCredential");
+const {
+  authenticationOptions: createPasskeyAuthenticationOptions,
+  verifyAuthentication: verifyPasskeyAuthentication,
+} = require("../services/passkeyService");
+const { verifyTotp } = require("../services/mfaService");
 const {
   normalizeEmail,
   sendVerificationEmail,
   applyVerifiedEmail,
+  verificationTokenHash,
 } = require("../utils/emailVerification");
+const {
+  recordSignupPolicyAcknowledgement,
+  policySubmissionMatches,
+} = require("../utils/legalDocuments");
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
+const { createS3Client, S3_REQUEST_TIMEOUT_MS } = require("../utils/s3Client");
+const StorageDeletionTask = require("../models/StorageDeletionTask");
+const { stagePersonalStorageDeletion, cancelPersonalStorageDeletion } = require("../services/personalStorageDeletion");
+const {
+  createGoogleOAuthClient,
+  verifyTurnstileToken,
+} = require("../services/authProviderClient");
+const { normalizeAccountTheme } = require("../utils/accountPreferences");
 
 const IS_PROD = process.env.NODE_ENV === "production" || process.env.PROD === "true";
-const TWO_FACTOR_ENABLED = String(process.env.ENABLE_TWO_FACTOR || "").toLowerCase() === "true";
-const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
-const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
-const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
+const TWO_FACTOR_ENABLED = String(process.env.ENABLE_TWO_FACTOR || "true").toLowerCase() !== "false";
+const GOOGLE_OAUTH_CONTEXT_COOKIE = "lpc_google_oauth";
+const GOOGLE_SIGNUP_HANDOFF_COOKIE = "lpc_google_signup";
+const GOOGLE_LINK_CANDIDATE_COOKIE = "lpc_google_link";
+const GOOGLE_TWO_FACTOR_COOKIE = "lpc_google_2fa";
+const GOOGLE_OAUTH_TTL_MS = 10 * 60 * 1000;
+const GOOGLE_SIGNUP_TTL_MS = 20 * 60 * 1000;
+const authLogger = createLogger("auth");
+
 function resolveCookieDomain(req) {
   if (!IS_PROD || !process.env.COOKIE_DOMAIN) return {};
   const domain = process.env.COOKIE_DOMAIN;
@@ -40,104 +84,47 @@ function resolveCookieDomain(req) {
 }
 
 function buildAuthCookieOptions(req, { maxAge } = {}) {
-  const forwardedProto = String(req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim();
-  const isSecureRequest = Boolean(req?.secure) || forwardedProto === "https";
-  const sameSite = isSecureRequest ? "none" : "lax";
-  const secure = IS_PROD ? isSecureRequest : false;
   return {
     httpOnly: true,
-    secure,
-    sameSite,
+    secure: IS_PROD,
+    sameSite: "lax",
     path: "/",
     ...resolveCookieDomain(req),
     ...(typeof maxAge === "number" ? { maxAge } : {}),
   };
 }
 
-const NO_ACCOUNT_MSG = "No account found for that email.";
+function buildGoogleCookieOptions(req, { maxAge, path: cookiePath = "/api/auth" } = {}) {
+  return {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: "lax",
+    path: cookiePath,
+    ...resolveCookieDomain(req),
+    ...(typeof maxAge === "number" ? { maxAge } : {}),
+  };
+}
+
 const EMAIL_NOT_VERIFIED_MSG = "Please verify your email before logging in.";
-const WRONG_PASSWORD_MSG = "Incorrect password.";
+const INVALID_CREDENTIALS_MSG = "Invalid email or password.";
+const DUMMY_PASSWORD_HASH = argon2.hash(crypto.randomBytes(32).toString("base64url"));
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
-const VALID_US_STATES = new Set([
-  "AL",
-  "AK",
-  "AZ",
-  "AR",
-  "CA",
-  "CO",
-  "CT",
-  "DE",
-  "DC",
-  "FL",
-  "GA",
-  "HI",
-  "ID",
-  "IL",
-  "IN",
-  "IA",
-  "KS",
-  "KY",
-  "LA",
-  "ME",
-  "MD",
-  "MA",
-  "MI",
-  "MN",
-  "MS",
-  "MO",
-  "MT",
-  "NE",
-  "NV",
-  "NH",
-  "NJ",
-  "NM",
-  "NY",
-  "NC",
-  "ND",
-  "OH",
-  "OK",
-  "OR",
-  "PA",
-  "RI",
-  "SC",
-  "SD",
-  "TN",
-  "TX",
-  "UT",
-  "VT",
-  "VA",
-  "WA",
-  "WV",
-  "WI",
-  "WY",
-]);
+const { VALID_US_STATES } = require("../utils/primaryState");
 const registrationUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_RESUME_FILE_BYTES },
+  // Multipart forms use flat fields; reject oversized numeric bracket indexes.
+  limits: { fileSize: MAX_RESUME_FILE_BYTES, fieldArrayIndexLimit: 0 },
 });
 
 // S3 client for resume uploads during registration
-const s3 = new S3Client({
-  region: process.env.S3_REGION,
-  credentials:
-    process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
-      ? {
-          accessKeyId: process.env.S3_ACCESS_KEY,
-          secretAccessKey: process.env.S3_SECRET_KEY,
-        }
-      : undefined,
-});
+const s3 = createS3Client();
 const BUCKET = process.env.S3_BUCKET || "";
 
 function sseParams() {
-  if (process.env.S3_SSE_KMS_KEY_ID) {
-    return {
-      ServerSideEncryption: "aws:kms",
-      SSEKMSKeyId: process.env.S3_SSE_KMS_KEY_ID,
-    };
-  }
-  return { ServerSideEncryption: "AES256" };
+  return process.env.S3_SSE_KMS_KEY_ID
+    ? { ServerSideEncryption:'aws:kms', SSEKMSKeyId:process.env.S3_SSE_KMS_KEY_ID }
+    : { ServerSideEncryption:'AES256' };
 }
 
 function safeSegment(value) {
@@ -147,18 +134,8 @@ function safeSegment(value) {
     .replace(/-+/g, "-");
 }
 
-function buildUnsubscribeToken(user) {
-  if (!user?._id || !process.env.JWT_SECRET) return "";
-  const payload = {
-    purpose: "unsubscribe",
-    uid: String(user._id),
-  };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "180d" });
-}
-
 function serializeOnboarding(onboarding = {}) {
   return {
-    paralegalWelcomeDismissed: Boolean(onboarding?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
     attorneyTourCompleted: Boolean(onboarding?.attorneyTourCompleted),
@@ -176,219 +153,26 @@ function serializePendingHire(pendingHire = {}) {
   };
 }
 
-function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                Reset your password
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 32px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
-                We received a request to reset your password. Use this
-                <a href="${resetUrl}" style="color:#1f1f1f;text-decoration:underline;">link</a>
-                to choose a new one. This link expires in 48 hours.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${resetUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Reset password
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 20px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.04em;color:#545454;line-height:1.7;word-break:break-word;">
-                If the button does not work, copy and paste this URL into your browser:<br>
-                <a href="${resetUrl}" target="_blank" rel="noopener" style="color:#1f1f1f;text-decoration:underline;word-break:break-all;">${resetUrl}</a>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                If you did not request a password reset, you can ignore this email and your password will stay the same.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#070300" style="padding:26px 32px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
 function buildTwoFactorEmailHtml(user, code) {
   const name = user?.firstName ? String(user.firstName).trim() : "there";
-  return `
+  return letterEmail(`
     <div style="font-family: Arial, sans-serif; color: #111;">
-      <p>Hi ${name},</p>
+      <p>Hi ${escapeEmailValue(name)},</p>
       <p>Your verification code is:</p>
-      <p style="font-size: 24px; letter-spacing: 4px; font-weight: bold;">${code}</p>
+      <p style="font-size: 24px; letter-spacing: 4px; font-weight: bold;">${escapeEmailValue(code)}</p>
       <p>This code expires in 15 minutes.</p>
       <p>If you did not attempt to sign in, you can ignore this email.</p>
     </div>
-  `;
+  `, { footer: accountEmailFooter(user).html, footerOutside:true, brandUrl:new URL(process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com").origin+"/" });
 }
 
-function buildApplicationSubmissionEmailHtml(user, opts = {}) {
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                Application received
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 32px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
-                Thank you for applying to Let’s-ParaConnect. Our verification team is reviewing your credentials,
-                and we’ll email you as soon as the review is complete.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                We’re onboarding paralegals first to ensure profiles and payouts are fully ready as attorneys join.
-                If you have questions, reply to this email and our team will help.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#070300" style="padding:26px 32px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
-// ----------------------------------------
-// Helpers
-// ----------------------------------------
+// Route error forwarding and session duration are independent of email templates.
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-
 const TWO_HOURS = "2h";
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const TWO_HOURS_MS = ACCESS_SESSION_TTL_MS;
+
 const FIFTEEN_MIN = 15 * 60 * 1000;
-const RESET_PASSWORD_MINUTES = 48 * 60;
+const { RESET_PASSWORD_MINUTES } = accountEmails;
 const DISABLED_ACCOUNT_MSG = "This account has been deactivated.";
 function isDeactivatedUser(user) {
   return !!(user && (user.disabled || user.deleted));
@@ -396,10 +180,13 @@ function isDeactivatedUser(user) {
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
 const BOT_REPEATED = /(.)\1{3,}/;
 const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
-const PARA_WELCOME_TITLE = "Welcome to Let's-ParaConnect - we're excited to have you.";
+const PARA_WELCOME_TITLE = "Welcome to Let’s-ParaConnect";
 const PARA_WELCOME_BODY =
-  "We're currently onboarding qualified paralegals as we prepare the platform for attorneys. " +
-  "Opportunities will begin appearing as attorney onboarding expands. In the meantime, feel free to complete your profile and upload credentials.";
+  "Your application is under review. We’ll notify you when a decision is recorded. " +
+  "After approval, complete your profile and Stripe payout setup, then browse and apply to open Matters.";
+const PARA_ADMITTED_WELCOME_BODY =
+  "Your application has been approved. Complete your profile and Stripe payout setup, " +
+  "then browse and apply to open Matters.";
 
 async function ensureParalegalWelcomeNotification(user) {
   if (!user) return;
@@ -410,13 +197,14 @@ async function ensureParalegalWelcomeNotification(user) {
     type: "paralegal_welcome",
   }).select("_id");
   if (existing) return;
-  const message = `${PARA_WELCOME_TITLE} ${PARA_WELCOME_BODY}`;
+  const body = isApprovedUser(user) ? PARA_ADMITTED_WELCOME_BODY : PARA_WELCOME_BODY;
+  const message = `${PARA_WELCOME_TITLE} ${body}`;
   await Notification.create({
     userId: user._id,
     userRole: user.role || "",
     type: "paralegal_welcome",
     message,
-    payload: { title: PARA_WELCOME_TITLE, body: PARA_WELCOME_BODY },
+    payload: { title: PARA_WELCOME_TITLE, body },
     read: false,
     isRead: false,
     createdAt: new Date(),
@@ -424,7 +212,7 @@ async function ensureParalegalWelcomeNotification(user) {
   publishNotificationEvent(user._id, "notifications", { at: new Date().toISOString() });
 }
 
-function signAccess(user) {
+function signAccess(user, sessionId) {
   const approved = String(user.status || "").toLowerCase() === "approved";
   const payload = {
     id: user._id.toString(),
@@ -432,6 +220,8 @@ function signAccess(user) {
     email: user.email,
     status: user.status,
     approved,
+    av: Number(user.authVersion || 0),
+    sid: String(sessionId || ""),
   };
   const opts = { expiresIn: TWO_HOURS };
   if (process.env.JWT_ISSUER) opts.issuer = process.env.JWT_ISSUER;
@@ -439,23 +229,228 @@ function signAccess(user) {
   return jwt.sign(payload, process.env.JWT_SECRET, opts);
 }
 
+async function establishSession(req, res, user, { session = null, issueCookie = true } = {}) {
+  if (user.authVersion === undefined) {
+    const authState = await User.findById(user._id || user.id).select("+authVersion").lean();
+    user.authVersion = Number(authState?.authVersion || 0);
+  }
+  const { sessionId } = await createAuthSession(user, req, { ttlMs: TWO_HOURS_MS, session });
+  if (issueCookie) {
+    const token = signAccess(user, sessionId);
+    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
+  }
+  return sessionId;
+}
+
+function createTwoFactorChallenge(user) {
+  const challengeToken = crypto.randomBytes(32).toString("base64url");
+  const code = String(crypto.randomInt(100000, 1000000));
+  user.twoFactorChallengeHash = hashOpaqueToken(challengeToken);
+  user.twoFactorChallengeAuthVersion = Number(user.authVersion || 0);
+  user.twoFactorFailedAttempts = 0;
+  return { challengeToken, code };
+}
+
+function clearTwoFactorChallenge(user) {
+  user.twoFactorTempCode = null;
+  user.twoFactorExpiresAt = null;
+  user.twoFactorChallengeHash = null;
+  user.twoFactorChallengeAuthVersion = null;
+  user.twoFactorFailedAttempts = 0;
+}
+
+function hashOpaqueToken(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("hex");
+}
+
+function createPasswordResetToken(userId) {
+  return `${String(userId)}.${crypto.randomBytes(32).toString("base64url")}`;
+}
+
 function signOneTime(payload, { minutes = 30, secretEnv = "JWT_SECRET" } = {}) {
   const expSeconds = Math.floor(Date.now() / 1000) + minutes * 60;
   return jwt.sign({ ...payload, exp: expSeconds }, process.env[secretEnv]);
 }
 
-function isEmail(v = "") {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
+function getGoogleConfig() {
+  const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+  const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || "").trim();
+  const redirectUri = String(process.env.GOOGLE_REDIRECT_URI || "").trim();
+  if (!clientId || !clientSecret || !redirectUri || !process.env.JWT_SECRET) return null;
+  return { clientId, clientSecret, redirectUri };
 }
 
-function isHttpUrl(v = "") {
-  if (!v || typeof v !== "string") return false;
+function getGoogleClient(config = getGoogleConfig()) {
+  if (!config) return null;
+  return createGoogleOAuthClient(config);
+}
+
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ""));
+  const rightBuffer = Buffer.from(String(right || ""));
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function maskEmail(value) {
+  const [local = "", domain = ""] = String(value || "").split("@");
+  if (!local || !domain) return "your email";
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${"•".repeat(Math.max(2, Math.min(6, local.length - visible.length)))}@${domain}`;
+}
+
+function signGoogleContext(payload, minutes) {
+  return signOneTime(
+    {
+      ...payload,
+      purpose: payload.purpose,
+    },
+    { minutes }
+  );
+}
+
+function verifyGoogleContext(token, purpose) {
+  if (!token || !process.env.JWT_SECRET) return null;
   try {
-    const u = new URL(String(v).trim());
-    return ["http:", "https:"].includes(u.protocol);
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (!payload || payload.purpose !== purpose) return null;
+    return payload;
   } catch {
+    return null;
+  }
+}
+
+function googleErrorRedirect(code, intent = "login", requestedTarget = "") {
+  const page = intent === "signup" ? "/signup.html" : "/login.html";
+  const next = intent === "login" ? resolveLoginReturnTarget(requestedTarget, "paralegal") || resolveLoginReturnTarget(requestedTarget, "attorney") : "";
+  return `${page}?google_error=${encodeURIComponent(code)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+}
+
+async function roleDashboard(user) {
+  const role=String(user?.role || '').toLowerCase();
+  if(role==='admin') return '/admin-dashboard.html';
+  if(role==='director') return '/director-portal.html';
+  return role==='paralegal' ? '/dashboard-paralegal.html' : '/dashboard-attorney.html';
+}
+
+async function startGoogleTwoFactor(req, res, user) {
+  const { challengeToken, code } = createTwoFactorChallenge(user);
+  user.twoFactorExpiresAt = new Date(Date.now() + FIFTEEN_MIN);
+  if (user.twoFactorMethod === "authenticator") {
+    user.twoFactorTempCode = null;
+    await user.save();
+  } else {
+    user.twoFactorTempCode = await bcrypt.hash(code, 10);
+    await user.save();
+    try {
+      const html = buildTwoFactorEmailHtml(user, code);
+      const text = `Your verification code is ${code}. This code expires in 15 minutes.\n\n${accountEmailFooter(user).text}`;
+      const delivery = await sendEmail(user.email, "Your verification code", html, { text, throwOnError: true });
+      if (!delivery || delivery.error || delivery.disabled || (Array.isArray(delivery.accepted) && !delivery.accepted.length)) {
+        throw new Error("Verification email was not accepted.");
+      }
+    } catch (err) {
+      clearTwoFactorChallenge(user);
+      await user.save();
+      authLogger.error("[auth.google] two-factor delivery failed");
+      return false;
+    }
+  }
+
+  const context = signGoogleContext(
+    {
+      purpose: "google_2fa",
+      userId: String(user._id),
+      challengeToken,
+    },
+    15
+  );
+  res.cookie(
+    GOOGLE_TWO_FACTOR_COOKIE,
+    context,
+    buildGoogleCookieOptions(req, { maxAge: FIFTEEN_MIN })
+  );
+  return true;
+}
+
+async function linkPendingGoogleIdentity(req, res, user, { session = null, clearCookie = true } = {}) {
+  const token = req.cookies?.[GOOGLE_LINK_CANDIDATE_COOKIE];
+  const candidate = verifyGoogleContext(token, "google_link");
+  if (!candidate) return false;
+
+  if (clearCookie) res.clearCookie(GOOGLE_LINK_CANDIDATE_COOKIE, buildGoogleCookieOptions(req));
+  if (
+    !candidate.userId ||
+    !candidate.providerAccountId ||
+    !safeEqual(String(candidate.userId), String(user?._id || ""))
+  ) {
+    await AuditLog.logFromReq(req, "auth.google.link.fail", {
+      targetType: "user",
+      targetId: user?._id,
+      meta: { reason: "authenticated_user_mismatch" },
+      ...(session ? { session } : {}),
+    });
     return false;
   }
+
+  const providerAccountId = String(candidate.providerAccountId);
+  const providerOwner = await User.findOne({
+    authProviders: {
+      $elemMatch: {
+        provider: "google",
+        providerAccountId,
+      },
+    },
+  }).select("_id").session(session);
+  if (providerOwner && String(providerOwner._id) !== String(user._id)) {
+    await AuditLog.logFromReq(req, "auth.google.link.fail", {
+      targetType: "user",
+      targetId: user._id,
+      meta: { reason: "provider_already_linked" },
+      ...(session ? { session } : {}),
+    });
+    return false;
+  }
+
+  const target = await User.findById(user._id).select("+authProviders").session(session);
+  if (!target) return false;
+  const alreadyLinked = (target.authProviders || []).some(
+    (identity) =>
+      identity.provider === "google" &&
+      safeEqual(identity.providerAccountId, providerAccountId)
+  );
+  if (alreadyLinked) return true;
+
+  target.authProviders.push({
+    provider: "google",
+    providerAccountId,
+    linkedAt: new Date(),
+  });
+  try {
+    await target.save(session ? { session, pathsToSave: ["authProviders", "updatedAt"] } : {});
+  } catch (err) {
+    if (err?.code === 11000) {
+      await AuditLog.logFromReq(req, "auth.google.link.fail", {
+        targetType: "user",
+        targetId: user._id,
+        meta: { reason: "provider_unique_conflict" },
+        ...(session ? { session } : {}),
+      });
+      return false;
+    }
+    throw err;
+  }
+
+  await AuditLog.logFromReq(req, "auth.google.link.success", {
+    targetType: "user",
+    targetId: user._id,
+    meta: { provider: "google" },
+    ...(session ? { session } : {}),
+  });
+  return true;
+}
+
+function isEmail(v = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
 }
 
 function isTypoEmailDomain(v = "") {
@@ -471,7 +466,7 @@ function looksLikeBot({ first = "", last = "", email = "" }) {
   const cleanLast = String(last).trim().toLowerCase();
   const cleanEmail = String(email).trim().toLowerCase();
   const combo = `${cleanFirst} ${cleanLast}`;
-  if (cleanFirst.length < 2 || cleanLast.length < 2) return true;
+  if (!cleanFirst || !cleanLast) return true;
   if (BOT_REPEATED.test(combo)) return true;
   if (BOT_NAME_GIBBERISH.test(cleanFirst) || BOT_NAME_GIBBERISH.test(cleanLast)) return true;
   if (BOT_FORBIDDEN_CHARS.test(combo)) return true;
@@ -481,28 +476,320 @@ function looksLikeBot({ first = "", last = "", email = "" }) {
 }
 
 async function verifyTurnstile(token, remoteIp) {
-  const secret = process.env.TURNSTILE_SECRET || "";
-  if (!secret) {
-    return { success: false, errorCodes: ["missing-secret"] };
-  }
-  if (!token) {
-    return { success: false, errorCodes: ["missing-token"] };
-  }
+  let expectedHostname = "";
   try {
-    const params = new URLSearchParams();
-    params.append("secret", secret);
-    params.append("response", token);
-    if (remoteIp) params.append("remoteip", remoteIp);
-    const { data } = await axios.post("https://challenges.cloudflare.com/turnstile/v0/siteverify", params);
-    return data || { success: false };
-  } catch (err) {
-    console.error("[turnstile] verify error", err?.message || err);
-    return { success: false, errorCodes: ["verify-error"] };
+    expectedHostname = new URL(process.env.APP_BASE_URL || "").hostname;
+  } catch (_err) {
+    // Production startup validation owns the canonical URL error. Verification fails closed below.
   }
+  return verifyTurnstileToken({
+    secret: process.env.TURNSTILE_SECRET || "",
+    token,
+    remoteIp,
+    logger: authLogger,
+    expectedAction: "signup",
+    expectedHostname,
+  });
 }
 
-installGoogleCallback({ signAccess, authCookieOptions: buildAuthCookieOptions, accessTtlMs: TWO_HOURS_MS });
-router.use(googleRouter);
+// ----------------------------------------
+// GOOGLE OAUTH (server-side authorization-code flow)
+// GET /api/auth/google
+// GET /api/auth/google/callback
+// ----------------------------------------
+router.get(
+  "/google",
+  asyncHandler(async (req, res) => {
+    const config = getGoogleConfig();
+    if (!config) {
+      return res.status(503).json({ msg: "Google authentication is temporarily unavailable." });
+    }
+
+    const intent = req.query?.intent === "signup" ? "signup" : "login";
+    const role = req.query?.role === "paralegal" ? "paralegal" : "attorney";
+    const state = crypto.randomBytes(32).toString("base64url");
+    const nonce = crypto.randomBytes(32).toString("base64url");
+    const context = signGoogleContext(
+      {
+        purpose: "google_oauth",
+        state,
+        nonce,
+        intent,
+        role,
+        next: resolveLoginReturnTarget(req.query?.next, "paralegal", process.env.APP_BASE_URL || "https://lpc.invalid") || resolveLoginReturnTarget(req.query?.next, "attorney", process.env.APP_BASE_URL || "https://lpc.invalid"),
+      },
+      10
+    );
+
+    res.cookie(
+      GOOGLE_OAUTH_CONTEXT_COOKIE,
+      context,
+      buildGoogleCookieOptions(req, {
+        maxAge: GOOGLE_OAUTH_TTL_MS,
+        path: "/api/auth/google",
+      })
+    );
+
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      nonce,
+      prompt: "select_account",
+    });
+    return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  })
+);
+
+router.get(
+  "/google/callback",
+  asyncHandler(async (req, res) => {
+    const config = getGoogleConfig();
+    const rawContext = req.cookies?.[GOOGLE_OAUTH_CONTEXT_COOKIE];
+    const context = verifyGoogleContext(rawContext, "google_oauth");
+    const intent = context?.intent === "signup" ? "signup" : "login";
+    const errorRedirect = (code, errorIntent = intent) => googleErrorRedirect(code, errorIntent, context?.next);
+    res.clearCookie(
+      GOOGLE_OAUTH_CONTEXT_COOKIE,
+      buildGoogleCookieOptions(req, { path: "/api/auth/google" })
+    );
+
+    if (!config) {
+      return res.redirect(errorRedirect("unavailable", intent));
+    }
+    if (
+      !context ||
+      !req.query?.state ||
+      !safeEqual(req.query.state, context.state)
+    ) {
+      await AuditLog.logFromReq(req, "auth.google.fail", {
+        targetType: "user",
+        meta: { reason: "invalid_state" },
+      });
+      return res.redirect(errorRedirect("invalid_state", intent));
+    }
+    if (req.query?.error || !req.query?.code) {
+      await AuditLog.logFromReq(req, "auth.google.fail", {
+        targetType: "user",
+        meta: { reason: req.query?.error ? "provider_denied" : "missing_code" },
+      });
+      return res.redirect(errorRedirect("cancelled", intent));
+    }
+
+    let profile;
+    try {
+      const client = getGoogleClient(config);
+      const { tokens } = await client.getToken({
+        code: String(req.query.code),
+        redirect_uri: config.redirectUri,
+      });
+      if (!tokens?.id_token) throw new Error("missing_id_token");
+      const ticket = await client.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: config.clientId,
+      });
+      profile = ticket.getPayload();
+    } catch {
+      await AuditLog.logFromReq(req, "auth.google.fail", {
+        targetType: "user",
+        meta: { reason: "code_exchange_or_identity_verification" },
+      });
+      return res.redirect(errorRedirect("oauth_failed", intent));
+    }
+
+    const providerAccountId = String(profile?.sub || "").trim();
+    const verifiedEmail = normalizeEmail(profile?.email || "");
+    if (
+      !providerAccountId ||
+      providerAccountId.length > 255 ||
+      !isEmail(verifiedEmail) ||
+      profile?.email_verified !== true ||
+      !profile?.nonce ||
+      !safeEqual(profile.nonce, context.nonce)
+    ) {
+      await AuditLog.logFromReq(req, "auth.google.fail", {
+        targetType: "user",
+        meta: { reason: "invalid_verified_identity" },
+      });
+      return res.redirect(errorRedirect("identity_invalid", intent));
+    }
+
+    const linkedUser = await User.findOne({
+      authProviders: {
+        $elemMatch: {
+          provider: "google",
+          providerAccountId,
+        },
+      },
+    }).select("+authVersion");
+
+    if (linkedUser) {
+      if (isDeactivatedUser(linkedUser)) {
+        return res.redirect(errorRedirect("disabled", "login"));
+      }
+
+      const settings = await getAppSettings();
+      if (
+        settings?.maintenanceMode &&
+        String(linkedUser.role || "").toLowerCase() !== "admin"
+      ) {
+        return res.redirect(errorRedirect("maintenance", "login"));
+      }
+
+      if (!isApprovedUser(linkedUser)) {
+        await AuditLog.logFromReq(req, "auth.google.login.blocked", {
+          targetType: "user",
+          targetId: linkedUser._id,
+          meta: { reason: String(linkedUser.status || "pending") },
+        });
+        return res.redirect(
+          errorRedirect(
+            String(linkedUser.status || "").toLowerCase() === "pending"
+              ? "pending"
+              : "not_approved",
+            "login"
+          )
+        );
+      }
+
+      let userChanged = ensureApprovedUserAuthReady(linkedUser);
+      if (linkedUser.emailVerified !== true) {
+        if (userChanged) await linkedUser.save();
+        return res.redirect(errorRedirect("email_unverified", "login"));
+      }
+      if (linkedUser.twoFactorEnabled && !TWO_FACTOR_ENABLED) {
+        return res.redirect(errorRedirect("two_factor_unavailable", "login"));
+      }
+      if (userChanged) await linkedUser.save();
+
+      if (linkedUser.twoFactorEnabled && TWO_FACTOR_ENABLED) {
+        const sent = await startGoogleTwoFactor(req, res, linkedUser);
+        if (!sent) return res.redirect(errorRedirect("two_factor_unavailable", "login"));
+        const next = resolveLoginReturnTarget(context.next, linkedUser.role);
+        return res.redirect(`/login.html?google_2fa=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+      }
+
+      const lastLoginAt = linkedUser.lastLoginAt ? new Date(linkedUser.lastLoginAt) : null;
+      const approvedAt = linkedUser.approvedAt ? new Date(linkedUser.approvedAt) : null;
+      const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
+      linkedUser.recordLoginSuccess();
+      await linkedUser.save();
+      await establishSession(req, res, linkedUser);
+      await AuditLog.logFromReq(req, "auth.google.login.success", {
+        targetType: "user",
+        targetId: linkedUser._id,
+      });
+      if (isFirstLogin) {
+        try {
+          await ensureParalegalWelcomeNotification(linkedUser);
+        } catch (err) {
+          authLogger.warn("[auth.google] welcome notification failed");
+        }
+      }
+      return res.redirect(resolveLoginReturnTarget(context.next, linkedUser.role) || await roleDashboard(linkedUser));
+    }
+
+    const emailOwner = await User.findOne({
+      email: verifiedEmail,
+      deleted: { $ne: true },
+    }).select("_id");
+    if (emailOwner) {
+      const linkCandidate = signGoogleContext(
+        {
+          purpose: "google_link",
+          userId: String(emailOwner._id),
+          provider: "google",
+          providerAccountId,
+        },
+        20
+      );
+      res.cookie(
+        GOOGLE_LINK_CANDIDATE_COOKIE,
+        linkCandidate,
+        buildGoogleCookieOptions(req, { maxAge: GOOGLE_SIGNUP_TTL_MS })
+      );
+      await AuditLog.logFromReq(req, "auth.google.login.blocked", {
+        targetType: "user",
+        targetId: emailOwner._id,
+        meta: { reason: "matching_email_unlinked" },
+      });
+      return res.redirect(errorRedirect("matching_email_unlinked", "login"));
+    }
+
+    const nameParts = String(profile?.name || "").trim().split(/\s+/).filter(Boolean);
+    const firstName = String(profile?.given_name || nameParts[0] || "").trim().slice(0, 150);
+    const lastName = String(
+      profile?.family_name || (nameParts.length > 1 ? nameParts.slice(1).join(" ") : "")
+    )
+      .trim()
+      .slice(0, 150);
+    const handoff = signGoogleContext(
+      {
+        purpose: "google_signup",
+        provider: "google",
+        providerAccountId,
+        email: verifiedEmail,
+        firstName,
+        lastName,
+      },
+      20
+    );
+    res.cookie(
+      GOOGLE_SIGNUP_HANDOFF_COOKIE,
+      handoff,
+      buildGoogleCookieOptions(req, { maxAge: GOOGLE_SIGNUP_TTL_MS })
+    );
+    await AuditLog.logFromReq(req, "auth.google.signup.handoff", {
+      targetType: "user",
+      meta: { provider: "google" },
+    });
+    const role = context.role === "paralegal" ? "paralegal" : "attorney";
+    return res.redirect(`/signup.html?google=1&role=${role}`);
+  })
+);
+
+router.get("/google/signup-profile", (req, res) => {
+  const handoff = verifyGoogleContext(
+    req.cookies?.[GOOGLE_SIGNUP_HANDOFF_COOKIE],
+    "google_signup"
+  );
+  if (!handoff) {
+    return res.status(401).json({ msg: "Google signup session expired. Please try again." });
+  }
+  return res.json({
+    profile: {
+      firstName: String(handoff.firstName || ""),
+      lastName: String(handoff.lastName || ""),
+      email: String(handoff.email || ""),
+      emailVerified: true,
+    },
+  });
+});
+
+router.get("/google/2fa-context", asyncHandler(async (req, res) => {
+  const context = verifyGoogleContext(
+    req.cookies?.[GOOGLE_TWO_FACTOR_COOKIE],
+    "google_2fa"
+  );
+  res.clearCookie(GOOGLE_TWO_FACTOR_COOKIE, buildGoogleCookieOptions(req));
+  if (!context?.userId || !isObjId(context.userId)) {
+    return res.status(401).json({ msg: "Google sign-in session expired. Please try again." });
+  }
+  const user = await User.findById(context.userId)
+    .select("email twoFactorEnabled twoFactorMethod")
+    .lean();
+  if (!user?.twoFactorEnabled) {
+    return res.status(401).json({ msg: "Google sign-in session expired. Please try again." });
+  }
+  return res.json({
+    challengeToken: context.challengeToken,
+    method: user.twoFactorMethod || "email",
+    destination: user.twoFactorMethod === "authenticator" ? "your authenticator app" : maskEmail(user.email),
+    passkeyAvailable: (await PasskeyCredential.exists({ userId: context.userId })) !== null,
+  });
+}));
 
 // ----------------------------------------
 // REGISTER
@@ -510,16 +797,13 @@ router.use(googleRouter);
 // ----------------------------------------
 router.post(
   "/register",
+  csrfProtection,
   registrationUpload.fields([
     { name: "resume", maxCount: 1 },
     { name: "resumeFile", maxCount: 1 },
     { name: "certificateFile", maxCount: 1 },
   ]),
   asyncHandler(async (req, res) => {
-    const bypassList = (process.env.DEV_BYPASS_EMAILS || "")
-      .split(",")
-      .map((entry) => entry.trim().toLowerCase())
-      .filter(Boolean);
     const enforceTurnstile = String(process.env.TURNSTILE_ENFORCED || "true").toLowerCase() === "true";
     const {
       firstName,
@@ -530,18 +814,18 @@ router.post(
       barNumber,
       linkedInURL,
       lawFirm,
-      resumeURL,
       certificateURL,
       turnstileToken,
-      captchaToken,
-      recaptchaToken,
       termsAccepted,
+      privacyAcknowledged,
       attorneyPricingAccepted,
+      attorneyGoodStanding,
       phoneNumber,
       barState,
       state,
       timezone,
       yearsExperience,
+      paralegalQualification,
       googleSignupIntent,
     } = req.body || {};
 
@@ -554,28 +838,38 @@ router.post(
     }
 
     const normalizedEmail = String(email || "").toLowerCase().trim();
-    const googleHandoff = verifyGoogleContext(req.cookies?.[SIGNUP_COOKIE], "google_signup");
-    if (String(googleSignupIntent || "").toLowerCase() === "true" && !googleHandoff) {
-      return res.status(401).json({ msg: "Google signup session expired. Please try again." });
+    const googleSignupHandoff = verifyGoogleContext(
+      req.cookies?.[GOOGLE_SIGNUP_HANDOFF_COOKIE],
+      "google_signup"
+    );
+    const expectsGoogleSignup =
+      String(googleSignupIntent || "").toLowerCase() === "true";
+    if (expectsGoogleSignup && !googleSignupHandoff) {
+      return res.status(401).json({
+        msg: "Google signup session expired. Please continue with Google again.",
+      });
     }
-    if (googleHandoff && (!googleEqual(normalizedEmail, googleHandoff.email) || !googleHandoff.sub)) {
-      return res.status(400).json({ msg: "Google signup identity does not match this form." });
+    if (
+      googleSignupHandoff &&
+      (!safeEqual(normalizedEmail, normalizeEmail(googleSignupHandoff.email || "")) ||
+        googleSignupHandoff.provider !== "google" ||
+        !googleSignupHandoff.providerAccountId)
+    ) {
+      return res.status(400).json({
+        msg: "Google signup details changed or expired. Please continue with Google again.",
+      });
     }
-    const bypassCaptcha = normalizedEmail && bypassList.includes(normalizedEmail);
-
     const resolvedTurnstileToken =
       turnstileToken ||
       req.body?.["cf-turnstile-response"] ||
-      req.body?.cfTurnstileResponse ||
-      captchaToken ||
-      recaptchaToken;
-    if (!bypassCaptcha && enforceTurnstile && process.env.NODE_ENV === "production") {
+      req.body?.cfTurnstileResponse;
+    if (enforceTurnstile && process.env.NODE_ENV === "production") {
       if (!resolvedTurnstileToken || !process.env.TURNSTILE_SECRET) {
         return res.status(400).json({ error: "Turnstile verification failed" });
       }
       const verification = await verifyTurnstile(resolvedTurnstileToken, req.ip);
       if (!verification?.success) {
-        console.warn("[turnstile] signup verify failed", verification?.["error-codes"] || verification?.errorCodes);
+        authLogger.warn("[turnstile] signup verify failed", verification?.["error-codes"] || verification?.errorCodes);
         return res.status(400).json({ error: "Turnstile verification failed" });
       }
     }
@@ -589,11 +883,19 @@ router.post(
       return res.status(400).json({ msg: "Registration failed validation. Please provide accurate information." });
     }
 
-    if (!termsAccepted) {
-      return res.status(400).json({ msg: "Terms of Use must be accepted." });
+    if (
+      String(termsAccepted || "").toLowerCase() !== "true" ||
+      String(privacyAcknowledged || "").toLowerCase() !== "true"
+    ) {
+      return res.status(400).json({
+        msg: "You must accept the Terms of Service and acknowledge the Privacy Policy.",
+      });
     }
 
     const roleLc = String(role || "").toLowerCase();
+    if (!policySubmissionMatches(req.body)) {
+      return res.status(409).json({ code: "LEGAL_DOCUMENTS_CHANGED", msg: "Review the current Terms and Privacy Policy before submitting. Reload the policy documents and try again." });
+    }
     if (!["attorney", "paralegal"].includes(roleLc)) {
       return res.status(400).json({ msg: "Invalid role" });
     }
@@ -611,16 +913,20 @@ router.post(
     if (isTypoEmailDomain(normalizedEmail)) {
       return res.status(400).json({ msg: "Please use a .com email address (.con is a typo)." });
     }
-    if (!password || String(password).length < 8) {
-      return res
-        .status(400)
-        .json({ msg: "Password must be at least 8 characters." });
-    }
+    const passwordPolicy = validateNewPassword(password, {
+      user: { email: normalizedEmail, firstName: safeFirst, lastName: safeLast },
+    });
+    if (!passwordPolicy.ok) return res.status(400).json({ msg: passwordPolicy.error, code: passwordPolicy.code, field: "password" });
 
     const normalizedBarState =
       typeof barState === "string" ? barState.trim().toUpperCase() : "";
     const normalizedBarNumber = String(barNumber || "").trim();
-    const normalizedLinkedInURL = linkedInURL ? String(linkedInURL).trim() : "";
+    const linkedIn = normalizeHttpUrl(linkedInURL, {
+      fieldLabel: "LinkedIn URL",
+      requiredHost: "linkedin.com",
+    });
+    if (!linkedIn.ok) return res.status(400).json({ msg: linkedIn.error });
+    const normalizedLinkedInURL = linkedIn.value;
     if (roleLc === "attorney") {
       if (!normalizedBarNumber) {
         return res.status(400).json({ msg: "State Bar Number is required for attorneys." });
@@ -628,17 +934,34 @@ router.post(
       if (!normalizedBarState) {
         return res.status(400).json({ msg: "Bar State is required for attorneys." });
       }
-      if (!/^[A-Z]{2}$/.test(normalizedBarState)) {
+      if (!VALID_US_STATES.has(normalizedBarState)) {
         return res.status(400).json({ msg: "Bar State must be a valid 2-letter code." });
       }
-      if (normalizedLinkedInURL && !isHttpUrl(normalizedLinkedInURL)) {
-        return res.status(400).json({ msg: "LinkedIn URL must start with http:// or https://" });
+      if (String(attorneyGoodStanding).toLowerCase() !== "true") {
+        return res.status(400).json({ msg: "Please confirm that you are licensed and in good standing.", field: "attorneyGoodStanding" });
       }
       const pricingAccepted = String(attorneyPricingAccepted || "").toLowerCase() === "true";
       if (!pricingAccepted) {
-        return res.status(400).json({ msg: "Attorneys must acknowledge the $400 minimum case requirement." });
+        return res.status(400).json({ msg: "Attorneys must acknowledge the $400 minimum Matter requirement." });
       }
     }
+
+    const qualification = String(paralegalQualification || "").trim();
+    if (roleLc === "paralegal" && qualification && !["certificate", "degree", "law_firm_experience"].includes(qualification)) {
+      return res.status(400).json({ msg: "Choose one of the listed qualifications or leave this optional field blank.", field: "paralegalQualification" });
+    }
+    const hasYearsExperience = yearsExperience !== undefined && String(yearsExperience).trim() !== "";
+    const parsedYearsExperience = Number(yearsExperience);
+    if (
+      roleLc === "paralegal" &&
+      hasYearsExperience && (!Number.isInteger(parsedYearsExperience) || parsedYearsExperience < 0 || parsedYearsExperience > 80)
+    ) {
+      return res.status(400).json({
+        msg: "Enter your completed years of paralegal experience, from 0 to 80.",
+        field: "paralegalExperience",
+      });
+    }
+    const safeYearsExperience = roleLc === "paralegal" ? (hasYearsExperience ? parsedYearsExperience : null) : undefined;
 
     const resumeFile = req.files?.resume?.[0] || req.files?.resumeFile?.[0] || null;
     const certificateFile = req.files?.certificateFile?.[0] || null;
@@ -648,16 +971,30 @@ router.post(
       return res.status(400).json({ msg: "Résumé file is required for paralegal registration." });
     }
 
-    const existing = await User.findOne({ email: normalizedEmail });
-    if (existing) {
-      if (existing.deleted) {
-        await User.deleteOne({ _id: existing._id, deleted: true });
-      } else {
-        return res.status(400).json({ msg: "User already exists" });
+    if (googleSignupHandoff) {
+      const existingProvider = await User.findOne({
+        authProviders: {
+          $elemMatch: {
+            provider: "google",
+            providerAccountId: String(googleSignupHandoff.providerAccountId),
+          },
+        },
+      }).select("_id");
+      if (existingProvider) {
+        return res.status(409).json({
+          msg: "This Google account is already linked. Sign in with Google instead.",
+        });
       }
     }
-    if (googleHandoff && await User.exists({ authProviders: { $elemMatch: { provider: "google", providerAccountId: googleHandoff.sub } } })) {
-      return res.status(409).json({ msg: "This Google account is already connected." });
+
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({
+        msg: existing.deleted
+          ? "An account with this email was deactivated. Contact support if you need help returning."
+          : "An account already uses this email. Please sign in or use another email.",
+        field: "email",
+      });
     }
 
     if (roleLc === "paralegal" && resumeFile) {
@@ -670,6 +1007,15 @@ router.post(
       if (!BUCKET) {
         return res.status(500).json({ msg: "Resume upload unavailable. Please try again later." });
       }
+      try {
+        validateMatterFileBuffer({
+          buffer: resumeFile.buffer,
+          mimeType: resumeFile.mimetype,
+          filename: resumeFile.originalname || "resume.pdf",
+        });
+      } catch (error) {
+        return res.status(400).json({ msg: "Résumé must be a valid PDF.", code: error?.code });
+      }
     }
     if (roleLc === "paralegal" && certificateFile) {
       if (certificateFile.mimetype !== "application/pdf") {
@@ -681,40 +1027,54 @@ router.post(
       if (!BUCKET) {
         return res.status(500).json({ msg: "Certificate upload unavailable. Please try again later." });
       }
+      try {
+        validateMatterFileBuffer({
+          buffer: certificateFile.buffer,
+          mimeType: certificateFile.mimetype,
+          filename: certificateFile.originalname || "certificate.pdf",
+        });
+      } catch (error) {
+        return res.status(400).json({ msg: "Certificate must be a valid PDF.", code: error?.code });
+      }
     }
 
     // Let the model hash the password (pre-save hook)
-
-    const parsedYearsExperience = parseInt(yearsExperience, 10);
-    const safeYearsExperience = Number.isFinite(parsedYearsExperience)
-      ? Math.max(0, Math.min(80, parsedYearsExperience))
-      : undefined;
 
     const user = new User({
       firstName: safeFirst,
       lastName: safeLast,
       email: String(email || "").toLowerCase(),
-      password: String(password),
-      emailVerified: Boolean(googleHandoff),
-      authProviders: googleHandoff ? [{ provider: "google", providerAccountId: googleHandoff.sub }] : [],
+      password: passwordPolicy.password,
       role: roleLc,
       status: "pending",
       preferences: {
-        theme: roleLc === "attorney" ? "light" : "mountain",
+        theme: "light",
       },
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
       resumeURL: roleLc === "paralegal" ? "" : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",
       linkedInURL: normalizedLinkedInURL,
       lawFirm: roleLc === "attorney" ? (String(lawFirm || "").trim() || null) : null,
-      termsAccepted: true,
       attorneyPricingAccepted:
         roleLc === "attorney" ? String(attorneyPricingAccepted || "").toLowerCase() === "true" : false,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
       state: normalizedState,
       timezone: safeTimezone || undefined,
       yearsExperience: roleLc === "paralegal" ? safeYearsExperience : undefined,
+      paralegalQualification: roleLc === "paralegal" ? qualification : "",
+      emailVerified: Boolean(googleSignupHandoff),
+      authProviders: googleSignupHandoff
+        ? [
+            {
+              provider: "google",
+              providerAccountId: String(googleSignupHandoff.providerAccountId),
+              linkedAt: new Date(),
+            },
+          ]
+        : [],
     });
+    await require("../services/legalPolicyService").preserveCurrentPolicyDocuments();
+    recordSignupPolicyAcknowledgement(user);
 
     if (roleLc === "attorney" && normalizedBarState) {
       user.location = normalizedBarState;
@@ -722,68 +1082,138 @@ router.post(
       user.location = normalizedState;
     }
 
-    // Upload resume (paralegal) before saving
-    if (roleLc === "paralegal" && resumeFile) {
-      const key = `paralegal-resumes/${safeSegment(user._id)}/resume.pdf`;
-      const putParams = {
-        Bucket: BUCKET,
-        Key: key,
-        Body: resumeFile.buffer,
-        ContentType: "application/pdf",
-        ContentLength: resumeFile.size,
-        ACL: "private",
-        ...sseParams(),
-      };
-      await s3.send(new PutObjectCommand(putParams));
-      user.resumeURL = key;
-    }
-    if (roleLc === "paralegal" && certificateFile) {
-      const key = `paralegal-certificates/${safeSegment(user._id)}/certificate.pdf`;
-      const putParams = {
-        Bucket: BUCKET,
-        Key: key,
-        Body: certificateFile.buffer,
-        ContentType: "application/pdf",
-        ContentLength: certificateFile.size,
-        ACL: "private",
-        ...sseParams(),
-      };
-      await s3.send(new PutObjectCommand(putParams));
-      user.certificateURL = key;
+    // Reserve recovery before any provider attempt. The worker reconciles an
+    // interrupted held reservation after its existing ten-minute grace period.
+    // Saving the account and cancelling its exact reservations share one
+    // transaction, so a winning cleanup claim can never attach deleted bytes.
+    const admissionUploads = [];
+    if (roleLc === "paralegal" && resumeFile) admissionUploads.push({
+      field: "resumeURL", key: protectedUploadKey(`paralegal-resumes/${safeSegment(user._id)}/resume.pdf`), file: resumeFile,
+    });
+    if (roleLc === "paralegal" && certificateFile) admissionUploads.push({
+      field: "certificateURL", key: protectedUploadKey(`paralegal-certificates/${safeSegment(user._id)}/certificate.pdf`), file: certificateFile,
+    });
+    const admissionTaskIds = await stagePersonalStorageDeletion({
+      ownerId: user._id, keys: admissionUploads.map(upload => upload.key), reason: "registration_upload_recovery",
+    }, { durable: true });
+    let admissionSession, admissionCommitStarted = false;
+    try {
+      for (const upload of admissionUploads) {
+        await s3.send(new PutObjectCommand({
+          Bucket: BUCKET, Key: upload.key, Body: upload.file.buffer,
+          ContentType: "application/pdf", ContentLength: upload.file.size, ...sseParams(),
+        }), { abortSignal: AbortSignal.timeout(S3_REQUEST_TIMEOUT_MS) });
+        user[upload.field] = upload.key;
+      }
+      if (admissionTaskIds.length) {
+        admissionSession = await mongoose.startSession();
+        admissionSession.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+        const reservations = await StorageDeletionTask.collection.find({ _id: { $in: admissionTaskIds } }, { session: admissionSession }).toArray();
+        const now = new Date();
+        if (reservations.length !== admissionUploads.length || admissionTaskIds.some((taskId, index) => {
+          const task = reservations.find(record => String(record._id) === String(taskId));
+          return !task || String(task.ownerId) !== String(user._id) || task.bucket !== BUCKET
+            || task.key !== admissionUploads[index].key || task.status !== "held" || !(task.eligibleAt > now);
+        })) throw Object.assign(new Error("Admission uploads no longer hold their recovery reservation."), { code: "ADMISSION_UPLOAD_RESERVATION_CHANGED" });
+        await user.save({ session: admissionSession });
+        await require("../services/authSignupAlerts").enqueueAlert({key:`signup:${user._id}`,kind:"signup",targetId:user._id},{session:admissionSession});
+        const cancelled = await cancelPersonalStorageDeletion(admissionTaskIds, { now, session: admissionSession });
+        if (cancelled.cancelled !== admissionTaskIds.length) throw Object.assign(new Error("Admission upload cleanup changed before registration."), { code: "ADMISSION_UPLOAD_RESERVATION_CHANGED" });
+        admissionCommitStarted = true;
+        await admissionSession.commitTransaction();
+      } else {
+        admissionSession = await mongoose.startSession();
+        await admissionSession.withTransaction(async()=>{
+          await user.save({session:admissionSession});
+          await require("../services/authSignupAlerts").enqueueAlert({key:`signup:${user._id}`,kind:"signup",targetId:user._id},{session:admissionSession});
+        });
+      }
+    } catch (err) {
+      if (admissionSession?.inTransaction() && !admissionCommitStarted) {
+        await admissionSession.abortTransaction().catch(error => authLogger.warn("[auth] admission transaction abort could not be confirmed", { name: error?.name }));
+      }
+      let recorded = false;
+      if (admissionCommitStarted) {
+        // A commit acknowledgement may be lost. Only our exact allocated user,
+        // attachment references and atomically cancelled reservations establish
+        // the saved outcome; never delete or replay an uncertain provider write.
+        try {
+          const saved = await User.collection.findOne({ _id: user._id, email: user.email, role: user.role, status: "pending",
+            ...Object.fromEntries(admissionUploads.map(upload => [upload.field, upload.key])) }, { readConcern: { level: "majority" } });
+          const reservations = await StorageDeletionTask.collection.find({ _id: { $in: admissionTaskIds } }, { readConcern: { level: "majority" } }).toArray();
+          recorded = Boolean(saved) && reservations.length === admissionTaskIds.length && admissionTaskIds.every((taskId, index) => {
+            const task = reservations.find(record => String(record._id) === String(taskId));
+            return task && String(task.ownerId) === String(user._id) && task.bucket === BUCKET
+              && task.key === admissionUploads[index].key && task.status === "cancelled";
+          });
+        } catch (error) {
+          authLogger.warn("[auth] admission commit outcome remains unconfirmed", { name: error?.name });
+        }
+      }
+      if (!recorded) {
+        // Keep durable held tasks on upload/save failure. Immediate deletion can
+        // race a late provider acknowledgement or a possibly committed account.
+        // Existing reconciliation checks both live User and retained resume refs.
+        const duplicateProvider = err?.code === 11000 &&
+          (err?.keyPattern?.["authProviders.providerAccountId"] || String(err?.message || "").includes("user_auth_provider_unique"));
+        if (duplicateProvider) return res.status(409).json({ msg: "This Google account is already linked. Sign in with Google instead." });
+        if (err?.code === 11000 && (err?.keyPattern?.email || err?.keyValue?.email)) {
+          return res.status(409).json({ msg: "An account already uses this email. Please sign in or use another email.", field: "email" });
+        }
+        throw err;
+      }
+    } finally {
+      await admissionSession?.endSession();
     }
 
-    await user.save();
-    if (googleHandoff) res.clearCookie(SIGNUP_COOKIE, googleCookieOptions(req));
+    if (googleSignupHandoff) {
+      res.clearCookie(
+        GOOGLE_SIGNUP_HANDOFF_COOKIE,
+        buildGoogleCookieOptions(req)
+      );
+    }
 
     // Email: registration received
     try {
-      const html = buildApplicationSubmissionEmailHtml(user);
-      await sendEmail(user.email, "Registration received", html);
-    } catch (_) {}
+      const email = accountEmails.applicationReceived(user);
+      await sendEmail(user.email, email.subject, email.html, { text: email.text });
+    } catch (error) {
+      authLogger.warn("[auth] registration email delivery failed", {
+        userId: String(user._id),
+        error: error?.message || String(error),
+      });
+    }
+
+    let verificationEmailStatus = user.emailVerified ? "not_required" : "not_sent";
+    if (!googleSignupHandoff) {
+      try {
+        const delivery = await sendVerificationEmail({ user, email: user.email });
+        verificationEmailStatus = delivery?.disabled ? "not_sent"
+          : Array.isArray(delivery?.accepted) && delivery.accepted.length === 0 ? "unknown" : "sent";
+      } catch (error) {
+        authLogger.warn("[auth] signup verification email delivery failed", {
+          userId: String(user._id),
+          error: error?.message || String(error),
+        });
+      }
+    }
 
     await AuditLog.logFromReq(req, "auth.register", {
       targetType: "user",
       targetId: user._id,
-      meta: { role: user.role },
+      meta: {
+        role: user.role,
+        provider: googleSignupHandoff ? "google" : "password",
+      },
     });
 
     try {
-      const baseUrl = String(process.env.APP_BASE_URL || "").replace(/\/+$/, "");
-      const adminLink = baseUrl ? `${baseUrl}/admin-dashboard.html#section-user-management` : "";
-      const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "New user";
-      const timestamp = new Date().toISOString();
-      const linkHtml = adminLink ? `<p><a href="${adminLink}">Open admin dashboard</a></p>` : "";
-      await sendEmail(
-        "admin@lets-paraconnect.com",
-        "New user signup",
-        `<p>A new user signed up.</p>
-         <p><strong>Name:</strong> ${fullName}<br/>
-         <strong>Role:</strong> ${String(user.role || "").toLowerCase()}<br/>
-         <strong>Timestamp:</strong> ${timestamp}</p>
-         ${linkHtml}`
-      );
-    } catch (err) {
-      console.warn("[auth] admin signup email failed", err?.message || err);
+      const { enqueueAlert, processAlerts } = require('../services/authSignupAlerts');
+      const key = `signup:${user._id}`;
+      await enqueueAlert({ key, kind: 'signup', targetId: user._id });
+      await processAlerts({ key, limit: 1 });
+    } catch (_) {
+      authLogger.warn("[auth] signup alert queued for worker reconciliation");
     }
 
     await publishEventSafe({
@@ -825,9 +1255,65 @@ router.post(
       },
     });
 
-    res.json({ msg: "Registered successfully. Await admin approval." });
+    res.json({ msg: "Registered successfully. Await admin approval.", emailVerified: user.emailVerified === true, verificationEmailStatus });
   })
 );
+
+async function recordCurrentPasswordLoginFailure(user) {
+  const now = new Date();
+  const authVersion = Number(user.authVersion || 0);
+  if (!Number.isSafeInteger(authVersion) || authVersion < 0) return;
+  const filter = {
+    _id: user._id,
+    password: user.password,
+    disabled: { $ne: true },
+    deleted: { $ne: true },
+    $and: [{ $or: [{ lockedUntil: null }, { lockedUntil: { $lte: now } }] }],
+  };
+  if (authVersion === 0) filter.$and.push({ $or: [{ authVersion: 0 }, { authVersion: { $exists: false } }] });
+  else filter.authVersion = authVersion;
+  const nextFailures = { $add: [{ $ifNull: ["$failedLogins", 0] }, 1] };
+  const shouldLock = { $gte: [nextFailures, 5] };
+  // One current-record update counts parallel failures without replacing a
+  // newer credential, account state or an already active fifteen-minute lock.
+  await User.collection.updateOne(filter, [{ $set: {
+    failedLogins: { $cond: [shouldLock, 0, nextFailures] },
+    lockedUntil: { $cond: [shouldLock, new Date(now.getTime() + FIFTEEN_MIN), "$lockedUntil"] },
+    updatedAt: now,
+  } }]);
+}
+
+async function rehashCurrentLoginPassword(user, password) {
+  return withActiveAccountWrite([user._id], async (session) => {
+    const current = await User.findById(user._id)
+      .select("+password +authVersion +twoFactorChallengeHash +twoFactorFailedAttempts")
+      .session(session);
+    if (!current || current.isLocked || !(await current.comparePassword(String(password)))) {
+      throw Object.assign(new Error(INVALID_CREDENTIALS_MSG), { status: 401, publicCode: "LOGIN_CREDENTIALS_CHANGED" });
+    }
+    if (current.emailVerified !== true) {
+      throw Object.assign(new Error(EMAIL_NOT_VERIFIED_MSG), { status: 403, publicCode: "LOGIN_EMAIL_NOT_VERIFIED" });
+    }
+    const approvedAtChanged = ensureApprovedUserAuthReady(current);
+    if (current._passwordNeedsRehash) {
+      // The earlier comparison may precede a password/security change. Use
+      // only this locked, current credential and retain the normal hash hook.
+      const currentHash = current.password;
+      current.password = String(password);
+      current.$where = { password: currentHash };
+      try {
+        await current.save({ session, pathsToSave: ["password", "approvedAt", "updatedAt"] });
+      } finally {
+        // Subsequent login-state saves must not retain the old hash predicate.
+        delete current.$where;
+        delete current._passwordNeedsRehash;
+      }
+    } else if (approvedAtChanged) {
+      await current.save({ session, pathsToSave: ["approvedAt", "updatedAt"] });
+    }
+    return current;
+  }, { ownerId: user._id, authVersion: Number(user.authVersion || 0) });
+}
 
 // ----------------------------------------
 // LOGIN
@@ -835,18 +1321,39 @@ router.post(
 // ----------------------------------------
 router.post(
   "/login",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
 
-    if (!isEmail(email) || !password) {
-      return res.status(400).json({ msg: "Invalid credentials" });
+    if (!isEmail(email) || !password || String(password).length > 128) {
+      return res.status(400).json({ msg: INVALID_CREDENTIALS_MSG, error: INVALID_CREDENTIALS_MSG });
     }
 
     // IMPORTANT: password is select:false in schema, so we MUST include it
-    const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
+    let user = await User.findOne({ email: String(email).toLowerCase() })
+      .select("+password +authVersion +twoFactorChallengeHash +twoFactorFailedAttempts");
     if (!user) {
+      const dummyHash = await DUMMY_PASSWORD_HASH;
+      await argon2.verify(dummyHash, String(password)).catch(() => false);
       await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", meta: { email } });
-      return res.status(404).json({ msg: NO_ACCOUNT_MSG, error: NO_ACCOUNT_MSG });
+      return res.status(401).json({ msg: INVALID_CREDENTIALS_MSG, error: INVALID_CREDENTIALS_MSG });
+    }
+
+    if (user.isLocked) {
+      await argon2.verify(await DUMMY_PASSWORD_HASH, String(password)).catch(() => false);
+      return res.status(401).json({ msg: INVALID_CREDENTIALS_MSG, error: INVALID_CREDENTIALS_MSG });
+    }
+
+    const ok = await user.comparePassword(String(password));
+    if (!ok) {
+      try {
+        await recordCurrentPasswordLoginFailure(user);
+      } catch (error) {
+        authLogger.warn("[auth] password failure count did not complete", { code: error?.name || "login_count_failed" });
+        return res.status(503).json({ msg: "Unable to complete sign-in. Please sign in again.", error: "Unable to complete sign-in. Please sign in again." });
+      }
+      await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", targetId: user._id });
+      return res.status(401).json({ msg: INVALID_CREDENTIALS_MSG, error: INVALID_CREDENTIALS_MSG });
     }
 
     if (isDeactivatedUser(user)) {
@@ -863,37 +1370,34 @@ router.post(
     if (!approvedFlag) {
       const msg =
         status === "pending"
-          ? "Your account is still under review. We'll email you as soon as it's approved."
+          ? "We’re reviewing your application. We’ll email you when your account is ready."
           : "Your application was not approved. Please contact support if you have questions.";
       return res.status(403).json({ msg });
     }
 
-    let userChanged = false;
+    let userChanged = ensureApprovedUserAuthReady(user);
     if (user.emailVerified !== true) {
-      userChanged = ensureApprovedUserAuthReady(user) || userChanged;
-      if (user.emailVerified !== true) {
-        return res.status(403).json({ msg: EMAIL_NOT_VERIFIED_MSG, error: EMAIL_NOT_VERIFIED_MSG });
-      }
-    }
-
-    const ok = await user.comparePassword(String(password));
-    if (!ok) {
-      await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", targetId: user._id });
-      return res.status(401).json({ msg: WRONG_PASSWORD_MSG, error: WRONG_PASSWORD_MSG });
+      if (userChanged) await user.save();
+      return res.status(403).json({ msg: EMAIL_NOT_VERIFIED_MSG, error: EMAIL_NOT_VERIFIED_MSG });
     }
 
     if (user._passwordNeedsRehash) {
-      user.password = String(password);
-      userChanged = true;
+      try {
+        user = await rehashCurrentLoginPassword(user, password);
+        userChanged = false;
+      } catch (error) {
+        const credentialsChanged = error?.publicCode === "ACCOUNT_CHANGED" || error?.publicCode === "LOGIN_CREDENTIALS_CHANGED" || error?.name === "DocumentNotFoundError";
+        const status = credentialsChanged ? 401 : ([403, 409, 503].includes(error?.status) ? error.status : 503);
+        const msg = credentialsChanged ? INVALID_CREDENTIALS_MSG
+          : error?.publicCode === "LOGIN_EMAIL_NOT_VERIFIED" ? EMAIL_NOT_VERIFIED_MSG
+          : "Unable to complete sign-in. Please sign in again.";
+        authLogger.warn("[auth] legacy password migration did not complete", { code: error?.publicCode || error?.name || "migration_failed" });
+        return res.status(status).json({ msg, error: msg });
+      }
     }
 
     if (user.twoFactorEnabled && !TWO_FACTOR_ENABLED) {
-      user.twoFactorEnabled = false;
-      user.twoFactorMethod = "email";
-      user.twoFactorTempCode = null;
-      user.twoFactorExpiresAt = null;
-      user.twoFactorBackupCodes = [];
-      userChanged = true;
+      return res.status(503).json({ msg: "Two-step verification is temporarily unavailable. Please try again later." });
     }
 
     if (userChanged) {
@@ -901,45 +1405,51 @@ router.post(
     }
 
     if (user.twoFactorEnabled && TWO_FACTOR_ENABLED) {
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      const hashed = await bcrypt.hash(code, 10);
-      user.twoFactorTempCode = hashed;
+      const { challengeToken, code } = createTwoFactorChallenge(user);
       user.twoFactorExpiresAt = new Date(Date.now() + FIFTEEN_MIN);
-      await user.save();
-
-      try {
-        const html = buildTwoFactorEmailHtml(user, code);
-        const text = `Your verification code is ${code}. This code expires in 15 minutes.`;
-        await sendEmail(user.email, "Your verification code", html, { text });
-      } catch (err) {
-        console.error("[2fa] email failed", err?.message || err);
+      if (user.twoFactorMethod === "authenticator") {
         user.twoFactorTempCode = null;
-        user.twoFactorExpiresAt = null;
         await user.save();
-        return res.status(500).json({ msg: "Unable to send verification code." });
+      } else {
+        user.twoFactorTempCode = await bcrypt.hash(code, 10);
+        await user.save();
+        try {
+          const html = buildTwoFactorEmailHtml(user, code);
+          const text = `Your verification code is ${code}. This code expires in 15 minutes.\n\n${accountEmailFooter(user).text}`;
+          const delivery = await sendEmail(user.email, "Your verification code", html, { text, throwOnError: true });
+          if (!delivery || delivery.error || delivery.disabled || (Array.isArray(delivery.accepted) && !delivery.accepted.length)) {
+            throw new Error("Verification email was not accepted.");
+          }
+        } catch (err) {
+          authLogger.error("[2fa] email failed", err?.message || err);
+          clearTwoFactorChallenge(user);
+          await user.save();
+          return res.status(500).json({ msg: "Unable to send verification code." });
+        }
       }
 
       return res.json({
         twoFactorRequired: true,
         method: user.twoFactorMethod || "email",
-        email: user.email,
+        challengeToken,
+        destination: user.twoFactorMethod === "authenticator" ? "your authenticator app" : maskEmail(user.email),
+        passkeyAvailable: (await PasskeyCredential.exists({ userId: user._id })) !== null,
       });
     }
 
+    await linkPendingGoogleIdentity(req, res, user);
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
     const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
     const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
     user.recordLoginSuccess();
     await user.save();
-    await linkPendingIdentity(req, res, user);
-    const token = signAccess(user);
-    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
+    await establishSession(req, res, user);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
     if (isFirstLogin) {
       try {
         await ensureParalegalWelcomeNotification(user);
       } catch (err) {
-        console.warn("[auth] welcome notification failed", err?.message || err);
+        authLogger.warn("[auth] welcome notification failed", err?.message || err);
       }
     }
 
@@ -965,78 +1475,231 @@ router.post(
   })
 );
 
+// Factor claim, login state and managed session share one commit. A retry
+// rereads the challenge, recovery hashes and current account security state.
+async function finishFactorSignIn(req, res, { backup = false } = {}) {
+  const challengeToken = String(req.body?.challengeToken || "");
+  const code = String(req.body?.code || "");
+  const invalid = { status: 400, body: { error: backup ? "Invalid request." : "Invalid 2FA attempt." } };
+  let session;
+  let outcome;
+  try {
+    session = await User.db.startSession();
+    await session.withTransaction(async () => {
+      outcome = invalid;
+      const user = await User.findOne({ twoFactorChallengeHash: hashOpaqueToken(challengeToken) })
+        .select("+twoFactorTempCode +twoFactorExpiresAt +twoFactorChallengeHash +twoFactorChallengeAuthVersion +twoFactorFailedAttempts +twoFactorBackupCodes +authVersion +totpSecretEncrypted +totpLastUsedTimeStep")
+        .session(session);
+      if (!user || !user.twoFactorEnabled) return;
+      if (isDeactivatedUser(user)) {
+        outcome = { status: 403, body: { error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG } };
+        return;
+      }
+      const saveChallenge = () => user.save({ session, pathsToSave: [
+        "twoFactorTempCode", "twoFactorExpiresAt", "twoFactorChallengeHash",
+        "twoFactorChallengeAuthVersion", "twoFactorFailedAttempts", "updatedAt",
+      ] });
+      if (!isApprovedUser(user)) {
+        if (!backup) { clearTwoFactorChallenge(user); await saveChallenge(); }
+        outcome = { status: 403, body: { error: "Account pending approval" } };
+        return;
+      }
+      ensureApprovedUserAuthReady(user);
+      if (user.emailVerified !== true) {
+        clearTwoFactorChallenge(user);
+        await saveChallenge();
+        outcome = { status: 403, body: { error: EMAIL_NOT_VERIFIED_MSG } };
+        return;
+      }
+      // Unbound old challenges and a challenge from before a password/security
+      // version change cannot authorize a new session.
+      if (!Number.isSafeInteger(user.twoFactorChallengeAuthVersion) ||
+          user.twoFactorChallengeAuthVersion !== Number(user.authVersion || 0)) {
+        clearTwoFactorChallenge(user);
+        await saveChallenge();
+        outcome = { status: 400, body: { error: "Sign-in challenge changed. Sign in again to request a new code." } };
+        return;
+      }
+      if (!user.twoFactorExpiresAt || user.twoFactorExpiresAt <= new Date() ||
+          (!backup && (user.twoFactorMethod === "authenticator" ? !user.totpSecretEncrypted : !user.twoFactorTempCode))) {
+        clearTwoFactorChallenge(user);
+        await saveChallenge();
+        outcome = { status: 400, body: { error: backup ? "Sign-in challenge expired. Please sign in again." : "Code expired." } };
+        return;
+      }
+      let match = false;
+      let backupIndex = -1;
+      let totpTimeStep = null;
+      if (backup) {
+        if (!Array.isArray(user.twoFactorBackupCodes) || !user.twoFactorBackupCodes.length) {
+          outcome = { status: 400, body: { error: "Invalid backup code." } };
+          return;
+        }
+        const suppliedHash = hashOpaqueToken(code.trim().toUpperCase());
+        backupIndex = user.twoFactorBackupCodes.findIndex(value => safeEqual(value, suppliedHash));
+        match = backupIndex !== -1;
+      } else if (user.twoFactorMethod === "authenticator") {
+        const result = await verifyTotp({ encryptedSecret: user.totpSecretEncrypted, token: code,
+          afterTimeStep: Number.isInteger(user.totpLastUsedTimeStep) ? user.totpLastUsedTimeStep : undefined });
+        match = result.valid === true;
+        totpTimeStep = result.timeStep;
+      } else {
+        match = await bcrypt.compare(code, user.twoFactorTempCode);
+      }
+      if (!match) {
+        user.twoFactorFailedAttempts = Number(user.twoFactorFailedAttempts || 0) + 1;
+        const exhausted = user.twoFactorFailedAttempts >= 5;
+        if (exhausted) clearTwoFactorChallenge(user);
+        await saveChallenge();
+        outcome = { status: exhausted ? 429 : 400, body: { error: exhausted
+          ? (backup ? "Too many attempts. Sign in again to continue." : "Too many attempts. Sign in again to request a new code.")
+          : (backup ? "Invalid backup code." : "Incorrect code.") } };
+        return;
+      }
+      const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+      const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
+      const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
+      if (backup) user.twoFactorBackupCodes.splice(backupIndex, 1);
+      clearTwoFactorChallenge(user);
+      if (Number.isInteger(totpTimeStep)) user.totpLastUsedTimeStep = totpTimeStep;
+      user.recordLoginSuccess();
+      await user.save({ session, pathsToSave: [
+        "twoFactorTempCode", "twoFactorExpiresAt", "twoFactorChallengeHash", "twoFactorChallengeAuthVersion",
+        "twoFactorFailedAttempts", "twoFactorBackupCodes", "totpLastUsedTimeStep",
+        "lastLoginAt", "failedLogins", "lockedUntil", "approvedAt", "updatedAt",
+      ] });
+      await linkPendingGoogleIdentity(req, res, user, { session, clearCookie: false });
+      const sessionId = await establishSession(req, res, user, { session, issueCookie: false });
+      await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id, session });
+      outcome = { status: 200, user, isFirstLogin, sessionId };
+    });
+  } catch (error) {
+    const unknown = error?.hasErrorLabel?.("UnknownTransactionCommitResult");
+    authLogger.error("[auth] factor sign-in transaction unavailable", { name: error?.name || "Error", code: error?.code });
+    return res.status(503).json({
+      error: unknown ? "Sign-in could not be confirmed. Sign in again before continuing." : "Sign-in is temporarily unavailable. Try again shortly.",
+      code: unknown ? "FACTOR_SIGN_IN_UNCONFIRMED" : "FACTOR_SIGN_IN_UNAVAILABLE",
+    });
+  } finally {
+    await session?.endSession();
+  }
+  if (outcome.status !== 200) return res.status(outcome.status).json(outcome.body);
+  const { user, isFirstLogin, sessionId } = outcome;
+  user.$session(null);
+  res.cookie("token", signAccess(user, sessionId), buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
+  if (req.cookies?.[GOOGLE_LINK_CANDIDATE_COOKIE]) res.clearCookie(GOOGLE_LINK_CANDIDATE_COOKIE, buildGoogleCookieOptions(req));
+  if (isFirstLogin) {
+    try { await ensureParalegalWelcomeNotification(user); }
+    catch (error) { authLogger.warn("[auth] welcome notification failed", error?.message || error); }
+  }
+  return res.json({ success: true, user: {
+    _id: user._id, id: user._id, firstName: user.firstName, lastName: user.lastName,
+    email: user.email, role: user.role, status: user.status, state: user.state || "",
+    location: user.location || "", stateExperience: Array.isArray(user.stateExperience) ? user.stateExperience : [],
+    disabled: Boolean(user.disabled), isFirstLogin, onboarding: serializeOnboarding(user.onboarding || {}),
+    pendingHire: serializePendingHire(user.pendingHire || {}),
+  } });
+}
+
 router.post(
   "/2fa-verify",
+  csrfProtection,
   asyncHandler(async (req, res) => {
-    if (!TWO_FACTOR_ENABLED) {
-      return res.status(400).json({ error: "Two-step verification is currently disabled." });
+    if (!TWO_FACTOR_ENABLED) return res.status(400).json({ error: "Two-step verification is currently disabled." });
+    if (!req.body?.challengeToken || !/^\d{6}$/.test(String(req.body?.code || ""))) return res.status(400).json({ error: "Invalid 2FA attempt." });
+    return finishFactorSignIn(req, res);
+  })
+);
+
+router.post(
+  "/passkeys/authentication-options",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    let userId = null;
+    const challengeToken = String(req.body?.challengeToken || "");
+    if (challengeToken) {
+      const challengeUser = await User.findOne({ twoFactorChallengeHash: hashOpaqueToken(challengeToken) })
+        .select("_id twoFactorEnabled +twoFactorExpiresAt");
+      if (!challengeUser?.twoFactorEnabled || !challengeUser.twoFactorExpiresAt || challengeUser.twoFactorExpiresAt <= new Date()) {
+        return res.status(400).json({ error: "Invalid sign-in challenge." });
+      }
+      userId = challengeUser._id;
     }
-    const { email, code } = req.body || {};
-    if (!isEmail(email) || !code) {
-      return res.status(400).json({ error: "Invalid 2FA attempt." });
+    const result = await createPasskeyAuthenticationOptions(req, { userId });
+    if (userId && !result.available) {
+      return res.status(404).json({ error: "No passkey is available for this account." });
+    }
+    res.json(result);
+  })
+);
+
+router.post(
+  "/passkeys/authenticate",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const challengeToken = String(req.body?.challengeToken || "");
+    let expectedUserId = null;
+    let challengeUser = null;
+    if (challengeToken) {
+      challengeUser = await User.findOne({ twoFactorChallengeHash: hashOpaqueToken(challengeToken) })
+        .select("+authVersion +twoFactorChallengeHash +twoFactorFailedAttempts +twoFactorExpiresAt");
+      if (!challengeUser?.twoFactorEnabled || !challengeUser.twoFactorExpiresAt || challengeUser.twoFactorExpiresAt <= new Date()) {
+        return res.status(400).json({ error: "Invalid sign-in challenge." });
+      }
+      expectedUserId = challengeUser._id;
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase() })
-      .select("+twoFactorTempCode +twoFactorExpiresAt");
-    if (!user || !user.twoFactorEnabled) {
-      return res.status(400).json({ error: "Invalid 2FA attempt." });
+    let passkey;
+    try {
+      passkey = await verifyPasskeyAuthentication(req, {
+        challengeId: req.body?.challengeId,
+        response: req.body?.response,
+        expectedUserId,
+      });
+    } catch (_error) {
+      return res.status(400).json({ error: "Passkey verification failed or expired." });
     }
-    if (isDeactivatedUser(user)) {
-      return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
+    const user = challengeUser || await User.findById(passkey.userId).select("+authVersion");
+    if (!user || isDeactivatedUser(user) || !isApprovedUser(user)) {
+      return res.status(403).json({ error: "This account cannot sign in." });
     }
-
-    if (!isApprovedUser(user)) {
-      user.twoFactorTempCode = null;
-      user.twoFactorExpiresAt = null;
-      await user.save();
-      return res.status(403).json({ error: "Account pending approval" });
+    const settings = await getAppSettings();
+    if (settings?.maintenanceMode && String(user.role || "").toLowerCase() !== "admin") {
+      return res.status(503).json({ error: "The platform is in maintenance mode. Please try again soon." });
     }
-
     ensureApprovedUserAuthReady(user);
-
-    if (!user.twoFactorTempCode || !user.twoFactorExpiresAt || user.twoFactorExpiresAt < new Date()) {
-      return res.status(400).json({ error: "Code expired." });
+    if (user.emailVerified !== true) {
+      return res.status(403).json({ error: EMAIL_NOT_VERIFIED_MSG });
     }
-
-    const match = await bcrypt.compare(String(code), user.twoFactorTempCode);
-    if (!match) {
-      return res.status(400).json({ error: "Incorrect code." });
-    }
-
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
     const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
     const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
-    user.twoFactorTempCode = null;
-    user.twoFactorExpiresAt = null;
+    if (challengeUser) clearTwoFactorChallenge(user);
     user.recordLoginSuccess();
     await user.save();
-    await linkPendingIdentity(req, res, user);
-
-    const token = signAccess(user);
-    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
-    await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
+    await establishSession(req, res, user);
+    await AuditLog.logFromReq(req, "auth.passkey.login.success", {
+      targetType: "user",
+      targetId: user._id,
+      meta: { passkeyId: String(passkey._id) },
+    });
     if (isFirstLogin) {
       try {
         await ensureParalegalWelcomeNotification(user);
       } catch (err) {
-        console.warn("[auth] welcome notification failed", err?.message || err);
+        authLogger.warn("[auth] welcome notification failed", err?.message || err);
       }
     }
-
     res.json({
       success: true,
       user: {
-        _id: user._id,
         id: user._id,
+        _id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
         role: user.role,
         status: user.status,
-        state: user.state || "",
-        location: user.location || "",
-        stateExperience: Array.isArray(user.stateExperience) ? user.stateExperience : [],
-        disabled: Boolean(user.disabled),
         isFirstLogin,
         onboarding: serializeOnboarding(user.onboarding || {}),
         pendingHire: serializePendingHire(user.pendingHire || {}),
@@ -1047,78 +1710,11 @@ router.post(
 
 router.post(
   "/2fa-backup",
+  csrfProtection,
   asyncHandler(async (req, res) => {
-    if (!TWO_FACTOR_ENABLED) {
-      return res.status(400).json({ error: "Two-step verification is currently disabled." });
-    }
-    const { email, code } = req.body || {};
-    if (!isEmail(email) || !code) {
-      return res.status(400).json({ error: "Invalid request." });
-    }
-
-    const user = await User.findOne({ email: String(email).toLowerCase() });
-    if (!user || !user.twoFactorEnabled) {
-      return res.status(400).json({ error: "Invalid request." });
-    }
-    if (isDeactivatedUser(user)) {
-      return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
-    }
-    if (!isApprovedUser(user)) {
-      return res.status(403).json({ error: "Account pending approval" });
-    }
-
-    ensureApprovedUserAuthReady(user);
-
-    if (!Array.isArray(user.twoFactorBackupCodes) || user.twoFactorBackupCodes.length === 0) {
-      return res.status(400).json({ error: "No backup codes available." });
-    }
-
-    const matchIndex = await Promise.all(
-      user.twoFactorBackupCodes.map(async (hashed) => bcrypt.compare(String(code), hashed))
-    );
-    const index = matchIndex.findIndex(Boolean);
-
-    if (index === -1) {
-      return res.status(400).json({ error: "Invalid backup code." });
-    }
-
-    const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
-    const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
-    const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
-    user.twoFactorBackupCodes.splice(index, 1);
-    user.twoFactorTempCode = null;
-    user.twoFactorExpiresAt = null;
-    user.recordLoginSuccess();
-    await user.save();
-    await linkPendingIdentity(req, res, user);
-
-    const token = signAccess(user);
-    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
-    await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
-    if (isFirstLogin) {
-      try {
-        await ensureParalegalWelcomeNotification(user);
-      } catch (err) {
-        console.warn("[auth] welcome notification failed", err?.message || err);
-      }
-    }
-
-    res.json({
-      success: true,
-      user: {
-        _id: user._id,
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        disabled: Boolean(user.disabled),
-        isFirstLogin,
-        onboarding: serializeOnboarding(user.onboarding || {}),
-        pendingHire: serializePendingHire(user.pendingHire || {}),
-      },
-    });
+    if (!TWO_FACTOR_ENABLED) return res.status(400).json({ error: "Two-step verification is currently disabled." });
+    if (!req.body?.challengeToken || !req.body?.code) return res.status(400).json({ error: "Invalid request." });
+    return finishFactorSignIn(req, res, { backup: true });
   })
 );
 
@@ -1128,7 +1724,9 @@ router.post(
 // ----------------------------------------
 router.get(
   "/me",
+  verifyToken.optional,
   asyncHandler(async (req, res) => {
+    if (!req.user?.id) return res.json({ user: null });
     const hdr = req.headers.authorization || "";
     const bearer = hdr.startsWith("Bearer ") ? hdr.slice(7) : "";
     const cookieToken =
@@ -1181,21 +1779,25 @@ router.get(
 );
 
 // ----------------------------------------
-// LOGOUT (stateless JWT – client deletes token)
+// LOGOUT (revokes the managed session and clears the cookie)
 // POST /api/auth/logout
 // ----------------------------------------
-router.post("/logout", (req, res) => {
+router.post("/logout", verifyToken.optional, csrfProtection, asyncHandler(async (req, res) => {
+  if (req.authSessionId && req.user?.id) {
+    await revokeSession(req.authSessionId, req.user.id, "logout");
+  }
   res.clearCookie("token", buildAuthCookieOptions(req));
   res.json({ success: true });
-});
+}));
 
 // ----------------------------------------
-// EMAIL VERIFICATION (optional but handy)
+// EMAIL VERIFICATION (separate from application approval)
 // POST /api/auth/resend-verification
 // POST /api/auth/verify-email  { token }
 // ----------------------------------------
 router.post(
   "/resend-verification",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { email } = req.body || {};
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
@@ -1214,7 +1816,12 @@ router.post(
         user,
         email: isPendingEmail ? user.pendingEmail : user.email,
       });
-    } catch (_) {}
+    } catch (error) {
+      authLogger.warn("[auth] verification email resend failed", {
+        userId: String(user._id),
+        error: error?.message || String(error),
+      });
+    }
 
     await AuditLog.logFromReq(req, "auth.verify.resend", {
       targetType: "user",
@@ -1227,68 +1834,109 @@ router.post(
 
 router.post(
   "/verify-email",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { token } = req.body || {};
-    if (!token) return res.status(400).json({ msg: "Missing token" });
+    if (typeof token !== "string" || !token || token.length > 4096) return res.status(400).json({ msg: "This verification link is missing or invalid." });
+    let payload;
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      if (payload.purpose !== "verify-email" || !isObjId(payload.uid) || !isEmail(payload.email || "")) {
-        return res.status(400).json({ msg: "Invalid token" });
-      }
-      const user = await User.findById(payload.uid);
-      if (!user) return res.status(404).json({ msg: "User not found" });
-      const verifiedEmail = normalizeEmail(payload.email);
-      if (!applyVerifiedEmail(user, verifiedEmail)) {
-        return res.status(400).json({ msg: "Invalid or expired token" });
-      }
-      if (normalizeEmail(user.email) === verifiedEmail) {
-        const collision = await User.exists({
-          _id: { $ne: user._id },
-          email: verifiedEmail,
-        });
-        if (collision) {
-          return res.status(409).json({ msg: "Email already in use" });
-        }
-      }
-      await user.save();
-
-      await AuditLog.logFromReq(req, "auth.verify.success", {
-        targetType: "user",
-        targetId: user._id,
-      });
-
-      res.json({ ok: true });
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+      const trackedProof = typeof payload.jti === "string" && /^[a-f0-9]{64}$/.test(payload.jti);
+      if (payload.purpose !== "verify-email" || !isObjId(payload.uid) || !isEmail(payload.email || "") || (!Number.isFinite(payload.exp) && !trackedProof)) throw new Error("Invalid proof");
     } catch (e) {
-      res.status(400).json({ msg: "Invalid or expired token" });
+      return res.status(400).json({ msg: "This verification link is invalid or expired. Request a new link below." });
+    }
+    const tokenHash = verificationTokenHash(token);
+    // Honor still-valid links issued before single-use tracking was introduced.
+    // New links must already have a persisted record from the send operation.
+    if (!payload.jti) {
+      try {
+        await EmailVerificationToken.updateOne({ tokenHash }, { $setOnInsert: {
+          userId: payload.uid, expiresAt: new Date(payload.exp * 1000), consumedAt: null,
+        } }, { upsert: true });
+      } catch (error) { if (error.code !== 11000) throw error; }
+    }
+    const session = await mongoose.startSession();
+    let outcome;
+    const invalid = () => Object.assign(new Error("This verification link is invalid or expired. Request a new link below."), { verificationStatus: 400 });
+    try {
+      await session.withTransaction(async () => {
+        const user = await User.findById(payload.uid).select("+authVersion").session(session);
+        const proofExpiry = Number.isFinite(payload.exp) ? { $gt: new Date() } : null;
+        const proof = await EmailVerificationToken.findOne({ tokenHash, userId: payload.uid, expiresAt: proofExpiry }).session(session);
+        if (!user || isDeactivatedUser(user) || !proof) throw invalid();
+        const verifiedEmail = normalizeEmail(payload.email);
+        const alreadyVerified = user.emailVerified === true && normalizeEmail(user.email) === verifiedEmail;
+        const notifyApplication = !user.emailVerified && user.role === "paralegal" && user.status === "pending";
+        const emailWillChange = normalizeEmail(user.pendingEmail) === verifiedEmail && normalizeEmail(user.email) !== verifiedEmail;
+        if (proof.consumedAt) {
+          if (!alreadyVerified) throw invalid();
+          outcome = { alreadyVerified: true, emailChanged: false, accountStatus: user.status };
+          return;
+        }
+        if (!alreadyVerified && !applyVerifiedEmail(user, verifiedEmail)) throw invalid();
+        if (emailWillChange && await User.exists({ _id: { $ne: user._id }, email: verifiedEmail }).session(session)) {
+          throw Object.assign(new Error("This email is already in use. Please contact LPC for help."), { verificationStatus: 409 });
+        }
+        const claim = await EmailVerificationToken.updateOne({ _id: proof._id, consumedAt: null }, { $set: { consumedAt: new Date() } }, { session });
+        if (claim.modifiedCount !== 1) throw invalid();
+        if (!alreadyVerified) {
+          if (emailWillChange) user.authVersion = Number(user.authVersion || 0) + 1;
+          await user.save({ session, pathsToSave: ["email", "pendingEmail", "pendingEmailRequestedAt", "emailVerified", "authVersion", "updatedAt"] });
+          if (emailWillChange) await revokeAllUserSessions(user._id, "email_change", { session });
+          await AuditLog.logFromReq(req, "auth.verify.success", { targetType: "user", targetId: user._id, session });
+        }
+        if (notifyApplication) await signupReviewNotices.stage(user, session);
+        outcome = { alreadyVerified, emailChanged: emailWillChange, accountStatus: user.status };
+      });
+      if (outcome.emailChanged) res.clearCookie("token", buildAuthCookieOptions(req));
+      res.json({ ok: true, alreadyVerified: outcome.alreadyVerified, accountStatus: outcome.accountStatus });
+    } catch (error) {
+      if (error.verificationStatus) return res.status(error.verificationStatus).json({ msg: error.message });
+      if (error.code === 11000) return res.status(409).json({ msg: "This email is already in use. Please contact LPC for help." });
+      authLogger.warn("[auth] email verification could not be confirmed", { code: error.code || error.name });
+      res.status(503).json({ msg: "We couldn’t confirm verification yet. Please try again." });
+    } finally {
+      await session.endSession();
     }
   })
 );
 
 // ----------------------------------------
-// PASSWORD RESET (stateless token via email)
+// PASSWORD RESET (opaque, hashed, single-use token via email)
 // POST /api/auth/request-password-reset { email }
 // POST /api/auth/reset-password { token, newPassword }
 // ----------------------------------------
 router.post(
   "/request-password-reset",
+  csrfProtection,
+  requireGuardedSupportReset,
   asyncHandler(async (req, res) => {
     const { email } = req.body || {};
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
 
     const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (req.supportExpectedAccount && (!user || String(user._id) !== req.supportExpectedAccount.ownerId || user.role !== req.supportExpectedAccount.role)) {
+      return res.status(409).json({ code: "SUPPORT_ACCOUNT_TARGET_CHANGED", msg: "Your account details changed. Reload before requesting a reset link." });
+    }
     if (!user) return res.json({ ok: true }); // do not reveal
 
-    const resetToken = signOneTime(
-      { purpose: "reset-password", uid: user._id.toString() },
-      { minutes: RESET_PASSWORD_MINUTES, secretEnv: "JWT_SECRET" }
-    );
+    const resetToken = createPasswordResetToken(user._id);
+    user.resetPasswordTokenHash = hashOpaqueToken(resetToken);
+    user.resetPasswordExpiresAt = new Date(Date.now() + RESET_PASSWORD_MINUTES * 60 * 1000);
+    user.resetPasswordRequestedAt = new Date();
+    await user.save();
     const baseUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, "");
     const resetUrl = `${baseUrl}/reset-password.html?token=${resetToken}`;
     try {
-      const html = buildResetPasswordEmailHtml(user, resetUrl);
-      const text = `Reset your password using this link: ${resetUrl}\nThis link expires in 48 hours.`;
-      await sendEmail(user.email, "Reset your password", html, { text });
-    } catch (_) {}
+      const email = accountEmails.passwordReset(resetUrl, user);
+      await sendEmail(user.email, email.subject, email.html, { text: email.text, throwOnError: true });
+    } catch (error) {
+      authLogger.warn("[auth] password reset email delivery failed", {
+        userId: String(user._id),
+        error: error?.message || String(error),
+      });
+    }
 
     await AuditLog.logFromReq(req, "auth.password.reset.request", {
       targetType: "user",
@@ -1301,31 +1949,69 @@ router.post(
 
 router.post(
   "/reset-password",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { token, newPassword } = req.body || {};
     if (!token || !newPassword) return res.status(400).json({ msg: "Missing token or newPassword" });
-    if (String(newPassword).length < 8) return res.status(400).json({ msg: "Password must be at least 8 characters." });
+    const separator = String(token).indexOf(".");
+    const userId = separator > 0 ? String(token).slice(0, separator) : "";
+    if (!isObjId(userId)) return res.status(400).json({ msg: "Invalid or expired token" });
 
+    const rejected = (msg, code) => Object.assign(new Error(msg), { passwordResetStatus: 400, code });
+    let session;
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      if (payload.purpose !== "reset-password" || !isObjId(payload.uid)) {
-        return res.status(400).json({ msg: "Invalid token" });
-      }
-      const user = await User.findById(payload.uid).select("+password");
-      if (!user) return res.status(404).json({ msg: "User not found" });
+      session = await User.db.startSession();
+      // Claiming the link, hashing/saving the password, advancing the current
+      // account version, revoking sessions and recording success are one write.
+      // A concurrent security change causes a fresh transaction read instead
+      // of saving a stale authVersion or consuming a link after a failed write.
+      await session.withTransaction(async () => {
+        const user = await User.findById(userId)
+          .select("+password +authVersion +resetPasswordTokenHash +resetPasswordExpiresAt +resetPasswordRequestedAt")
+          .session(session);
+        if (
+          !user || isDeactivatedUser(user) ||
+          !user.resetPasswordTokenHash ||
+          !safeEqual(user.resetPasswordTokenHash, hashOpaqueToken(token)) ||
+          !user.resetPasswordExpiresAt ||
+          user.resetPasswordExpiresAt <= new Date()
+        ) throw rejected("Invalid or expired token");
 
-      // Assign; hashing handled by model pre-save
-      user.password = String(newPassword);
-      await user.save();
+        const passwordPolicy = validateNewPassword(newPassword, { user });
+        if (!passwordPolicy.ok) throw rejected(passwordPolicy.error, passwordPolicy.code);
+        if (await user.comparePassword(passwordPolicy.password)) {
+          throw rejected("Choose a password you have not already used for this account.");
+        }
 
-      await AuditLog.logFromReq(req, "auth.password.reset.success", {
-        targetType: "user",
-        targetId: user._id,
+        const claimHash = `claimed:${crypto.randomBytes(32).toString("hex")}`;
+        const claimed = await User.updateOne(
+          { _id: user._id, resetPasswordTokenHash: user.resetPasswordTokenHash, resetPasswordExpiresAt: { $gt: new Date() } },
+          { $set: { resetPasswordTokenHash: claimHash } },
+          { session }
+        );
+        if (claimed.modifiedCount !== 1) throw rejected("Invalid or expired token");
+
+        user.password = passwordPolicy.password;
+        user.authVersion = Number(user.authVersion || 0) + 1;
+        user.resetPasswordTokenHash = null;
+        user.resetPasswordExpiresAt = null;
+        user.resetPasswordRequestedAt = null;
+        clearTwoFactorChallenge(user);
+        await user.save({ session, pathsToSave: ["password", "authVersion", "resetPasswordTokenHash", "resetPasswordExpiresAt", "resetPasswordRequestedAt", "twoFactorTempCode", "twoFactorExpiresAt", "twoFactorChallengeHash", "twoFactorChallengeAuthVersion", "twoFactorFailedAttempts", "updatedAt"] });
+        await revokeAllUserSessions(user._id, "password_reset", { session });
+        await AuditLog.logFromReq(req, "auth.password.reset.success", { targetType: "user", targetId: user._id, session });
       });
-
-      res.json({ ok: true });
-    } catch (e) {
-      res.status(400).json({ msg: "Invalid or expired token" });
+      res.clearCookie("token", buildAuthCookieOptions(req));
+      res.json({ ok: true, reauthenticationRequired: true });
+    } catch (error) {
+      if (error.passwordResetStatus === 400) return res.status(400).json({ msg: error.message, ...(error.code ? { code: error.code } : {}) });
+      if (error.hasErrorLabel?.("UnknownTransactionCommitResult")) {
+        return res.status(503).json({ code: "PASSWORD_RESET_UNCONFIRMED", msg: "Your password change could not be confirmed. Try signing in with your new password before requesting another reset link." });
+      }
+      authLogger.error("[auth] password reset transaction failed", { code: error.code || error.name });
+      res.status(503).json({ code: "PASSWORD_RESET_UNAVAILABLE", msg: "Your password could not be changed. Try again or request a new reset link." });
+    } finally {
+      await session?.endSession();
     }
   })
 );
@@ -1334,8 +2020,18 @@ router.post(
 // Route-level error fallback
 // ----------------------------------------
 router.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
+  if (respondToCsrfError(err, res, { field: "msg" })) return;
+  const productionRuntime = process.env.NODE_ENV === "production" || process.env.PROD === "true";
+  if (productionRuntime) {
+    authLogger.error("Route failure", { name: err?.name || "Error" });
+  } else {
+    authLogger.error(err);
+  }
+  const payload = { msg: "Server error" };
+  if (!productionRuntime) {
+    payload.error = err?.message || "Unknown error";
+  }
+  res.status(500).json(payload);
 });
 
 module.exports = router;

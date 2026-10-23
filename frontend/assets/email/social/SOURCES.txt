@@ -1,0 +1,5 @@
+Navy social logo artwork rendered from Font Awesome Free 6.7.2 brand SVGs.
+https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.7.2/svgs/brands/instagram.svg
+https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.7.2/svgs/brands/linkedin.svg
+https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.7.2/svgs/brands/facebook.svg
+License: LICENSE.txt

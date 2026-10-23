@@ -1,0 +1,117 @@
+.signup-page .lpc-resume-upload { margin-bottom:12px; font:inherit; }
+.signup-page .lpc-resume-upload .resume-zone { position:relative;height:205px;border:1px solid #dce3ed;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:background .25s,border-color .25s;overflow:hidden; }
+.signup-page .lpc-resume-upload .resume-zone.over { background:#f0f5ff;border-color:#779be3; }
+.signup-page .lpc-resume-upload .resume-meta { position:absolute;right:16px;top:12px;color:#718097;font-size:11px;line-height:14px;text-align:right; }
+.signup-page .lpc-resume-upload .resume-empty { display:flex;flex-direction:column;align-items:center;text-align:center;font-size:14px;line-height:21px; }
+.signup-page .lpc-resume-upload .resume-art { position:relative;width:94px;height:78px;margin:0 auto 4px;perspective:450px; }
+.signup-page .lpc-resume-upload .resume-back { position:absolute;left:12px;bottom:5px;width:72px;height:48px;border-radius:5px;background:#294668;transform:rotate(-5deg); }
+.signup-page .lpc-resume-upload .resume-paper { position:absolute;left:27px;top:7px;width:42px;height:52px;background:#fff;border:1px solid #dae2ef;border-radius:3px;box-shadow:0 3px 6px #223c6020;transform:rotate(-12deg);transition:transform .55s cubic-bezier(.2,.8,.2,1); }
+.signup-page .lpc-resume-upload .resume-paper:before,.signup-page .lpc-resume-upload .resume-paper:after { content:'';position:absolute;left:8px;right:8px;top:13px;height:3px;background:#ccdaf0;box-shadow:0 7px #dce5f3,0 14px #dce5f3; }
+.signup-page .lpc-resume-upload .resume-paper.second { left:40px;top:12px;transform:rotate(12deg); }
+.signup-page .lpc-resume-upload .resume-front { position:absolute;left:11px;bottom:0;width:75px;height:43px;background:linear-gradient(135deg,#436c9b,#29486d);border-radius:4px 5px 7px 7px;transform:skewX(-7deg);box-shadow:0 7px 12px #273e5418;transition:transform .45s; }
+.signup-page .lpc-resume-upload .resume-zone:is(:hover,:focus-within,.over) .resume-paper { transform:translate(-3px,-10px) rotate(-17deg); }
+.signup-page .lpc-resume-upload .resume-zone:is(:hover,:focus-within,.over) .resume-paper.second { transform:translate(4px,-15px) rotate(17deg); }
+.signup-page .lpc-resume-upload .resume-zone:is(:hover,:focus-within,.over) .resume-front { transform:skewX(-9deg) rotateX(-13deg); }
+.signup-page .lpc-resume-upload .resume-zone.settling .resume-paper { transform:translateY(36px) rotate(0);transition:transform .5s cubic-bezier(.4,0,.2,1); }
+.signup-page .lpc-resume-upload .resume-link { font:inherit;background:none;border:0;padding:3px 0;color:#4773bc;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:28px;margin:0; }
+.signup-page .lpc-resume-upload .resume-link:focus-visible { outline:2px solid #4773bc;outline-offset:3px;border-radius:3px; }
+.signup-page .lpc-resume-upload .resume-sub { font-size:12px;line-height:18px;color:#718097;margin-top:3px; }
+.signup-page .lpc-resume-upload .resume-empty > .resume-sub { margin-top:0; }
+.signup-page .lpc-resume-upload .resume-result { width:100%;padding:20px;display:flex;align-items:center;gap:12px;max-height:165px;overflow:auto;margin-top:16px; }
+.signup-page .lpc-resume-upload .resume-filemark { color:#4773bc;background:#edf3ff;padding:10px;border-radius:7px;font-size:11px; }
+.signup-page .lpc-resume-upload .resume-filetext { flex:1;min-width:0; }
+.signup-page .lpc-resume-upload .resume-filename { overflow-wrap:anywhere;font-size:14px;line-height:20px;font-weight:500; }
+.signup-page .lpc-resume-upload .resume-actions { display:flex;gap:16px;margin-top:10px; }
+.signup-page .lpc-resume-upload .resume-error { color:#a73737;font-size:13px;line-height:20px;margin:8px 0 0; }
+.signup-page .lpc-resume-upload [hidden] { display:none!important; }
+@media (pointer:coarse) { .signup-page .lpc-resume-upload .resume-link { min-height:44px; } }
+@media (prefers-reduced-motion:reduce) { .signup-page .lpc-resume-upload * { transition:none!important; } }
+/* Redistribute the existing optional fields between the fixed title/action anchors. */
+.signup-page.signup-step-two #roleFieldWrap { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;align-items:center; }
+.signup-page.signup-step-two #roleFieldWrap .signup-resume-cell { grid-column:1/-1; }
+.signup-page.signup-step-two #roleFieldWrap #certFileHint { grid-column:1/-1;grid-row:3; }
+.signup-page.signup-step-two #roleFieldWrap > label { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
+.signup-page.signup-step-two #roleFieldWrap #paralegalLinkedIn { margin-bottom:12px; }
+.signup-page.signup-step-two .lpc-resume-upload { color:#293b50; }
+.signup-page.signup-step-two .signup-step-two-title { margin-bottom:12px; }
+@media (min-width:360px) and (max-width:768px) {
+ .signup-page.signup-step-two #paralegalCoreRow { grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px; }
+ .signup-page.signup-step-two #paralegalExperience { padding-left:10px;padding-right:44px;font-size:14px; }
+ .signup-page.signup-step-two .experience-input > span { right:10px;font-size:12px; }
+}
+@media (min-width:769px), (max-width:359px) {
+ .signup-page .lpc-resume-upload .resume-zone { height:181px; }
+}
+@media (max-width:359px) {
+ .signup-page.signup-step-two #roleFieldWrap { grid-template-columns:minmax(0,1fr); }
+ .signup-page.signup-step-two #roleFieldWrap #certFileHint { grid-row:auto; }
+ .signup-page.signup-step-two .signup-form-scroll { scrollbar-width:thin; }
+}
+/* One field rhythm for the remaining paralegal details. */
+.signup-page.signup-step-two #roleFieldWrap { grid-template-columns:minmax(0,1fr); }
+.signup-page.signup-step-two #roleFieldWrap #certFileHint { grid-row:auto;margin:0 0 8px;color:#a73737;font-size:13px;line-height:20px; }
+.signup-page.signup-step-two #roleFieldWrap #certFileHint:empty { display:none; }
+.signup-page.signup-step-two .lpc-resume-upload { margin-bottom:8px; }
+.signup-page.signup-step-two #roleFieldWrap #paralegalLinkedIn { margin:0; }
+.signup-page.signup-step-two :is(#signupState,#paralegalExperience,#paralegalLinkedIn) { border:1px solid #dce3ed;border-radius:12px;font-size:14px;line-height:20px;color:#293b50; }
+.signup-page.signup-step-two .experience-input > span { top:22px;font-size:14px;line-height:20px; }
+.signup-page.signup-step-two .lpc-certificate-upload { margin-bottom:8px; }
+.signup-page.signup-step-two .certificate-zone { min-height:44px;border:1px solid #dce3ed;border-radius:12px;background:#fff;display:flex;align-items:center;gap:12px;padding:0 14px;color:#293b50;font-size:14px; }
+.signup-page.signup-step-two .certificate-zone.over { border-color:#779be3;background:#f0f5ff; }
+.signup-page.signup-step-two .certificate-details { flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
+.signup-page.signup-step-two .certificate-details span { overflow-wrap:anywhere; }
+.signup-page.signup-step-two .certificate-details small { color:#718097;font-size:14px;line-height:18px; }
+.signup-page.signup-step-two .certificate-actions { display:flex;gap:12px;flex-shrink:0; }
+.signup-page.signup-step-two .certificate-actions button { background:none;border:0;margin:0;padding:0;font:inherit;color:#4773bc;text-decoration:underline;text-underline-offset:3px;min-height:44px;cursor:pointer; }
+.signup-page.signup-step-two .certificate-actions [hidden] { display:none!important; }
+.signup-page.signup-step-two .certificate-actions button:focus-visible { outline:2px solid #4773bc;outline-offset:2px; }
+@media(max-width:768px) {
+ .signup-page.signup-step-two :is(#signupState,#paralegalExperience,#paralegalLinkedIn) { font-size:16px; }
+ .signup-page.signup-step-two .certificate-details { font-size:16px; }
+ .signup-page.signup-step-two .certificate-details small { font-size:16px; }
+ .signup-page.signup-step-two #paralegalExperience { padding-right:48px; }
+}
+.signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) { flex-direction:column;align-items:stretch;gap:0; }
+.signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) span { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px; }
+.signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) { flex-basis:0; overflow:hidden; }
+.signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) span { width:100%; }
+.signup-page.signup-step-two .experience-hint { display:block;font-size:12px;line-height:18px;color:#52647b;margin:0; }
+.signup-page.signup-step-two .certificate-details { row-gap:0; }
+.signup-page.signup-step-two .certificate-details .certificate-format { flex-basis:100%;font-size:11px;line-height:14px;color:#52647b;margin:0; }
+.signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) .certificate-format { display:none; }
+.signup-page.auth-entry #paralegalExperience { margin-bottom:4px; }
+/* Keep the numeric field quiet and its focus treatment inside the field bounds. */
+.signup-page.signup-step-two #paralegalExperience {
+ appearance: textfield;
+ -moz-appearance: textfield;
+}
+.signup-page.signup-step-two #paralegalExperience::-webkit-inner-spin-button,
+.signup-page.signup-step-two #paralegalExperience::-webkit-outer-spin-button {
+ -webkit-appearance: none;
+ margin: 0;
+}
+.signup-page.signup-step-two #paralegalExperience:focus,
+.signup-page.signup-step-two #paralegalExperience:focus-visible {
+ outline: none;
+ border-color: #4773bc;
+ box-shadow: inset 0 0 0 1px #4773bc;
+}
+.signup-page.signup-step-two #paralegalLinkedIn:focus,
+.signup-page.signup-step-two #paralegalLinkedIn:focus-visible {
+ outline: none;
+ border-color: #4773bc;
+ box-shadow: inset 0 0 0 1px #4773bc;
+}
+
+.signup-page.signup-step-two .certificate-zone { cursor:pointer; }
+.signup-page.signup-step-two .certificate-zone:hover { border-color:#779be3; }
+
+/* Keep the existing upload hints readable at their small text size. */
+.signup-page .lpc-resume-upload :is(.resume-meta, .resume-sub),
+.signup-page.signup-step-two .certificate-details small { color:#52647b; }
+
+/* Fit the experience guidance within the original desktop field gap. */
+@media (min-width:769px) and (min-height:501px) {
+ .signup-page.auth-entry #paralegalExperience { margin-bottom:0; }
+ .signup-page.signup-step-two .experience-hint { line-height:12px; }
+}

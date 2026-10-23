@@ -461,6 +461,9 @@ button[type="submit"]:focus-visible,
 </style>
   <link rel="stylesheet" href="assets/styles/auth-entry.css?v=20261012-compact-preview" />
   <link rel="stylesheet" href="assets/styles/auth-workspace-preview.css?v=20260925-contrast" />
+  <link rel="stylesheet" href="/assets/styles/brand-lockup.css?v=20261016-mountain" />
+  <link rel="stylesheet" href="/assets/styles/auth-field-boundaries.css" />
+  <link rel="stylesheet" href="assets/styles/verification-resend.css" />
 </head>
 
 <body class="login-page auth-entry" data-public-page="true">
@@ -470,7 +473,7 @@ button[type="submit"]:focus-visible,
     <div class="left-panel">
       <div class="form-container">
 <p class="brand-heading">
-  <a href="index.html" class="brand"><span class="company-name">Let<span class="accent-apostrophe">’</span>s-ParaConnect</span></a>
+  <a href="index.html" class="brand lpc-brand-lockup" aria-label="Let’s-ParaConnect home"><svg class="home-brand__mountain" viewBox="7 20 50 22" fill="none" stroke="currentColor" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9.25 39.63C13 39 16.8 34.1 20.1 31.5S23.9 30.4 25.2 30.2C27 29.9 30.4 25.2 32.63 22.38C35 24.3 37.8 29.3 39.2 30.6S42.9 31.5 44.7 33.4S47.7 34.8 49.9 36.7S52.9 38.9 54.8 39.4" /></svg><span class="home-brand__name"><span class="company-name">Let<span class="accent-apostrophe">’</span>s-ParaConnect</span></span></a>
 </p>
 <h1 class="login-title">Sign in</h1>
 
@@ -485,7 +488,7 @@ button[type="submit"]:focus-visible,
             <span>Continue with Google</span>
           </a>
           <div class="auth-divider"><span>or</span></div>
-          <form id="loginForm">
+          <form id="loginForm" method="post" action="/api/auth/login">
             <label class="sr-only" for="email">Email address</label>
             <input id="email" name="email" type="email" autocomplete="username webauthn" placeholder="you@example.com" required />
 
@@ -496,6 +499,7 @@ button[type="submit"]:focus-visible,
             </div>
 
             <button type="submit" class="login-btn" data-public-action="primary" data-action-shape="control">Sign in</button>
+            <button type="button" class="login-btn passkey-login-btn" id="passkeyLoginBtn" data-public-action="secondary" data-action-shape="control">Sign in with a passkey</button>
 
   <div class="login-actions">
     <p>
@@ -508,6 +512,15 @@ button[type="submit"]:focus-visible,
             </div>
 
           </form>
+          <details id="loginVerificationRecovery" class="verification-resend" hidden>
+            <summary>Resend verification email</summary>
+            <form data-verification-resend>
+              <label for="loginVerificationEmail">Email address</label>
+              <input id="loginVerificationEmail" type="email" autocomplete="email" required />
+              <button type="submit">Resend verification email</button>
+              <p role="status" aria-live="polite"></p>
+            </form>
+          </details>
         </div>
 
         <div id="twoFactorPanel" class="two-factor-panel hidden">
@@ -521,6 +534,9 @@ button[type="submit"]:focus-visible,
           <div class="login-actions">
             <p>
               <button type="button" class="link-button" id="twoFactorBackupToggle" data-public-action="text">Use a backup code</button>
+            </p>
+            <p id="twoFactorPasskeyAction" hidden>
+              <button type="button" class="link-button" id="twoFactorPasskeyBtn" data-public-action="text">Use a passkey</button>
             </p>
             <button type="button" class="link-button" id="twoFactorBackBtn" data-public-action="text">Back to sign in</button>
           </div>
@@ -549,7 +565,7 @@ button[type="submit"]:focus-visible,
           <div class="lpc-closeup__conversation-heading"><span class="lpc-closeup__avatar lpc-closeup__avatar--small">ME</span><div><strong>Morgan Ellis</strong><small>Document review</small></div><span class="lpc-closeup__dots">···</span></div>
           <div class="lpc-closeup__bubble">The summary is ready for your review.</div>
           <div class="lpc-closeup__bubble lpc-closeup__bubble--reply">Thanks. I’ll take a look today.</div>
-          <div class="lpc-closeup__composer"><span>Message Morgan…</span><b>↑</b></div>
+          <div class="lpc-closeup__composer"><span>Message Morgan…</span><b><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Zm0 0L11 13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></b></div>
         </div>
         </div>
       </figure>
@@ -586,7 +602,9 @@ button[type="submit"]:focus-visible,
       );
     })();
   </script>
+  <script src="/assets/vendor/simplewebauthn-13.3.0.js"></script>
   <script type="module" src="assets/scripts/login.js"></script>
+  <script type="module" src="assets/scripts/verification-resend.js"></script>
   <script src="assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
 </body>
 </html>

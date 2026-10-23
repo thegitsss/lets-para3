@@ -60,6 +60,7 @@
     "@aws-sdk/client-s3": "^3.645.0",
     "@aws-sdk/lib-storage": "^3.940.0",
     "@aws-sdk/s3-request-presigner": "^3.645.0",
+    "@simplewebauthn/server": "13.3.2",
     "archiver": "^7.0.1",
     "argon2": "^0.44.0",
     "axios": "1.20.0",

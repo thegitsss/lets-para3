@@ -123,3 +123,17 @@ body.auth-entry {
 /* Readable public confirmation links and bounded error messages. */
 .auth-entry :is(.signup-confirmation__eyebrow, .signup-confirmation__home, .extra-links a, .forgot-password) { color: #385f9e; }
 .auth-entry #toastBanner { max-width: calc(100vw - 24px); width: max-content; max-height: 25dvh; overflow-y: auto; overflow-wrap: anywhere; bottom: 12px; }
+
+.login-session-notice { margin: -12px 0 24px; color: #65758b; font-size: 14px; line-height: 1.5; }
+
+/* Signup-only field errors and consent. */
+.signup-page .signup-field-error { margin: 2px 0 12px; color: #a33127; font-size: .82rem; line-height: 1.45; }
+.signup-page [aria-invalid="true"] { outline: 1px solid #a33127; outline-offset: 2px; }
+.signup-page #signupPolicyReview { margin: 18px 0 8px; color: var(--muted); font: 300 .8rem/1.5 'Sarabun', sans-serif; }
+.signup-page #signupPolicyReview p { margin: 10px 0; }
+.signup-page #signupPolicyReview .terms-label { font-size: .85rem; font-weight: 300; color: var(--navy); }
+.signup-page :is(#signupPolicyReview, #attorneyConfirmWrap) input[type="checkbox"] { width: 16px; height: 16px; margin-top: 3px; accent-color: var(--navy); }
+.signup-page #signupPolicyReview a { color: #385f9e; text-underline-offset: 2px; }
+.signup-page #signupPolicyStatus { font-size: .72rem; }
+.signup-page #signupPolicyReload { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: #385f9e; cursor: pointer; font: inherit; }
+.signup-page .msg { overflow-wrap: anywhere; }
