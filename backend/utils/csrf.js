@@ -30,4 +30,6 @@ module.exports = {
   csrfProtection,
   protectMutations,
   isCsrfEnabled,
+  csrfCookieName: () => "_csrf",
+  respondToCsrfError: (error, res, {field="error"}={}) => { if(error?.code!=="EBADCSRFTOKEN")return false; res.status(403).json({[field]:"Your session changed. Please try again.",code:"EBADCSRFTOKEN"}); return true; },
 };

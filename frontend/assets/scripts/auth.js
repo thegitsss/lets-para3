@@ -265,21 +265,44 @@ export function requireAuth(expectedRole) {
   return session;
 }
 
-// Prefetch CSRF token (sets cookie via server; we store the token for headers)
+// One document shares a pending hydration. A forced current-token read
+// cancels its predecessor before issuing another credential-bound request.
+let csrfRequest = null;
+let csrfGeneration = 0;
+
+function setCsrfToken(value) {
+  CSRF_TOKEN = value || "";
+  if (typeof window !== "undefined") window.__CSRF__ = CSRF_TOKEN;
+}
+
 export async function fetchCSRF(force = false) {
-  if (CSRF_TOKEN && !force) return CSRF_TOKEN;
-  if (force) {
-    CSRF_TOKEN = "";
-    if (typeof window !== "undefined") window.__CSRF__ = "";
+  if (!force) {
+    if (csrfRequest) return csrfRequest.promise;
+    if (CSRF_TOKEN) return CSRF_TOKEN;
   }
-  const r = await fetchInDocument("/api/csrf", { credentials: "include" });
-  if (r.ok) {
-    const { csrfToken } = await r.json();
-    CSRF_TOKEN = csrfToken || "";
-    // keep compat with older code
-    if (typeof window !== "undefined") window.__CSRF__ = CSRF_TOKEN;
-  }
-  return CSRF_TOKEN;
+  const previous = csrfRequest;
+  const generation = ++csrfGeneration;
+  if (force) setCsrfToken("");
+  previous?.controller.abort();
+  const request = { generation, controller: new AbortController(), promise: null };
+  csrfRequest = request;
+  request.promise = (async () => {
+    try {
+      const response = await fetchInDocument("/api/csrf", {
+        credentials: "include",
+        signal: request.controller.signal,
+      });
+      const payload = response.ok ? await response.json() : null;
+      if (generation !== csrfGeneration || request.controller.signal.aborted) {
+        throw new DOMException("A newer CSRF token request replaced this request.", "AbortError");
+      }
+      if (response.ok) setCsrfToken(payload?.csrfToken);
+      return CSRF_TOKEN;
+    } finally {
+      if (csrfRequest === request) csrfRequest = null;
+    }
+  })();
+  return request.promise;
 }
 export async function secureJSON(url, opts = {}) {
   const res = await secureFetch(url, opts);
@@ -333,7 +356,15 @@ export async function secureFetch(url, opts = {}) {
   let body = opts.body;
 
   if (isMutation) {
-    if (typeof window !== "undefined" && typeof window.refreshSession === "function") {
+    // Logout must reach the server even when the session read is unavailable.
+    // The logout endpoint accepts an optional session and still enforces CSRF.
+    const requestUrl = new URL(String(url), window.location.origin);
+    const isLogout = requestUrl.pathname === "/api/auth/logout";
+    // Registration and email recovery intentionally work before a member has a session.
+    // Keep the session check for every protected mutation, including noRedirect callers.
+    const isPublicAuthRequest = method === "POST" && requestUrl.origin === window.location.origin &&
+      ["/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification"].includes(requestUrl.pathname);
+    if (!isLogout && !isPublicAuthRequest && typeof window !== "undefined" && typeof window.refreshSession === "function") {
       const activeSession = await window.refreshSession();
       if (!activeSession) {
         clearSession();
@@ -413,11 +444,17 @@ export function applyRoleVisibility(role) {
   });
 }
 
-export async function logout(redirect = "login.html") {
+export async function logout(redirect = "login.html", { onError, timeoutMs = 10000 } = {}) {
+  const controller = new AbortController();
+  let timer;
   try {
-    const response = await secureFetch("/api/auth/logout", { method: "POST", noRedirect: true });
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new Error("Sign out timed out")); }, timeoutMs);
+    });
+    const response = await Promise.race([secureFetch("/api/auth/logout", { method: "POST", noRedirect: true, signal: controller.signal }), timeout]);
     if (!response.ok) throw new Error(`Logout failed with HTTP ${response.status}`);
   } catch (error) {
+    if (onError) { onError(error); return false; }
     import("./utils/dialogs.js")
       .then(({ showAlert }) =>
         showAlert("Your session could not be ended. Check your connection and try again.", {
@@ -428,7 +465,7 @@ export async function logout(redirect = "login.html") {
         console.error("[auth] logout failure dialog could not be shown", dialogError);
       });
     return false;
-  }
+  } finally { clearTimeout(timer); }
   clearHelpStorage();
   clearSession();
   if (redirect) {

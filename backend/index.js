@@ -302,7 +302,7 @@ function connectWithRetry() {
       connectTimeoutMS: 5000,
       socketTimeoutMS: 20000,
     })
-    .then(() => console.log("✅ Connected to MongoDB Atlas"))
+    .then(async () => { console.log("✅ Connected to MongoDB Atlas"); await require("./services/authNoticeWorker").start(); })
     .catch((err) => {
       console.error("❌ MongoDB Error:", err);
       setTimeout(connectWithRetry, 5000);

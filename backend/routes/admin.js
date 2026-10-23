@@ -1079,20 +1079,8 @@ function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
 }
 
 async function dispatchDecisionEmail(user, status) {
-if (!user?.email) return;
-const role = String(user?.role || "").toLowerCase();
-if (status === "approved") {
-const subject = role === "attorney" ? ATTORNEY_APPROVAL_EMAIL_SUBJECT : APPROVAL_EMAIL_SUBJECT;
-const html = role === "attorney"
-  ? buildAttorneyApprovalEmailHtml(user)
-  : buildApprovalEmailHtml(user);
-await sendEmail(user.email, subject, html);
-return;
-}
-if (status === "denied") {
-const html = buildDenialEmailHtml(user);
-await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html);
-}
+  if (!user?.email || !['approved','denied'].includes(status)) return;
+  return require('../services/admissionDecisionNotifications').sendForDecision(user);
 }
 
 async function sendDecisionEmailSafe(user, status) {
@@ -1104,34 +1092,27 @@ console.warn(`[admin] Failed to send ${status} email to ${user?.email || "unknow
 }
 
 async function applyUserDecision(req, user, status, note) {
-const normalized = normalizeUserStatus(status);
-if (!normalized || normalized === "pending") {
-const error = new Error("Invalid status");
-error.statusCode = 400;
-throw error;
-}
-const wasApproved = user.status === "approved";
-  const previousStatus = String(user.status || "");
-  const cleanNote = sanitizeNote(note);
-  user.status = normalized;
-  if (normalized === "approved") {
-    ensureApprovedUserAuthReady(user);
-  }
-  if (!wasApproved && normalized === "approved" && String(user.role || "").toLowerCase() === "paralegal") {
-    user.preferences = {
-      ...(typeof user.preferences?.toObject === "function"
-        ? user.preferences.toObject()
-        : user.preferences || {}),
-      hideProfile: true,
-    };
-  }
-if (!Array.isArray(user.audit)) user.audit = [];
-user.audit.push({
-adminId: req.user?.id || null,
-action: normalized === "denied" ? "denied" : "approved",
-note: cleanNote,
-});
-await user.save();
+const normalized=normalizeUserStatus(status);
+if(!normalized || normalized==='pending') throw Object.assign(new Error('Invalid status'),{statusCode:400});
+const cleanNote=sanitizeNote(note);
+let previousStatus, committed;
+const session=await User.db.startSession();
+try {
+ await session.withTransaction(async()=>{
+  const fresh=await User.findById(user._id).session(session);
+  if(!fresh)throw Object.assign(new Error('User not found'),{statusCode:404});
+  previousStatus=String(fresh.status||'');
+  fresh.status=normalized;
+  if(normalized==='approved')ensureApprovedUserAuthReady(fresh);
+  if(previousStatus!=='approved' && normalized==='approved' && fresh.role==='paralegal')fresh.set('preferences.hideProfile',true);
+  if(!Array.isArray(fresh.audit))fresh.audit=[];
+  fresh.audit.push({adminId:req.user?.id||null,action:normalized,note:cleanNote});
+  await fresh.save({session});
+  await require('../services/admissionDecisionNotifications').stage(fresh,normalized,session);
+  committed=fresh;
+ });
+ user=committed;user.$session(null);
+} finally {await session.endSession()}
 
 const auditEvent = normalized === "denied" ? "admin.user.denied" : "admin.user.approved";
 try {
@@ -2334,9 +2315,10 @@ if (userId && isObjId(userId)) {
   user = await User.findOne({ email: String(email).toLowerCase().trim() });
 }
 if (!user) return res.status(404).send("User not found.");
-const html = String(user?.role || "").toLowerCase() === "attorney"
-  ? buildAttorneyApprovalEmailHtml(user)
-  : buildApprovalEmailHtml(user);
+const previewEmail=require('../email/accountTemplates').applicationApproved(user,
+  `${String(process.env.EMAIL_BASE_URL||process.env.APP_BASE_URL||'https://www.lets-paraconnect.com').replace(/\/$/,'')}/login.html`,
+  `${String(process.env.EMAIL_BASE_URL||process.env.APP_BASE_URL||'https://www.lets-paraconnect.com').replace(/\/$/,'')}/verify-email.html`);
+const html=previewEmail.html;
 res.set("Content-Type", "text/html").send(html);
 }));
 
@@ -2355,7 +2337,7 @@ if (!ids.length) {
 }
 
 const users = await User.find({ _id: { $in: ids } })
-  .select("firstName lastName email role status profileImage avatarURL profilePhotoStatus")
+  .select("firstName lastName email emailVerified role status profileImage avatarURL profilePhotoStatus")
   .lean();
 const emailOpts = {
   throwOnError: true,
@@ -2395,17 +2377,15 @@ for (const user of users) {
   }
   let subject = "";
   let html = "";
+  let accountMail;
   if (normalizedType === "acceptance") {
-    if (String(user?.role || "").toLowerCase() === "attorney") {
-      subject = ATTORNEY_APPROVAL_EMAIL_SUBJECT;
-      html = buildAttorneyApprovalEmailHtml(user);
-    } else {
-      subject = APPROVAL_EMAIL_SUBJECT;
-      html = buildApprovalEmailHtml(user);
-    }
+    const verificationUrl = user.emailVerified !== true
+      ? await require('../utils/emailVerification').createEmailVerificationLink({ user, email: user.email }) : undefined;
+    accountMail = require('../email/accountTemplates').applicationApproved({ ...user, emailVerified: user.emailVerified === true }, undefined, verificationUrl);
+    ({ subject, html } = accountMail);
   } else if (normalizedType === "denial") {
-    subject = DENIAL_EMAIL_SUBJECT;
-    html = buildDenialEmailHtml(user);
+    accountMail = require('../email/accountTemplates').applicationDenied(user);
+    ({ subject, html } = accountMail);
   } else if (normalizedType === "complete_profile") {
     subject = "Complete your profile on Let’s-ParaConnect";
     html = buildCompleteProfileEmailHtml(user);
@@ -2420,7 +2400,7 @@ for (const user of users) {
     html = buildAttorneyFirstMatterEmailHtml(user);
   }
   try {
-    await sendEmail(email, subject, html, emailOpts);
+    await sendEmail(email, subject, html, { ...emailOpts, ...(accountMail ? { text: accountMail.text } : {}) });
     sent += 1;
   } catch (err) {
     failures.push({ id: user._id, email });
