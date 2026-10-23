@@ -345,6 +345,18 @@ describe("Auth workflows", () => {
     }
   });
 
+  test("repeated-domain invalid email is rejected before any account lookup", async () => {
+    const lookup = jest.spyOn(User, "findOne");
+    try {
+      const response = await request(app).post("/api/auth/login").send({
+        email: "!@!." + "!.".repeat(50000) + "@",
+        password: "A synthetic email validation passphrase",
+      });
+      expect(response.status).toBe(400);
+      expect(lookup).not.toHaveBeenCalled();
+    } finally { lookup.mockRestore(); }
+  }, 2500);
+
   test("Login does not disclose whether an account exists", async () => {
     const res = await request(app).post("/api/auth/login").send({
       email: "missing.user@example.com",

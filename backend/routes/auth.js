@@ -450,7 +450,12 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
 }
 
 function isEmail(v = "") {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
+  const value = String(v).toLowerCase();
+  const at = value.indexOf("@");
+  if (at <= 0 || at !== value.lastIndexOf("@") || /\s/.test(value)) return false;
+  const domain = value.slice(at + 1);
+  const dot = domain.indexOf(".", 1);
+  return dot !== -1 && dot < domain.length - 1;
 }
 
 function isTypoEmailDomain(v = "") {
