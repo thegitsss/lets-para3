@@ -1372,13 +1372,13 @@ router.post(
         status === "pending"
           ? "We’re reviewing your application. We’ll email you when your account is ready."
           : "Your application was not approved. Please contact support if you have questions.";
-      return res.status(403).json({ msg });
+      return res.status(403).json({ msg, emailVerificationRequired: status === "pending" && user.emailVerified !== true });
     }
 
     let userChanged = ensureApprovedUserAuthReady(user);
     if (user.emailVerified !== true) {
       if (userChanged) await user.save();
-      return res.status(403).json({ msg: EMAIL_NOT_VERIFIED_MSG, error: EMAIL_NOT_VERIFIED_MSG });
+      return res.status(403).json({ msg: EMAIL_NOT_VERIFIED_MSG, error: EMAIL_NOT_VERIFIED_MSG, code: "email_unverified" });
     }
 
     if (user._passwordNeedsRehash) {

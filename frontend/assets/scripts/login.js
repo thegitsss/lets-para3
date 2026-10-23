@@ -390,7 +390,7 @@ const initLogin = () => {
       if (!res.ok) {
         clearLocalSession();
         const msg = data?.error || data?.msg || data?.message || "Sign-in failed";
-        if (data?.code === "email_unverified" || /^Please verify your email before (?:logging|signing) in\.$/.test(msg)) {
+        if (data?.emailVerificationRequired === true || data?.code === "email_unverified" || /^Please verify your email before (?:logging|signing) in\.$/.test(msg)) {
           setVerificationRecovery(true, email);
         }
         notify(msg);

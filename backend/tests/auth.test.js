@@ -179,6 +179,25 @@ describe("Auth workflows", () => {
     expect(await User.countDocuments({ email: validAttorneyPayload.email })).toBe(1);
   });
 
+  test.each(['attorney', 'paralegal'])('%s sign-in exposes verification recovery only after matching credentials when needed', async role => {
+    const user = await User.create({ firstName: 'Pending', lastName: 'Applicant', email: role + '.recovery@example.test', password: 'An isolated recovery passphrase', role, status: 'pending', emailVerified: false });
+    const credentials = { email: user.email, password: 'An isolated recovery passphrase' };
+    const wrong = await request(app).post('/api/auth/login').send({ ...credentials, password: 'Wrong password value' });
+    expect(wrong.status).toBe(401);
+    expect(wrong.body.emailVerificationRequired).toBeUndefined();
+    const pending = await request(app).post('/api/auth/login').send(credentials);
+    expect(pending.status).toBe(403);
+    expect(pending.body.emailVerificationRequired).toBe(true);
+    await User.updateOne({ _id: user._id }, { $set: { emailVerified: true } });
+    const verified = await request(app).post('/api/auth/login').send(credentials);
+    expect(verified.status).toBe(403);
+    expect(verified.body.emailVerificationRequired).toBe(false);
+    await User.updateOne({ _id: user._id }, { $set: { status: 'denied', emailVerified: false } });
+    const denied = await request(app).post('/api/auth/login').send(credentials);
+    expect(denied.status).toBe(403);
+    expect(denied.body.emailVerificationRequired).toBe(false);
+  });
+
   test("Login works after logout", async () => {
     await User.create({
       firstName: "Casey",
