@@ -58,6 +58,22 @@ afterAll(closeDatabase);
 beforeEach(async () => { await clearDatabase(); sendEmail.mockClear(); });
 afterEach(() => jest.restoreAllMocks());
 
+for (const role of ['attorney', 'paralegal']) {
+  test.each(['argon2', 'bcrypt'])(`${role} existing %s Unicode credential survives the normalization rollout`, async kind => {
+    const raw = 'Cafe\u0301 existing account passphrase';
+    const user = await User.create({ firstName: 'Existing', lastName: 'Member', email: role + '.unicode@example.test', password: raw, role, status: 'approved', emailVerified: true, authVersion: 9 });
+    const oldHash = kind === 'argon2' ? await require('argon2').hash(raw) : await bcrypt.hash(raw, 10);
+    await User.collection.updateOne({ _id: user._id }, { $set: { password: oldHash } });
+    const response = await request(app).post('/api/auth/login').send({ email: user.email, password: raw });
+    expect(response.status).toBe(200);
+    const migrated = await stored(user);
+    expect(migrated.password).not.toBe(oldHash);
+    expect(migrated.authVersion).toBe(9);
+    expect(await migrated.comparePassword(raw.normalize('NFC'))).toBe(true);
+    expect((await request(app).post('/api/auth/login').send({ email: user.email, password: raw.normalize('NFC') })).status).toBe(200);
+  });
+}
+
 for (const role of ["attorney", "paralegal"]) {
   for (const change of ["reset", "password change"]) {
     test(`${role} legacy login cannot restore an old credential after an actual ${change}`, async () => {

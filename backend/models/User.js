@@ -461,12 +461,17 @@ userSchema.methods.comparePassword = async function (plain) {
   // password field is select:false by default; ensure it's loaded when calling this
   const hash = this.password;
   if (!hash || !plain) return false;
-  const candidate = normalizePassword(plain);
+  const raw = String(plain);
+  const candidate = normalizePassword(raw);
   if (isArgon2Hash(hash)) {
-    return argon2.verify(hash, candidate);
+    if (await argon2.verify(hash, candidate)) return true;
+    // Older credentials were hashed before NFC normalization was introduced.
+    const legacyMatch = raw !== candidate && await argon2.verify(hash, raw);
+    if (legacyMatch) this._passwordNeedsRehash = true;
+    return legacyMatch;
   }
   if (isBcryptHash(hash)) {
-    const ok = await bcrypt.compare(candidate, hash);
+    const ok = await bcrypt.compare(candidate, hash) || (raw !== candidate && await bcrypt.compare(raw, hash));
     if (ok) this._passwordNeedsRehash = true;
     return ok;
   }
