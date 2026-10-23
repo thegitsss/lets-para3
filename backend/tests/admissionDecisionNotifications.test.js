@@ -100,9 +100,9 @@ test.each(['attorney', 'paralegal'])('%s manual admission emails use the reviewe
     const response = await request(app).post('/api/admin/bulk-email').set('Cookie', cookie).send({ type, userIds: [String(user._id)] });
     expect(response.status).toBe(200); expect(response.body.sent).toBe(1);
     const [, subject, html, options] = sendEmail.mock.calls[0];
-    expect(html).toContain('background:#eef3fb');
-    expect(html).toContain('/' + role + '-faq.html');
-    expect(options.text).toContain('/login.html');
+    expect(html).toContain('mailto:help@lets-paraconnect.com');
+    expect(html).toContain('/privacy.html');
+    expect(options.text).toContain('help@lets-paraconnect.com');
     if (type === 'acceptance') {
       expect(subject).toBe('Welcome to Let’s-ParaConnect');
       expect(html).toContain('>Verify your email</a>');
