@@ -1,0 +1,17 @@
+.git
+**/.env
+**/.env.*
+**/node_modules
+**/.cache
+**/test-results
+**/playwright-report
+outputs
+output
+.lpc-build
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+.aws
+.codex
+.agents

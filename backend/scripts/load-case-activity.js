@@ -1,12 +1,36 @@
+const crypto = require("node:crypto");
+if (process.env.NODE_ENV && process.env.NODE_ENV !== "test") {
+  throw new Error("The read-load rehearsal requires NODE_ENV=test and never uses a configured database.");
+}
+function countOption(name, fallback, maximum) {
+  const value = process.env[name] === undefined ? fallback : Number(process.env[name]);
+  if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+    throw new Error(`${name} must be a positive integer no greater than ${maximum}.`);
+  }
+  return value;
+}
+const CASE_COUNT = countOption("LOAD_CASE_COUNT", 12, 100);
+const ROUNDS = countOption("LOAD_ROUNDS", 25, 100);
+const CONCURRENCY = countOption("LOAD_CONCURRENCY", 24, 64);
+const MESSAGES_PER_CASE = countOption("LOAD_MESSAGES_PER_CASE", 10, 100);
+const DOCS_PER_CASE = countOption("LOAD_DOCS_PER_CASE", 4, 50);
+
+// This command owns a fresh loopback replica. Never inherit provider secrets or
+// a production encryption key for synthetic records; no .env is loaded.
+Object.assign(process.env, {
+  NODE_ENV: "test", APP_ENV: "test", REQUIRE_AUTH_SESSION: "true", JWT_SECRET: crypto.randomBytes(32).toString("hex"),
+  DATA_ENCRYPTION_KEY: crypto.randomBytes(32).toString("hex"),
+  STRIPE_SECRET_KEY: "sk_test_read_load_synthetic", OPENAI_API_KEY: "",
+  EMAIL_DISABLE: "true", S3_MALWARE_SCAN_REQUIRED: "false",
+  S3_BUCKET: "synthetic-read-load", AWS_EC2_METADATA_DISABLED: "true",
+  ENABLE_CSRF: "false",
+  LPC_TEST_MONGO_NAMESPACE: process.env.LPC_TEST_MONGO_NAMESPACE || `read-load-${crypto.randomUUID()}`,
+});
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const request = require("supertest");
-
-process.env.NODE_ENV = process.env.NODE_ENV || "test";
-process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
-process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
-process.env.ENABLE_CSRF = "false";
+require("../tests/helpers/supertestLoopback").isolateSupertestLoopback();
 
 const User = require("../models/User");
 const Case = require("../models/Case");
@@ -16,12 +40,10 @@ const casesRouter = require("../routes/cases");
 const messagesRouter = require("../routes/messages");
 const uploadsRouter = require("../routes/uploads");
 const { connect, clearDatabase, closeDatabase } = require("../tests/helpers/db");
-
-const CASE_COUNT = Number(process.env.LOAD_CASE_COUNT || 12);
-const ROUNDS = Number(process.env.LOAD_ROUNDS || 25);
-const CONCURRENCY = Number(process.env.LOAD_CONCURRENCY || 24);
-const MESSAGES_PER_CASE = Number(process.env.LOAD_MESSAGES_PER_CASE || 10);
-const DOCS_PER_CASE = Number(process.env.LOAD_DOCS_PER_CASE || 4);
+const setupDatabase = require("../tests/helpers/globalMongoSetup");
+const teardownDatabase = require("../tests/helpers/globalMongoTeardown");
+const acceptedPolicyFixture = require("../tests/helpers/legalPolicyFixture");
+const { createAuthSession } = require("../services/authSessionService");
 
 const app = (() => {
   const instance = express();
@@ -37,12 +59,15 @@ const app = (() => {
   return instance;
 })();
 
-function authCookieFor(user) {
+async function authCookieFor(user) {
+  const session = await createAuthSession(user, { headers: { "user-agent": "Synthetic loopback read-load" }, ip: "127.0.0.1" });
   const payload = {
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
+    sid: session.sessionId,
+    av: user.authVersion || 0,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
   return `token=${token}`;
@@ -62,22 +87,26 @@ function average(values) {
 
 async function seedDataset() {
   const attorney = await User.create({
+    ...acceptedPolicyFixture(),
     firstName: "Alex",
     lastName: "Stone",
     email: "load.attorney@example.com",
     password: "Password123!",
     role: "attorney",
     status: "approved",
+    emailVerified: true,
     state: "CA",
   });
 
   const paralegal = await User.create({
+    ...acceptedPolicyFixture(),
     firstName: "Priya",
     lastName: "Ng",
     email: "load.paralegal@example.com",
     password: "Password123!",
     role: "paralegal",
     status: "approved",
+    emailVerified: true,
     state: "CA",
   });
 
@@ -133,7 +162,8 @@ async function seedDataset() {
         version: idx + 1,
       });
     }
-    await CaseFile.insertMany(fileDocs);
+    // create() runs the encryption save hook; insertMany bypasses that hook.
+    await CaseFile.create(fileDocs);
   }
 
   return { attorney, cases };
@@ -141,36 +171,29 @@ async function seedDataset() {
 
 async function runWithConcurrency(tasks, limit, worker) {
   let cursor = 0;
-  let active = 0;
-
-  return new Promise((resolve, reject) => {
-    const next = () => {
-      if (cursor >= tasks.length && active === 0) {
-        resolve();
-        return;
-      }
-      while (active < limit && cursor < tasks.length) {
-        const task = tasks[cursor++];
-        active += 1;
-        Promise.resolve(worker(task))
-          .then(() => {
-            active -= 1;
-            next();
-          })
-          .catch(reject);
-      }
-    };
-    next();
-  });
+  const outcomes = await Promise.allSettled(Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    while (cursor < tasks.length) {
+      await worker(tasks[cursor++]);
+    }
+  }));
+  const failures = outcomes.filter(outcome => outcome.status === "rejected");
+  if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), "Read-load workers failed after all in-flight requests settled.");
 }
 
 async function run() {
-  await connect();
-  await clearDatabase();
-  const startedAt = Date.now();
+  let databaseReady = false;
+  let listener;
   try {
+    await setupDatabase();
+    databaseReady = true;
+    await connect();
+    await clearDatabase();
+    listener = await new Promise((resolve, reject) => {
+      const server = app.listen(0, "127.0.0.1", () => resolve(server));
+      server.once("error", reject);
+    });
     const { attorney, cases } = await seedDataset();
-    const cookie = authCookieFor(attorney);
+    const cookie = await authCookieFor(attorney);
     const caseIds = cases.map((c) => String(c._id));
 
     const tasks = [];
@@ -185,22 +208,26 @@ async function run() {
     const durations = { case: [], messages: [], documents: [] };
     const failures = [];
     let completed = 0;
+    const startedAt = Date.now();
 
     await runWithConcurrency(tasks, CONCURRENCY, async (task) => {
       const t0 = process.hrtime.bigint();
-      const res = await request(app).get(task.path).set("Cookie", cookie);
+      const res = await request(listener).get(task.path).set("Cookie", cookie).timeout({ response: 10000, deadline: 15000 });
       const t1 = process.hrtime.bigint();
       const ms = Number(t1 - t0) / 1_000_000;
 
       durations[task.type].push(ms);
       completed += 1;
 
-      if (res.status !== 200) {
+      const completePayload = task.type === "case" ? String(res.body.id || res.body._id) === task.path.split("/").pop()
+        : task.type === "messages" ? Array.isArray(res.body.messages) && res.body.messages.length === MESSAGES_PER_CASE && res.body.messages.every(message => String(message.text).startsWith("Load message "))
+        : Array.isArray(res.body.files) && res.body.files.length === DOCS_PER_CASE && res.body.files.every(file => /^doc-\d+\.pdf$/.test(file.originalName));
+      if (res.status !== 200 || !completePayload) {
         failures.push({
           path: task.path,
           type: task.type,
           status: res.status,
-          body: res.body,
+          completePayload,
         });
       }
     });
@@ -209,7 +236,7 @@ async function run() {
     const totalRequests = tasks.length;
     const perSecond = totalRequests / Math.max(1, elapsedMs / 1000);
 
-    console.log("Load test dataset");
+    console.log("Synthetic loopback read-load dataset; no provider or production capacity acceptance");
     console.log(`- Cases: ${CASE_COUNT}`);
     console.log(`- Messages per case: ${MESSAGES_PER_CASE}`);
     console.log(`- Documents per case: ${DOCS_PER_CASE}`);
@@ -238,7 +265,7 @@ async function run() {
       failures.slice(0, 5).forEach((entry, idx) => {
         console.error(
           `  ${idx + 1}. [${entry.type}] ${entry.path} -> ${entry.status} ${
-            entry.body?.error || entry.body?.msg || ""
+            entry.completePayload ? "" : "incomplete or unreadable seeded payload"
           }`
         );
       });
@@ -246,9 +273,16 @@ async function run() {
       return;
     }
 
-    console.log("Load test passed: no non-200 responses.");
+    console.log("Read-load requests passed: complete seeded responses; graceful cleanup must also pass.");
   } finally {
-    await closeDatabase();
+    const cleanupErrors = [];
+    if (listener) {
+      listener.closeAllConnections?.();
+      await new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve())).catch(error => cleanupErrors.push(error));
+    }
+    await closeDatabase().catch(error => cleanupErrors.push(error));
+    if (databaseReady) await teardownDatabase().catch(error => cleanupErrors.push(error));
+    if (cleanupErrors.length) throw new AggregateError(cleanupErrors, "The read-load rehearsal did not clean up completely.");
   }
 }
 

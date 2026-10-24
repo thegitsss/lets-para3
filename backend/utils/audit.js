@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("./logger");
+const runtimeLogger = createRuntimeLogger("utils:audit");
 // backend/utils/audit.js
 const AuditLog = require("../models/AuditLog");
 
@@ -24,7 +26,7 @@ async function logAction(req, action, target) {
       await AuditLog.logFromReq(req, action, target || {});
     }
   } catch (e) {
-    console.warn("[audit] logAction error:", e?.message || e);
+    runtimeLogger.warn("[audit] logAction error:", e?.message || e);
   }
 }
 
@@ -54,7 +56,7 @@ async function systemLog(action, opts = {}) {
       ua: opts.ua || undefined,
     });
   } catch (e) {
-    console.warn("[audit] systemLog error:", e?.message || e);
+    runtimeLogger.warn("[audit] systemLog error:", e?.message || e);
   }
 }
 

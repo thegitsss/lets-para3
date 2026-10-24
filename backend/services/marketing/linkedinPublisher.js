@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { LINKEDIN_API_VERSION } = require("./linkedinApiPolicy");
 
 function normalizeOrganizationUrn(connection = {}) {
   const organizationUrn = String(connection.organizationUrn || "").trim();
@@ -43,12 +44,11 @@ async function publishLinkedInCompanyPost({ connection = {}, packet = {} } = {})
   }
 
   const payload = buildLinkedInPostPayload({ connection, packet });
-  const apiVersion = String(connection.apiVersion || "202503").trim() || "202503";
   const response = await axios.post("https://api.linkedin.com/rest/posts", payload, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      "Linkedin-Version": apiVersion,
+      "Linkedin-Version": LINKEDIN_API_VERSION,
       "X-Restli-Protocol-Version": "2.0.0",
     },
     timeout: 15_000,

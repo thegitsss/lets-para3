@@ -1,0 +1,127 @@
+/* Shared attorney-facing profile presentation. Keep both portals in sync here. */
+:root body.lpc-v2 .lpc-candidate-profile {--av2-bg:#fff;--av2-soft:#f5f7fa;--av2-ink:#263347;--av2-muted:#657186;--av2-line:#e9edf3;--av2-accent:#406aa8;--av2-primary:#10243f;--av2-primary-ink:#fff;color:var(--av2-ink);font:400 1rem/1.5 "Sarabun",sans-serif;min-width:0;}
+:root.theme-dark body.lpc-v2 .lpc-candidate-profile {--av2-bg:#18191b;--av2-soft:#242527;--av2-ink:#d9dce1;--av2-muted:#a0a5af;--av2-line:#303237;--av2-accent:#a9bafa;--av2-primary:#d9e6ff;--av2-primary-ink:#10243f;}
+:root body.lpc-v2 .lpc-candidate-profile * {box-sizing:border-box;}
+:root body.lpc-v2 .lpc-candidate-profile .av2-muted {color:var(--av2-muted);}
+:root body.lpc-v2 .lpc-candidate-profile .av2-preserve-text {white-space:pre-wrap;overflow-wrap:anywhere;}
+:root body.lpc-v2 .lpc-candidate-profile a {color:inherit;text-underline-offset:4px;}
+:root body.lpc-v2 .lpc-candidate-profile .av2-actions {display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;}
+:root body.lpc-v2 .lpc-candidate-profile svg {width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;}
+:root body.lpc-v2 .lpc-candidate-profile :is(a,button,summary):focus-visible {outline:2px solid var(--av2-accent);outline-offset:3px;}
+
+
+
+:root body.lpc-v2 .lpc-candidate-profile > .av2-profile-pagebar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 20px; margin:0; padding:0; }
+:root body.lpc-v2 .lpc-candidate-profile > .av2-profile-pagebar h1 { margin:0; font:400 .8125rem/1.4 "Sarabun",sans-serif; color:var(--av2-muted); letter-spacing:0; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-pagebar .av2-profile-back { display:inline-flex; align-items:center; min-height:32px; padding:4px 0; font-size:.8125rem; line-height:1.4; color:var(--av2-muted); text-decoration:none; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-pagebar .av2-profile-back:hover { color:var(--av2-accent); text-decoration:underline; text-underline-offset:3px; }
+:root body.lpc-v2 .lpc-candidate-profile > [data-av2-region="candidate-profile"] { border:0; padding:0; background:transparent; box-shadow:none; margin-top:18px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro { display:flex; align-items:center; gap:16px; padding:0 0 18px; border-bottom:1px solid var(--av2-line); }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro > div { min-width:0; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro img { width:64px; height:64px; flex:0 0 64px; border-radius:50%; object-fit:cover; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro h1 { margin:0 0 6px; font:500 1.75rem/1.2 "Sarabun",sans-serif; overflow-wrap:anywhere; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro p { margin:0 0 5px; font-size:.8125rem; line-height:1.45; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro .av2-status { background:transparent; border:0; padding:0; color:var(--av2-accent); }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-columns { display:grid; padding-top:20px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-content, :root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar { min-width:0; overflow-wrap:anywhere; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-section { margin:0 0 20px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-section h2 { font-size:1.125rem; font-weight:500; margin:0 0 6px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-section p { font-size:.8125rem; line-height:1.5; margin:0 0 8px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-invite > summary { display:block; cursor:pointer; padding:12px 16px; border-radius:6px; color:var(--av2-primary-ink); background:var(--av2-primary); text-align:center; font-size:.875rem; font-weight:500; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-invite > summary::-webkit-details-marker { display:none; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-invite[open] > summary { margin-bottom:16px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-invite .av2-card { padding:0; border:0; box-shadow:none; margin:0 0 20px; background:transparent; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-invite h2 { font-size:1rem; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-invite p { font-size:.875rem; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-paralegal { margin:10px 0 0; padding:0; border:0; border-radius:0; background:transparent; color:var(--av2-ink); }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-saved-button { width:100%; border:1px solid var(--av2-line); border-radius:6px; background:var(--av2-bg); color:var(--av2-ink); font-size:.875rem; min-height:44px; }
+:root body.lpc-v2 .lpc-candidate-profile [role="status"]:empty { display:none; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-documents .av2-actions { display:flex; flex-wrap:wrap; margin-bottom:4px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-documents .av2-profile-document-link { width:auto; min-height:32px; padding:4px 0; border:0; border-radius:0; background:transparent; color:var(--av2-accent); font-size:.8125rem; text-align:left; text-decoration:underline; text-underline-offset:3px; box-shadow:none; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-document-link:hover { text-decoration-thickness:2px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-document-link:disabled { opacity:.6; cursor:wait; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-documents a { font-size:.8125rem; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-hiring { font-size:.875rem; padding-top:16px; border-top:1px solid var(--av2-line); }
+@media(max-width:900px) {
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar { border-top:1px solid var(--av2-line); padding-top:18px; }
+}
+@media(max-width:480px) {
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro { align-items:flex-start; gap:14px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro h1 { font-size:1.4rem; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro img { width:52px; height:52px; flex-basis:52px; }
+}
+:root body.lpc-v2 .lpc-candidate-profile .av2-header > .av2-profile-back { display:inline-flex; align-items:center; min-height:40px; margin-right:auto; padding:4px 8px; min-width:0; color:var(--av2-muted); font-size:.8125rem; line-height:1.3; text-decoration:none; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-header > .av2-profile-back:hover { color:var(--av2-accent); text-decoration:underline; text-underline-offset:3px; }
+@media(max-width:480px) {
+:root body.lpc-v2 .lpc-candidate-profile .av2-header > .av2-profile-back { padding-inline:2px; font-size:.75rem; }
+}
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-name-row { display:grid; grid-template-columns:minmax(0,auto) auto; justify-content:start; align-items:center; gap:2px 3px; margin-bottom:6px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-name-row h1 { min-width:0; margin:0; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-name-actions { display:flex; align-items:center; gap:0; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions { display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; align-items:start; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .av2-profile-invite { min-width:0; grid-column:2; grid-row:1; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .av2-profile-invite > summary { min-height:44px; padding:12px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .av2-profile-invite > .av2-card { width:calc(100% + 54px); margin-left:-54px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions > .lpc-save-paralegal { margin:0; grid-column:1; grid-row:1; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions > .lpc-save-paralegal:has(> p:not(.lpc-save-status-quiet):not(:empty)) { grid-column:1 / -1; grid-row:2; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-name-actions { align-self:center; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-name-actions .lpc-availability-dot { width:18px; height:24px; margin:0; }
+:root body.lpc-v2 .lpc-candidate-profile { max-width:960px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-columns { grid-template-columns:minmax(0,1fr) 280px; grid-template-areas:"content actions" "content details"; grid-template-rows:auto 1fr; gap:20px 40px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-content { grid-area:content; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar { grid-area:details; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions { grid-area:actions; margin-bottom:0; align-self:start; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-record { border-left:0; padding-left:0; margin-bottom:16px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-record p { margin-bottom:3px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-record .av2-profile-record-title { font-weight:500; color:var(--av2-ink); }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar > .av2-profile-section:not(.av2-profile-documents) { margin-bottom:14px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar > .av2-profile-section:not(.av2-profile-documents) h2 { font-size:.8125rem; font-weight:500; margin-bottom:3px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar > .av2-profile-section:not(.av2-profile-documents) p { color:var(--av2-muted); }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-documents { display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:20px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-documents .av2-actions { margin:0; }
+@container(max-width:700px) {
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-columns { grid-template-columns:minmax(0,1fr); grid-template-areas:"actions" "content" "details"; grid-template-rows:auto; gap:20px; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-sidebar { border-top:1px solid var(--av2-line); padding-top:18px; }
+}
+@media(max-width:900px) {
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-columns { grid-template-columns:minmax(0,1fr); grid-template-areas:"actions" "content" "details"; grid-template-rows:auto; gap:20px; }
+}
+
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-paralegal {margin-block:1.25rem;color:inherit;font:inherit}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-paralegal {padding:1rem;border:1px solid #dce5f2;border-radius:12px;background:#f5f8fd}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-paralegal[hidden] {display:none}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-paralegal p {margin:0 0 .75rem}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-saved-button {display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:.5rem .85rem;border:1px solid #203550;border-radius:8px;background:#203550;color:#fff;font:inherit;cursor:pointer}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-saved-button:disabled {opacity:.55;cursor:wait}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-saved-button:focus-visible {outline:3px solid #6495ed;outline-offset:3px}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-paralegal {color:#203550}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-saved-button.lpc-save-star { position:relative; width:40px; min-height:40px; padding:8px; border:0; background:transparent; color:var(--av2-accent); }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star svg { width:24px; height:24px; flex:0 0 24px; fill:none; stroke:currentColor; stroke-width:1.5; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star[aria-pressed="true"] svg { fill:currentColor; stroke-width:1.5; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star-tooltip { display:none; position:absolute; right:0; top:100%; z-index:20; white-space:nowrap; padding:6px 9px; border-radius:5px; background:#182033; color:#fff; font:400 12px/1.4 "Sarabun",sans-serif; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star:hover .lpc-save-star-tooltip, .lpc-save-star:focus-visible .lpc-save-star-tooltip { display:block; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .lpc-saved-button.lpc-save-star { width:44px; min-height:44px; padding:3px; border:0; border-radius:9px; background:transparent; color:var(--av2-accent); box-shadow:none; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .lpc-save-star:is(:hover,:focus-visible,[aria-pressed="true"]) { background:transparent; box-shadow:none; color:var(--av2-accent); }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .lpc-save-star-tooltip { right:auto; left:0; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star svg { transform-origin:center; transition:transform .18s ease-out,stroke-width .18s ease-out; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star:not(:disabled):is(:hover,:focus-visible) svg { transform:scale(1.15); stroke-width:2.5; }
+@media(prefers-reduced-motion:reduce) {
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star svg { transition:none; }
+}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star:hover:not(:focus-visible) .lpc-save-star-tooltip { animation:lpc-bookmark-caption .22s ease-out .4s both; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-candidate-preview-invite {display:block;width:100%;min-height:44px;padding:12px;border:0;border-radius:6px;color:var(--av2-primary-ink);background:var(--av2-primary);text-align:center;font:500 .875rem/1.5 "Sarabun",sans-serif;}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-candidate-preview-actions button:disabled {opacity:1;cursor:default;}
+.lpc-candidate-preview-hiring {text-decoration:underline;text-underline-offset:4px;}
+:root body.lpc-v2 [data-v2-profile-preview] {max-width:960px;margin-inline:auto;}
+:root body.lpc-v2 [data-v2-profile-preview]>.v2-settings-preview-header {flex-direction:row;justify-content:space-between;align-items:center;margin-bottom:18px;}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-availability-dot.is-available::before {background:var(--av2-accent);box-shadow:none;}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-availability-dot.is-available::after {display:none;}
+/* The bookmark occupies the same compact slot as the live attorney control. */
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions>.lpc-save-paralegal {margin:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--av2-ink);}
+
+/* Owner tools and preview context sit outside the attorney-facing profile. */
+:root body.lpc-v2 [data-v2-profile-preview]>.v2-settings-preview-header {padding:18px 20px;margin-bottom:26px;gap:16px 28px;border:1px solid var(--v2-line);border-radius:12px;background:var(--v2-soft);cursor:default;}
+.v2-settings-preview-context {min-width:0;}
+:root body.lpc-v2 .v2-settings-preview-context h2 {margin:0;color:var(--v2-ink);font:500 22px/1.25 var(--v2-font-sans);letter-spacing:-.02em;}
+:root body.lpc-v2 .v2-settings-preview-context p {margin:7px 0 0;max-width:58ch;color:var(--v2-muted);font:400 13px/1.5 var(--v2-font-sans);}
+@media(max-width:600px){:root body.lpc-v2 [data-v2-profile-preview]>.v2-settings-preview-header {align-items:flex-start;flex-direction:column;padding:16px;gap:14px;}.v2-settings-preview-header>.v2-settings-preview-edit {align-self:flex-start;}}

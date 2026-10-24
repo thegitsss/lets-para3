@@ -1,0 +1,20 @@
+/* Workspace views uses the existing sidebar row grammar only. */
+:root body.lpc-v2 .v2-sidebar .portal-home-tools,
+:root body.lpc-v2 .v2-sidebar .portal-home-tools[open] { box-sizing:border-box; width:100%; margin:0; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+:root body.lpc-v2 .v2-sidebar .portal-home-tools > summary {
+  box-sizing:border-box; display:flex; align-items:center; gap:10px; width:100%; min-height:32px; padding:5px 8px;
+  border:0; border-radius:5px; background:transparent; color:var(--v2-ink); font:400 calc(13 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) var(--v2-font-sans);
+}
+:root body.lpc-v2 .v2-sidebar .portal-home-tools > summary > span { flex:1; min-width:0; }
+:root body.lpc-v2 .v2-sidebar .portal-home-tools > summary > .v2-workspace-icon { width:18px; height:18px; flex:0 0 18px; transform:none; }
+:root body.lpc-v2 .v2-sidebar .portal-home-tools > summary > .v2-workspace-chevron { width:14px; height:14px; flex:0 0 14px; color:var(--v2-muted); transform:none; }
+:root body.lpc-v2 .v2-sidebar .portal-home-tools[open] > summary > .v2-workspace-chevron { transform:rotate(90deg); }
+:root body.lpc-v2 .v2-sidebar .portal-home-tools > summary:is(:hover,:focus-visible) { background:var(--v2-soft); }
+:root body.lpc-v2 .v2-sidebar .portal-home-tools .v2-more-tools-list > .v2-nav-link { min-height:32px; padding:6px 10px 6px 40px; font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2.v2-sidebar-collapsed .v2-sidebar .portal-home-tools > summary { justify-content:center; padding-inline:0; }
+:root body.lpc-v2.v2-sidebar-collapsed .v2-sidebar .portal-home-tools > summary > .v2-workspace-chevron { display:none; }
+@media(pointer:coarse) { :root body.lpc-v2 .v2-sidebar .portal-home-tools > summary, :root body.lpc-v2 .v2-sidebar .portal-home-tools .v2-more-tools-list > .v2-nav-link { min-height:44px; } }
+
+:root body.lpc-v2 .v2-sidebar .portal-home-tools[open] > summary,
+:root body.lpc-v2 .v2-sidebar .portal-home-tools > summary[data-workspace-active],
+:root body.lpc-v2 .v2-sidebar .portal-home-tools .v2-nav-link[aria-current="page"] { background:var(--v2-soft); color:var(--v2-blue-hover); font-weight:600; }

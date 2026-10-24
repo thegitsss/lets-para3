@@ -64,8 +64,8 @@ const ATTORNEY_PRODUCTION_DEFECTS = Object.freeze([
     prompt: "Do I have a saved payment method, and do I need one before posting?",
     requiredEvidence: ["billing_method", "workflow_readiness"],
     requiredTools: ["get_billing_snapshot", "get_attorney_workflow_readiness"],
-    requiredClaims: ["payment_method_account_state", "payment_method_required_before_posting"],
-    forbiddenClaims: ["payment_method_not_required", "knowledge_overrides_policy", "manual_review_sent"],
+    requiredClaims: ["payment_method_account_state", "payment_method_not_required_before_posting"],
+    forbiddenClaims: ["payment_method_required_before_posting", "knowledge_overrides_policy", "manual_review_sent"],
     riskLabels: ["financial", "workflow_policy"],
   }),
   Object.freeze({

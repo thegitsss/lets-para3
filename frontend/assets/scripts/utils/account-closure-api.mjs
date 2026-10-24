@@ -16,7 +16,17 @@ export function closureReview(value, ownerId) {
   const seen = new Set();
   const blockers = value.blockers.map(item => {
     if (!plain(item) || !codes.has(item.code) || seen.has(item.code) || typeof item.message !== 'string' || !item.message || item.message.length > 1000 || !Number.isSafeInteger(item.count) || item.count < 0) throw new ClosureError('invalid_response');
-    seen.add(item.code);return {code:item.code,message:item.message,count:item.count};
+    let matters;
+    if (item.matters !== undefined) {
+      if (!Array.isArray(item.matters) || item.matters.length > 20 || item.matters.length > item.count) throw new ClosureError('invalid_response');
+      const ids = new Set();
+      matters = item.matters.map(matter => {
+        if (!plain(matter) || !id(matter.caseId) || ids.has(matter.caseId) || typeof matter.title !== 'string' || !matter.title || matter.title.length > 300 || typeof matter.status !== 'string' || matter.status.length > 80 || typeof matter.reason !== 'string' || !matter.reason || matter.reason.length > 500) throw new ClosureError('invalid_response');
+        ids.add(matter.caseId);
+        return {caseId:matter.caseId,title:matter.title,status:matter.status,reason:matter.reason};
+      });
+    }
+    seen.add(item.code);return {code:item.code,message:item.message,count:item.count,...(matters ? {matters} : {})};
   });
   if (value.canDeactivate !== (blockers.length === 0)) throw new ClosureError('invalid_response');
   return {ownerId,canDeactivate:value.canDeactivate,blockers,closureRevision:value.closureRevision,resultProof:value.resultProof,proofExpiresAt:value.proofExpiresAt};

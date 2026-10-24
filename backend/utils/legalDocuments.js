@@ -9,7 +9,7 @@ let currentDocuments;
 // distinguish corrections made on the same effective date.
 function getCurrentPolicyDocuments() {
   if (!currentDocuments) {
-    const directory = path.resolve(__dirname, "../../frontend");
+    const directory = require("./frontendAssets").frontendDirectory();
     currentDocuments = Object.freeze(Object.fromEntries([
       ["terms", CURRENT_TERMS_VERSION], ["privacy", CURRENT_PRIVACY_VERSION],
     ].map(([kind, version]) => {

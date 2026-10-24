@@ -1,0 +1,62 @@
+const { test } = require('../assistant-completion/shell-fixture');
+const { expect } = require('playwright/test');
+const { fixture, home } = require('./alignment-fixture');
+
+test('Paralegal header is compact and fades in icon labels', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await fixture(page);
+  await home(page);
+  const header = page.locator('.v2-header');
+  const notifications = page.getByRole('button', { name: 'View notifications' });
+  const assistant = page.getByRole('button', { name: 'Open LPC Assistant' });
+  await expect(header).toHaveCSS('height', '48px');
+  await expect(notifications).toHaveCSS('width', '30px');
+  await expect(notifications.locator('svg')).toHaveCSS('width', '18px');
+  await expect(assistant.locator('svg')).toHaveCSS('width', '18px');
+  await expect(page.locator('.v2-header-search svg')).toHaveCSS('width', '18px');
+  await expect(assistant.locator('.pv2-assistant-label')).toBeHidden();
+  await notifications.hover();
+  await expect.poll(() => notifications.evaluate(element => getComputedStyle(element, '::after').opacity)).toBe('1');
+  expect(await notifications.evaluate(element => getComputedStyle(element, '::after').transitionDuration)).toContain('0.15s');
+  await expect(notifications).toHaveCSS('background-color', 'rgb(245, 247, 250)');
+  await page.screenshot({ path: testInfo.outputPath('paralegal-header-notifications-hover.png') });
+  await assistant.hover();
+  await expect.poll(() => assistant.evaluate(element => getComputedStyle(element, '::after').opacity)).toBe('1');
+  await expect.poll(() => assistant.locator('svg').evaluate(element => {
+    const transform = new DOMMatrix(getComputedStyle(element).transform);
+    return Math.abs(transform.a) < .01 && Math.abs(transform.b - 1) < .01;
+  })).toBe(true);
+  await expect(assistant.locator('svg')).toHaveCSS('stroke-width', '2px');
+  await page.screenshot({ path: testInfo.outputPath('paralegal-header-assistant-hover.png') });
+  const search = page.locator('.v2-header-search');
+  await search.hover();
+  await expect(search).toHaveCSS('width', '280px');
+  await search.click();
+  await expect(page.locator('[data-v2-search-input]')).toBeFocused();
+  await expect(search).toHaveCSS('border-top-color', 'rgb(233, 237, 243)');
+  await expect(page.locator('[data-v2-search-panel]')).toBeHidden();
+  await page.keyboard.press('Escape');
+  await page.mouse.move(1, 500);
+  for (const width of [390, 360, 320]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 740 });
+    const boxes = [];
+    for (const control of [search, notifications, assistant,
+      page.getByRole('button', { name: 'Open navigation', exact: true }),
+      page.getByRole('link', { name: 'Find Work', exact: true })]) {
+      if (!await control.isVisible()) continue;
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+      boxes.push(box);
+    }
+    const searchBox = await search.boundingBox();
+    expect(searchBox.width).toBeGreaterThanOrEqual(90);
+    // The mobile search flexes around the actual visible tools. Preserve a
+    // readable field and non-overlapping controls, rather than retired widths.
+    boxes.sort((left, right) => left.x - right.x);
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width - 1);
+    expect(await header.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`paralegal-header-mobile-${width}.png`) });
+  }
+});

@@ -1,0 +1,116 @@
+/* Isolated Paralegal sign-in Security controls and dialogs. */
+.pv2-security { min-width: 0; color: var(--v2-ink); }
+.pv2-security *, .pv2-security-dialog * { box-sizing: border-box; }
+.pv2-security-toolbar { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+.v2-settings-header-feedback .pv2-security-toolbar { margin: 0; }
+.pv2-security-toolbar button { font: inherit; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+.pv2-security-toolbar button:disabled { cursor: not-allowed; opacity: .65; }
+.pv2-security :is(h2,h3), .pv2-security-dialog h2 { color: var(--v2-ink); font-family: var(--v2-font-sans); }
+.pv2-muted, .pv2-account-field small { color: var(--v2-muted); line-height: 1.6; }
+.pv2-security button, .pv2-security-dialog button { font: inherit; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+.pv2-secondary, .pv2-refresh, .pv2-button { padding: 10px 16px; min-height: 44px; border: 1px solid var(--v2-line); border-radius: 8px; background: var(--v2-white); color: var(--v2-ink); }
+.pv2-button { background: #0b2947; border-color: #0b2947; color: #fff; }
+.pv2-security button:disabled, .pv2-security-dialog button:disabled { cursor: not-allowed; opacity: .65; }
+.pv2-security :is(a,button,input,summary):focus-visible, .pv2-security-dialog :is(a,button,input,summary,pre):focus-visible, .pv2-security h2:focus { outline: 2px solid var(--v2-ink); outline-offset: 3px; }
+.pv2-text-link { color: var(--v2-ink); text-underline-offset: 3px; }
+.pv2-account-feedback { margin: 0; padding: 12px 0; line-height: 1.6; }
+.pv2-account-feedback:empty { display: none; }
+.pv2-account-feedback[data-state="error"] { color: #a52c32; }
+.theme-dark .pv2-account-feedback[data-state="error"] { color: #ffb4b4; }
+.pv2-account-field { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.pv2-account-field input { min-width: 0; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--v2-muted); border-radius: 6px; color: var(--v2-ink); background: var(--v2-white); font: inherit; }
+.pv2-account-field label { color: var(--v2-ink); font-size: .9375rem; }
+.pv2-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
+.pv2-security-dialog { box-sizing: border-box; width: min(540px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--v2-line); border-radius: 12px; color: var(--v2-ink); background: var(--v2-white); }
+.pv2-security-dialog::backdrop { background: #101b2b88; }
+.pv2-security-dialog h2 { margin: 0 0 12px; font-size: 1.35rem; overflow-wrap: anywhere; }
+@media(max-width:480px) { .pv2-security-dialog { padding: 18px; } }
+.pv2-security-section { padding: 0 0 28px; margin: 0 0 28px; border-bottom: 1px solid var(--v2-line); }
+.pv2-security-section:last-child { border-bottom: 0; }
+.pv2-security-password-section { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; }
+.pv2-security-password-section > h2 { margin: 0; }
+.pv2-security-section > h2 { font-size: 1.125rem; margin: 0 0 16px; font-weight: 600; }
+.pv2-security-row { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; padding: 16px 0; border-bottom: 1px solid var(--v2-line); }
+.pv2-security-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.pv2-security-row > div { min-width: 0; }
+.pv2-security-row > button { flex-shrink: 0; max-width: 100%; overflow-wrap: anywhere; }
+.pv2-security-row h3 { font-size: 1rem; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.pv2-security-row p { margin: 6px 0 0; overflow-wrap: anywhere; line-height: 1.6; }
+.pv2-security-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; padding-top: 20px; }
+.pv2-security-footer p { flex: 1 1 240px; margin: 0; }
+.pv2-security-danger { background: transparent; border: 0; min-height: 44px; color: #a52c32; text-align: left; text-decoration: underline; text-underline-offset: 4px; padding: 8px 0; font: inherit; cursor: pointer; }
+.theme-dark .pv2-security-danger { color: #ffb4b4; }
+.pv2-security-error { padding: 0 0 20px; }
+.pv2-security-error p { color: #a52c32; margin: 0 0 12px; }
+.theme-dark .pv2-security-error p { color: #ffb4b4; }
+.pv2-security-dialog > p { line-height: 1.6; margin: 0 0 20px; }
+.pv2-security-dialog form { display: grid; gap: 18px; }
+.pv2-security-dialog form > .pv2-actions { margin-top: 0; }
+.pv2-security-dialog .pv2-account-feedback { padding: 0; }
+.pv2-security-password { display: flex; align-items: stretch; min-width: 0; }
+.pv2-security-password input { border-radius: 6px 0 0 6px; padding-right: 8px; }
+.pv2-security-reveal { flex: 0 0 auto; min-width: 4.5em; white-space: nowrap; border: 1px solid var(--v2-muted); border-left: 0; border-radius: 0 6px 6px 0; padding: 8px; font: inherit; background: var(--v2-soft); color: var(--v2-ink); cursor: pointer; }
+.pv2-security-qr { display: block; width: 240px; max-width: 100%; margin: 20px auto; background: white; }
+.pv2-security-manual { margin: 0 0 20px; }
+.pv2-security-manual summary { cursor: pointer; min-height: 44px; padding: 10px 0; color: var(--v2-blue); }
+.pv2-security-secret { display: block; padding: 12px; background: var(--v2-soft); overflow-wrap: anywhere; font-size: .9375rem; }
+.pv2-security-codes { padding: 20px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--v2-soft); font-size: 1rem; line-height: 1.8; }
+@media(max-width:600px) { .pv2-security-row { flex-wrap: wrap; align-items: start; } .pv2-security-row > div { flex: 1 1 100%; } .pv2-security-row > button { margin-top: 2px; } }
+
+/* Security section menu: retain the existing live controllers and dialogs. */
+:root body.lpc-v2 #v2-settings-security .pv2-security-layout {display:grid;grid-template-columns:180px minmax(0,1fr);gap:36px;align-items:start;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-navigation {display:flex;flex-direction:column;gap:5px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-nav-item {border:0;border-radius:7px;background:transparent;color:var(--v2-muted);text-align:left;padding:12px 14px;font:400 calc(13 * var(--lpc-reading-unit,1px))/1.5 var(--v2-font-sans);cursor:pointer;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-nav-item:hover {background:var(--v2-soft);color:var(--v2-ink);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-nav-item[aria-current=page] {background:var(--v2-soft);color:var(--v2-blue-hover);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-nav-item:focus-visible {outline:2px solid var(--v2-blue);outline-offset:2px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels {min-width:0;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels>[hidden] {display:none!important;}
+.pv2-security[data-security-category=signin] #pv2-security-sessions {display:none;}
+.pv2-security[data-security-category=devices] [data-security-content]>.pv2-security-section:not(#pv2-security-sessions):not(#pv2-security-reauthenticate) {display:none;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels .pv2-security-section {margin:0 0 24px;padding:20px 22px;border:1px solid var(--v2-line);border-radius:12px;background:var(--v2-white);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels .pv2-security-section>h2 {font-size:calc(14 * var(--lpc-reading-unit,1px));font-weight:500;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels .pv2-security-row h3 {font-weight:500;font-size:calc(14 * var(--lpc-reading-unit,1px));}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels .pv2-muted {font-size:calc(12 * var(--lpc-reading-unit,1px));}
+@media(max-width:760px) {
+ :root body.lpc-v2 #v2-settings-security .pv2-security-layout {grid-template-columns:1fr;gap:20px;}
+ :root body.lpc-v2 #v2-settings-security .pv2-security-navigation {flex-direction:row;flex-wrap:wrap;}
+ :root body.lpc-v2 #v2-settings-security .pv2-security-nav-item {min-height:44px;padding:10px;}
+ :root body.lpc-v2 #v2-settings-security .pv2-security-panels .pv2-security-section {padding:18px 16px;}
+}
+
+/* Match the approved section-menu reference: one group, quiet text actions. */
+.pv2-security[data-security-category=devices] .pv2-security-signin-panel {display:none;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-layout {max-width:1000px;margin:0 auto;min-height:510px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-nav-item[aria-current=page] {background:#e8eef8;color:#355f98;}
+:root.theme-dark body.lpc-v2 #v2-settings-security .pv2-security-nav-item[aria-current=page] {background:var(--v2-soft);color:var(--v2-blue);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-category-title {margin:11px 0;font-size:14px;font-weight:500;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-signin-group {padding:0 22px;border:1px solid var(--v2-line);border-radius:12px;background:var(--v2-white);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-signin-group #pv2-security-password {margin:0;padding:21px 0;min-height:80px;border:0;border-bottom:1px solid var(--v2-line);border-radius:0;background:transparent;display:flex;align-items:center;justify-content:space-between;gap:24px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-signin-group #pv2-security-password>h2 {margin:0;font-size:14px;font-weight:500;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-password-description {display:block;margin-top:6px;font:400 12px/1.5 var(--v2-font-sans);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-signin-group .lpc-settings-section-body {border:0;border-radius:0;background:transparent;padding:0;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row {border-bottom:1px solid var(--v2-line);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row:last-child {border:0;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row>summary {display:flex;align-items:center;justify-content:space-between;gap:24px;padding:21px 0;min-height:80px;cursor:pointer;list-style:none;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row>summary::-webkit-details-marker {display:none;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-copy {display:grid;gap:6px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-copy strong {font-size:14px;font-weight:500;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-tools {display:flex;gap:18px;align-items:center;flex-shrink:0;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-manage {font-size:13px;color:var(--v2-blue-hover);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row>summary:hover .pv2-security-overview-manage {text-decoration:underline;text-underline-offset:3px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row>.pv2-security-section {border:0;border-radius:0;margin:0;padding:0 0 20px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-overview-row>.pv2-security-section>h2 {display:none;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-layout :is(.pv2-secondary,.v2-settings-primary,.pv2-refresh):not(dialog *) {background:transparent;border:0;color:var(--v2-blue-hover);padding:8px 0;box-shadow:none;font-size:13px;font-weight:400;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-layout :is(.pv2-secondary,.v2-settings-primary,.pv2-refresh):not(dialog *):hover:not(:disabled) {background:transparent;text-decoration:underline;text-underline-offset:3px;}
+@media(max-width:640px) {
+ :root body.lpc-v2 #v2-settings-security .pv2-security-signin-group {padding:0 16px;}
+ :root body.lpc-v2 #v2-settings-security .pv2-security-overview-row>summary {gap:14px;flex-wrap:wrap;}
+ :root body.lpc-v2 #v2-settings-security .pv2-security-overview-copy {min-width:0;}
+ :root body.lpc-v2 #v2-settings-security .pv2-security-overview-tools {gap:12px;}
+}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels #pv2-security-sessions {border:0;background:transparent;padding:0;margin:0;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels #pv2-security-sessions>h2 {margin:11px 0;font-size:14px;font-weight:500;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels #pv2-security-sessions>.lpc-settings-section-body {padding:0 22px;border:1px solid var(--v2-line);border-radius:12px;background:var(--v2-white);}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels #pv2-security-sessions .pv2-security-row {padding:21px 0;min-height:80px;}
+:root body.lpc-v2 #v2-settings-security .pv2-security-panels #pv2-security-sessions .pv2-security-footer {padding:16px 0;}

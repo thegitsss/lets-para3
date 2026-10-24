@@ -1,0 +1,320 @@
+'use strict';
+// Additive manual continuation only. Default complete/eight-shard contracts stay unchanged.
+const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),assert=require('node:assert/strict');
+const h=require('./verify-ci-jest-shards'),c=require('./verify-ci-jest-continuation'),coverage=require('./verify-ci-jest-coverage');
+const root=path.resolve(__dirname,'../..'),backend=path.join(root,'backend');
+const PLAN='backend/tests/playwright/acceptance/native-continuation-plan.json',SUITE='tests/paymentAttentionSignedRecovery.test.js';
+const J='86e8ea5006dc2d8e975dcca840f2eee0e1de3254',IMPACT='a52a9b89a72d837507edf772dffc937c53c383af249221751edaaeeb7e12e4da';
+const SPEC='a0ac984208486bb7cc62973eb0c150759b06b9f443fda1ececf531ff131814e0';
+const PRODUCTS={
+ 'backend/routes/paymentsWebhook.js':['4b459bb02a81467ca4ab0da18c94f22ccb2a7e3fa09d205b222fb5744e416367','fa8ef09b933b7ff433e636179d29c77a04d870e8b38eafe9e9d5d8e7c8f8b07c'],
+ 'backend/services/attorneyRefundEvents.js':['fb52cf41a725709ac049bc4b906e20698a7bd0358670b9670f4d0ad5334919ac','f6ee1dba64dd1c56a4c3c4252f41151b98fb91a7195d0224af78c20c10a322be'],
+ 'backend/services/paymentAttentionRecovery.js':['e2bd997ae8e6b92030d34d35eb1d642dac441068510e62b7be86032822af998b','b21daa3468595cf99eaf837225b20555a8e75f94c0ef70bc11e094e325f32782']
+};
+const BACKEND_RUNTIME_CHANGES={
+  "backend/ai/aggregateOverviewGrounding.js": {"pins": [null, "939030927e86d2c90e3d90f2f59b0e61e09337a5ca7fafbf8b808b07dc73b3c9"], "affectedSuites": ["tests/attorneyAggregateOverviewGrounding.test.js", "tests/attorneyResponseValidator.test.js", "tests/attorneyEvidenceContract.test.js", "tests/supportManagerAgent.test.js", "tests/attorneySupportDatabaseIntegration.test.js"], "reviewedEvidenceSha256": "d801290aa9eeb09a89e3e1fc565fe24102a30cb928a397c673d99747959bf822"},
+  "backend/ai/attorneyResponseValidator.js": {"pins": ["2f13f82abb4b995fd5a78c00640aa89e0cc5f0dfade5981cc0fc67b88eea8db0", "f86e7afcca8fb4b75a5f4183dafe295ec792cab919e8fdcf43a5dec20f45bd18"], "affectedSuites": ["tests/attorneyAggregateOverviewGrounding.test.js", "tests/attorneyResponseValidator.test.js", "tests/attorneyEvidenceContract.test.js", "tests/supportManagerAgent.test.js", "tests/attorneySupportDatabaseIntegration.test.js"], "reviewedEvidenceSha256": "0b626f3e676902b705bf4c6b4b85295cc5d185b8157eaaf0ba2ad5a9e0e05d37"},
+  "backend/ai/supportManagerAgent.js": {"pins": ["10b12c3d818390b893ba4e53482b48a6d1f3d52a0f5c02ede3e08097361a0717", "e05b49c2692396d2d32a57208648b2f7f5ec210be2338d85afc172b626c8d5b3"], "affectedSuites": ["tests/attorneyAggregateOverviewGrounding.test.js", "tests/attorneyResponseValidator.test.js", "tests/attorneyEvidenceContract.test.js", "tests/supportManagerAgent.test.js", "tests/attorneySupportDatabaseIntegration.test.js"], "reviewedEvidenceSha256": "0b626f3e676902b705bf4c6b4b85295cc5d185b8157eaaf0ba2ad5a9e0e05d37"},
+  "backend/tests/attorneyAggregateOverviewGrounding.test.js": {"pins": [null, "7408a8ff902d2faa58adedeabba9239566ff8cf71032df96cab9114a702ab733"], "affectedSuites": ["tests/attorneyAggregateOverviewGrounding.test.js"], "reviewedEvidenceSha256": "d801290aa9eeb09a89e3e1fc565fe24102a30cb928a397c673d99747959bf822"},
+  "backend/tests/attorneyEvidenceContract.test.js": {"pins": ["5fea0042651574d8ffee27a95c923163b0f04bd4f6d9397f270e830620f76d30", "61c6f311c3435603f56b95e3858f6f6d4582b722fb9e48e5ab2402a9124ff1c3"], "affectedSuites": ["tests/attorneyEvidenceContract.test.js"], "reviewedEvidenceSha256": "0b626f3e676902b705bf4c6b4b85295cc5d185b8157eaaf0ba2ad5a9e0e05d37"},
+  "backend/tests/supportManagerAgent.test.js": {"pins": ["a4cb5b2be8339d512cf794410ac76b6eaf8cda12f87ce1a54ff7b23a9f31d6ce", "41565292d7f680377e28e89c8b8dbd968bb13c01c19f7d38535050429c16000d"], "affectedSuites": ["tests/supportManagerAgent.test.js"], "reviewedEvidenceSha256": "0b626f3e676902b705bf4c6b4b85295cc5d185b8157eaaf0ba2ad5a9e0e05d37"},
+  "backend/services/attorneyRefundEvents.js": {"pins": ["fb52cf41a725709ac049bc4b906e20698a7bd0358670b9670f4d0ad5334919ac", "9835f8fc3c3f5a18d96d03042d04f16f68541e7292b7f09ba045d9ec30b10558"], "affectedSuites": ["tests/attorneyRefundConcurrency.test.js", "tests/attorneyRefundEvents.test.js", "tests/attorneyRefundRetention.test.js", "tests/attorneyFinancialHistory.test.js", "tests/webhookHandling.test.js", "tests/phase2Lifecycle.test.js"], "reviewedEvidenceSha256": "0252b0138a5b224e316307442f7c8d56430fd642b8d32f48278a4c0eec6224b7"},
+  "backend/tests/attorneyRefundConcurrency.test.js": {"pins": [null, "a71faecbe7d4ef95349144bf2e4e3f2691c3ee82528c0f7bd9ee88b0dc84b4c7"], "affectedSuites": ["tests/attorneyRefundConcurrency.test.js"], "reviewedEvidenceSha256": "0252b0138a5b224e316307442f7c8d56430fd642b8d32f48278a4c0eec6224b7"},
+
+  "backend/ai/config.js": {
+    "pins": [
+      "04a1d148851d5636b5afa01191dbc5fb415cddb97795db0786d4ca2003d953eb",
+      "7c393d74a8352a0c1d78d8b267b1e551d34a7cc866b2514ae63ba661402132f1"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudget.test.js",
+      "tests/supportCostBudgetReplica.test.js",
+      "tests/supportCostBudgetCeiling.test.js"
+    ],
+    "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"
+  },
+  "backend/ai/supportCostBudget.js": {
+    "pins": [
+      null,
+      "8808a98220b738eae8c1d510ea4e0fafe9a609155fbf0128c5c2df0c1b6a8448"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudget.test.js",
+      "tests/supportCostBudgetReplica.test.js",
+      "tests/supportCostBudgetCeiling.test.js"
+    ],
+    "reviewedEvidenceSha256": "68fd46354aad7c9d87915b1c99d343990f54eebe5ae118396bfb2d08d8702e36"
+  },
+  "backend/tests/supportCostBudget.test.js": {
+    "pins": [
+      null,
+      "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudget.test.js"
+    ],
+    "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d"
+  },
+  "backend/tests/supportCostBudgetReplica.test.js": {
+    "pins": [
+      null,
+      "6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudgetReplica.test.js"
+    ],
+    "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d"
+  },
+  "backend/tests/supportCostBudgetCeiling.test.js": {
+    "pins": [
+      null,
+      "93589883fb4abe3bde58a30e8568bc5dc4b662142d8a61466853dc42c413c97f"
+    ],
+    "affectedSuites": [
+      "tests/supportCostBudgetCeiling.test.js"
+    ],
+    "reviewedEvidenceSha256": "68fd46354aad7c9d87915b1c99d343990f54eebe5ae118396bfb2d08d8702e36"
+  },
+  "backend/scripts/ops-monitor.js": {
+    "pins": [
+      "3507176da4b42f063d4ff25900e78ebc4a4c107ead507e947a878bfad4f353a8",
+      "f2a78d9317dae0be10454393a4060f97510c22871e13e1dd7aad994a3b8a4fa7"
+    ],
+    "affectedSuites": [
+      "tests/opsMonitorState.test.js"
+    ],
+    "reviewedEvidenceSha256": "81aa188a9085da2f0a373a8e880407576bfc1d01f7a7236085e4d0dab98de032"
+  },
+  "backend/tests/opsMonitorState.test.js": {
+    "pins": [
+      "0830655c380c1a2e955db8e26130d950801a8911def67d7734032256e0cadf81",
+      "4e238e87696e7ec88df7336cf1dcc774eb4e53aa23cafbcb366eab97e6076b88"
+    ],
+    "affectedSuites": [
+      "tests/opsMonitorState.test.js"
+    ],
+    "reviewedEvidenceSha256": "81aa188a9085da2f0a373a8e880407576bfc1d01f7a7236085e4d0dab98de032"
+  },
+  "backend/services/matterFileWrites.js": {
+    "pins": [
+      "30fe43318b767d32dd106d9bb2710cc6a944ab928d6cceea3cdc1e4b7eb11fe8",
+      "60e1d2a2d1d50416af27646f1f815c6f95b2def851a99a0b0d73d3888a0e518a"
+    ],
+    "affectedSuites": [
+      "tests/matterFileWrites.test.js",
+      "tests/uploadsDownloads.test.js",
+      "tests/matterDownloads.test.js"
+    ],
+    "reviewedEvidenceSha256": "836ef349db3616c69dea5ae2ff24e65c0029017cae1b5aef742274be7c566761"
+  },
+  "backend/tests/matterFileWrites.test.js": {
+    "pins": [
+      "7cd1f7890bfc10f60351f0899ca7a38697e67ab404483886d2d33acbe5bee7ea",
+      "24a00dc86e8a4179e4e9ce0b2974aaff5bc97c4208f1a7e8dac8bcd0656c73c5"
+    ],
+    "affectedSuites": [
+      "tests/matterFileWrites.test.js"
+    ],
+    "reviewedEvidenceSha256": "836ef349db3616c69dea5ae2ff24e65c0029017cae1b5aef742274be7c566761"
+  },
+  "backend/routes/auth.js": {
+    "pins": [
+      "647bbee6a9e5b758a285357d58d91d78b4d4df56923aae93207b2ea7e3ffd2b7",
+      "2574a1c6533ad012dc7e7ccba4d4dbdada9d3f192348ac65551f4b3e114e7a32"
+    ],
+    "affectedSuites": [
+      "tests/authAdmissionUploadRecovery.test.js",
+      "tests/adminAdmissionsJourney.test.js"
+    ],
+    "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+  },
+  "backend/services/personalStorageDeletion.js": {
+    "pins": [
+      "d160456e6a625071896cd6bfbbf557524350149bd5d3800c18bfe881ca4d921c",
+      "06892c91d11cb4a942371d3064051e1b9e9c6502128e1f5f79057201ca084181"
+    ],
+    "affectedSuites": [
+      "tests/authAdmissionUploadRecovery.test.js",
+      "tests/personalStorageDeletion.test.js"
+    ],
+    "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+  },
+  "backend/tests/authAdmissionUploadRecovery.test.js": {
+    "pins": [
+      null,
+      "0c6ae02713e437046db908cf4374f2bbbfb4a7680ca82a4923b7fe3cb2d16829"
+    ],
+    "affectedSuites": [
+      "tests/authAdmissionUploadRecovery.test.js"
+    ],
+    "reviewedEvidenceSha256": "db78f2f8531bc9517eed7c9516850baa63e2936e388e414bead96bfeea23a464"
+  },
+  "backend/tests/adminAdmissionsJourney.test.js": {
+    "pins": [
+      "02a4154c135031f787842d89f5e6cf3b56f30f8c0ef75e34c904c8830861462b",
+      "e35e71df8235baeaf7f4806ffe9611bc6798fd2ad1333d6d744ff4dd58e01106"
+    ],
+    "affectedSuites": [
+      "tests/adminAdmissionsJourney.test.js"
+    ],
+    "reviewedEvidenceSha256": "0c8488006159efe06ff58faacdd62443ccb1a2357208935e199be6943f6b31eb"
+  },
+  "backend/utils/stagingEmailBoundary.js": {
+    "pins": [
+      "564a0908978ab092db1b78d8d0b1261e13f09fbfe85321c07ccdd19a25b40820",
+      "9e6d691cdadacd65dc7e3de3e425970890860f9a1749ea25df9e286388df8fcd"
+    ],
+    "affectedSuites": [
+      "tests/stagingEmailBoundary.test.js",
+      "tests/stagingRuntimeConfig.test.js"
+    ],
+    "reviewedEvidenceSha256": "06b8b19323fc74ee84a1108370e04c3272a4c4b0b81625054c67fa7ea21b5db3"
+  },
+  "backend/tests/stagingEmailBoundary.test.js": {
+    "pins": [
+      "7bd0c576a2bf5527600a2f40a31f410da383fab3e7da0deeb54856d0cd7a6b99",
+      "53054c9d0ba4cff0de8cab847918f1ba1005b99dfe86a7c55d810b4db615229e"
+    ],
+    "affectedSuites": [
+      "tests/stagingEmailBoundary.test.js"
+    ],
+    "reviewedEvidenceSha256": "06b8b19323fc74ee84a1108370e04c3272a4c4b0b81625054c67fa7ea21b5db3"
+  }
+};
+// Exact reviewed backend additions; the default-off Assistant bridge preserves existing AI consumers.
+const ASSISTANT_DEFAULT_OFF_BRIDGE='b712ecbd301730e99cd7630bb814d40b93205f750d37a0a8e899734e6560bfc4';
+const ASSISTANT_PRESERVED_CONSUMERS=['tests/matterDraftSuggestions.test.js','tests/outboundNetworkPolicy.test.js'];
+const ADDED_BACKEND_TESTS=["tests/supportCostBudget.test.js","tests/supportCostBudgetReplica.test.js","tests/supportCostBudgetCeiling.test.js","tests/authAdmissionUploadRecovery.test.js","tests/attorneyRefundConcurrency.test.js","tests/attorneyAggregateOverviewGrounding.test.js"];
+const EXISTING_CI=['.github/workflows/native-acceptance-return.yml','backend/scripts/verify-ci-jest-continuation.js','.github/workflows/quality.yml','backend/scripts/check-ci-workflow.js','backend/tests/ciWorkflowContract.test.js','backend/tests/playwright/acceptance/groups.json','backend/scripts/guard-ci-artifact-budget.js','backend/scripts/verify-critical-browser-groups.js'];
+const CI_ADDITIONS=['.github/workflows/backend-acceptance-return.yml','.github/workflows/native-acceptance-return.yml','.github/workflows/backend-single-file-return.yml','backend/scripts/verify-source-bound-backend-return.js','backend/scripts/prepare-linux-audio.cjs','backend/scripts/admin-private-navigation-controls.test.cjs','backend/scripts/legacy-message-link-read-controls.test.cjs','backend/scripts/verify-single-file-jest-return.cjs','backend/scripts/single-file-jest-return-controls.test.cjs','backend/scripts/import-native-continuation-junit.py','backend/scripts/native-continuation-contract.cjs','backend/scripts/native-continuation-controls.test.cjs','backend/scripts/native-continuation-lib.cjs','backend/scripts/prepare-native-browser-continuation.cjs','backend/scripts/run-native-browser-continuation.cjs','backend/tests/playwright/acceptance/native-continuation.config.cjs',PLAN];
+// Exact reviewed browser-only surfaces. Their affected source-contract suites
+// must be supplied to the strict local union; final17 alone never covers them.
+const BROWSER_ONLY_PRODUCTS={
+ 'frontend/assets/styles/matter-publication.css':[],
+ 'frontend/assets/styles/paralegal-v2-global.css':['tests/paralegalV2FoundationContract.test.js','tests/paralegalV2Phase6Contract.test.js'],
+ 'frontend/dashboard-paralegal.html':['tests/paralegalHomePhase2Contract.test.js','tests/paralegalPhase5Contract.test.js','tests/dashboardUpgradeContract.test.js','tests/launchQualityUiContract.test.js','tests/productivityFiltersContract.test.js','tests/paralegalShellPhase1Contract.test.js'],
+ 'frontend/assets/styles/paralegal-v2.css':['tests/paralegalV2HomeContract.test.js','tests/paralegalV2SettingsContract.test.js','tests/paralegalV2FoundationContract.test.js'],
+ 'frontend/assets/styles/paralegal-v2-work.css':['tests/paralegalV2WorkContract.test.js'],
+ 'frontend/assets/scripts/paralegal-v2/settings-view.mjs':['tests/paralegalV2SettingsContract.test.js','tests/paralegalV2ParityContract.test.js'],
+ 'frontend/assets/styles/paralegal-conversations.css':[],
+ 'frontend/assets/styles/attorney-v2-home.css':[],
+ 'frontend/assets/scripts/attorney-v2/matter-receipts.mjs':[],
+ 'frontend/assets/scripts/attorney-v2/workspace-funding.mjs':[],
+ 'frontend/assets/scripts/attorney-v2/workspace-summary.mjs':[],
+ 'frontend/assets/scripts/case-detail.js':['tests/productionNoTheaterPolicy.test.js','tests/phase3FrontendContract.test.js','tests/launchQualityUiContract.test.js'],
+ 'frontend/assets/scripts/admin/shared.js':[],
+ 'frontend/assets/scripts/admin/flow.js':[],
+ 'frontend/assets/scripts/admin/accounts.js':[],
+ 'frontend/assets/scripts/admin/drafts.js':[],
+ 'frontend/assets/styles/admin-live.css':[]
+};
+const BROWSER_FIXTURES=['backend/tests/helpers/financialLifecycleBrowserServer.js','backend/tests/playwright/frontend-hygiene/flows.spec.js','backend/tests/playwright/frontend-hygiene/admin-review.spec.js','backend/tests/playwright/admin-solo/attention.spec.js','backend/tests/playwright/attorney-v2/conversation.spec.js','backend/tests/playwright/attorney-v2/security.spec.js','backend/tests/playwright/attorney-v2/pre-engagement.spec.js','backend/tests/playwright/attorney-v2/invitations.spec.js','backend/tests/playwright/accessibility/public-accessibility-phase-nine.spec.js','backend/tests/playwright/attorney-v2/applications.spec.js','backend/tests/playwright/attorney-v2/payment-setup.spec.js','backend/tests/playwright/attorney-v2/funding.spec.js','backend/tests/playwright/attorney-v2/invitation-inventory.spec.js','backend/tests/playwright/attorney-v2/recovery-controls.spec.js','backend/tests/playwright/attorney-v2/accounts-real.spec.js','backend/tests/playwright/attorney-v2/workspace.spec.js','backend/tests/playwright/attorney-v2/read-views.spec.js','backend/tests/playwright/attorney-v2/matter-inventory.spec.js','backend/tests/playwright/paralegal-support/conversations-approved.spec.js','backend/tests/playwright/paralegal-support/home-redesign.spec.js','backend/tests/playwright/paralegal-support/linear-rebuild.spec.js','backend/tests/playwright/paralegal-support/paralegal-documents-actual.spec.js','backend/tests/playwright/paralegal-support/shell-stability.spec.js','backend/tests/playwright/shared-matter/paired-workspace.spec.js','backend/tests/playwright/shared-matter/email-message-links.spec.js','backend/tests/playwright/financial-lifecycle/exception.spec.js','backend/tests/playwright/financial-lifecycle/admission-journey.spec.js','backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js','backend/tests/playwright/paralegal-support/header.spec.js','backend/tests/playwright/paralegal-support/v2-work.spec.js','backend/tests/playwright/paralegal-support/v2-files.spec.js','backend/tests/playwright/paralegal-support/v2-messaging.spec.js'];
+const BROWSER_CONFIGS=['backend/playwright.accessibility.config.js'];
+const DOCS=['LAUNCH_CHECKLIST.md','docs/LAUNCH_CERTIFICATION_CURRENT.md','docs/RELEASE_GATES.md','docs/LPC_ROUTE_SECURITY_INVENTORY.md'],STRICT=['.gitleaksignore','docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json','backend/scripts/eval-attorney-support-e2e.js'];
+const TITLES=[
+ 'authentic refund.created redelivery records an immutable proof before explicit Admin resolve and exact replay',
+ 'authentic charge.refunded redelivery records an immutable proof before explicit Admin resolve and exact replay',
+ ...['signature','original-hash','amount','request','account','mode','pending-refund'].map(kind=>`current ${kind} mismatch cannot create trusted observation or clear the alert`),
+ 'forged or mismatched observation provenance cannot replace the original signed audit',
+ 'substantive and unrelated processed deliveries retain original deduplication response and records',
+ 'failed observation audit append rolls back its Case version and preserves the processed alert',
+ 'independently committed source change defeats an in-flight signed observation fence',
+ ...['disabled','revoked-session'].map(kind=>`real ${kind} authority loss defeats resolution using the signed observation`),
+ ...['URL-only','financial-source'].map(kind=>`review survives only the allowed ${kind} change after signed observation`)
+];
+const J_SHARD_JOBS=[116250131320,116250131353,116250131372,116250131375,116250131422,116250131456,116250131472,116250131545],J_SOURCE_JOBS=[116249605657,116250356151];
+const same=(a,b)=>assert.deepEqual(a,b),sorted=x=>[...x].sort(),hash=h.hash;
+const read=file=>JSON.parse(fs.readFileSync(file,'utf8')),write=(file,value)=>fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n',{mode:0o600});
+function validateContext(bytes,approved,current,env,event,dirty){
+ assert(/^[a-f0-9]{64}$/.test(approved||''));assert.equal(hash(bytes),approved);assert.equal(env.GITHUB_EVENT_NAME,'workflow_dispatch');assert.equal(env.GITHUB_ACTIONS,'true');assert.equal(env.RUNNER_OS,'Linux');assert.equal(env.GITHUB_REPOSITORY,'thegitsss/lets-para3');assert.equal(event.repository.id,1077216514);assert.equal(event.repository.private,false);assert.equal(env.GITHUB_SHA,current.commit);assert(/^[1-9]\d*$/.test(env.GITHUB_RUN_ID)&&/^[1-9]\d*$/.test(env.GITHUB_RUN_ATTEMPT));assert.equal(event.inputs.execution_scope,'recovery-return');assert.equal(event.inputs.continuation_plan_sha256,approved);assert.equal(dirty,'');
+ const plan=JSON.parse(bytes),spec=plan.backendReturn?.singleFileRecovery;assert.equal(plan.candidateCommit,'@checked-out-head');assert.equal(plan.sourcePins[PLAN],'@approved-plan');same(sorted(Object.keys(plan.sourcePins)),sorted(Object.keys(current.files)));
+ for(const[p,value]of Object.entries(plan.sourcePins))assert.equal(current.files[p],p===PLAN?approved:value,'Current source pin changed: '+p);
+ assert.equal(spec?.schemaVersion,1);assert.equal(spec.mode,'exact-single-final-signed-recovery-file');assert.equal(spec.suite,SUITE);assert.equal(spec.suiteSha256,SPEC);assert.equal(spec.expectedCallbacks,17);same(sorted(spec.expectedTitles),sorted(TITLES));assert.equal(spec.reviewedImpactSha256,IMPACT);assert.equal(spec.priorSuites,538);assert.equal(spec.priorCallbacks,7745);
+ assert.equal(current.files['backend/'+SUITE],SPEC);assert(Number.isSafeInteger(spec.cloudEvidence?.maximumNewBytes)&&spec.cloudEvidence.maximumNewBytes>0&&spec.cloudEvidence.maximumNewBytes<=64*1024**2);
+ assert.equal(plan.cloudEvidence.maximumNewBytes,8*1024**3);assert(Number.isSafeInteger(plan.cloudEvidence.priorRetainedBytes)&&plan.cloudEvidence.priorRetainedBytes>=0);assert(plan.cloudEvidence.priorRetainedBytes+plan.cloudEvidence.maximumNewBytes+spec.cloudEvidence.maximumNewBytes<=10*1024**3,'Combined reviewed storage cap exceeded');return{plan,spec};
+}
+function validateCiEvidence(plan,current,prior,ciBytes){
+ const e=plan.backendReturn.ciAdaptationEvidence,raw=Buffer.from(e.rawReportBase64,'base64');assert.equal(hash(raw),e.rawReportSha256);const report=JSON.parse(raw);assert(report.success&&report.numTotalTestSuites===1&&report.numPassedTestSuites===1&&report.testResults.length===1);assert(!report.numFailedTests&&!report.numPendingTests&&!report.numTodoTests&&!report.numFailedTestSuites&&!report.numPendingTestSuites&&!report.numRuntimeErrorTestSuites);assert(Number.isSafeInteger(e.passedCallbacks)&&e.passedCallbacks>=46);assert.equal(report.numTotalTests,e.passedCallbacks);assert.equal(report.numPassedTests,e.passedCallbacks);const suite=report.testResults[0];assert(suite.name.endsWith('/tests/ciWorkflowContract.test.js')&&suite.status==='passed'&&!suite.testExecError);assert.equal(suite.assertionResults.length,e.passedCallbacks);for(const row of suite.assertionResults)assert(row.status==='passed'&&row.invocations===1&&!row.failureMessages?.length&&!row.retryReasons?.length);
+ for(const p of EXISTING_CI)assert.equal(e.sourceBindings[p],current.files[p]);assert(Number.isSafeInteger(e.originalPrefixBytes)&&e.originalPrefixBytes>0);assert.equal(hash(ciBytes.subarray(0,e.originalPrefixBytes)),prior.files['backend/tests/ciWorkflowContract.test.js'],'Original36callback prefix changed');return{callbacks:e.passedCallbacks,rawReportSha256:e.rawReportSha256,proofClass:'Existing current local CI-only controls; not new Linux product callbacks.'};
+}
+function validateSource(plan,approved,current,prior,discovered,ciBytes){
+ assert.equal(prior.commit,J);same(sorted(discovered),sorted([...Object.keys(prior.files).filter(p=>/^backend\/tests\/.*\.test\.js$/.test(p)).map(p=>p.slice(8)),SUITE,...ADDED_BACKEND_TESTS.filter(file=>current.files['backend/'+file])]));
+ const browserAffected=new Set(),runtimeAffected=new Set(),changes=plan.backendReturn.singleFileRecovery.sourceChanges,actual=[...new Set([...Object.keys(prior.files),...Object.keys(current.files)])].filter(p=>prior.files[p]!==current.files[p]);same(sorted(changes.map(e=>e.path)),sorted(actual));assert.equal(new Set(changes.map(e=>e.path)).size,changes.length);
+ for(const e of changes){assert.equal(e.beforeSha256,prior.files[e.path]||null);assert.equal(e.afterSha256==='@approved-plan'&&e.path===PLAN?approved:e.afterSha256,current.files[e.path]);assert(/^[a-f0-9]{64}$/.test(e.reviewedEvidenceSha256||''));
+  if(PRODUCTS[e.path]&&current.files[e.path]!==BACKEND_RUNTIME_CHANGES[e.path]?.pins?.[1]){same([e.beforeSha256,e.afterSha256],PRODUCTS[e.path]);assert.equal(e.kind,'product-change');same(e.affectedSuites,[SUITE]);assert.equal(e.reviewedEvidenceSha256,IMPACT);}
+  else if(BACKEND_RUNTIME_CHANGES[e.path]){const definition=BACKEND_RUNTIME_CHANGES[e.path];same([e.beforeSha256,e.afterSha256],definition.pins);assert.equal(e.kind,e.path.startsWith('backend/tests/')?'test-fixture':'product-change');same(sorted(e.affectedSuites),sorted(definition.affectedSuites));assert.equal(e.reviewedEvidenceSha256,definition.reviewedEvidenceSha256);if(e.path==='backend/ai/config.js'){assert.equal(e.defaultOffSourceBridgeSha256,ASSISTANT_DEFAULT_OFF_BRIDGE);same(e.preservedDefaultOffConsumerSuites,ASSISTANT_PRESERVED_CONSUMERS);}for(const file of definition.affectedSuites)runtimeAffected.add(file);}
+  else if(e.path==='backend/'+SUITE){assert.equal(e.beforeSha256,null);assert.equal(e.afterSha256,SPEC);assert.equal(e.kind,'test-fixture');same(e.affectedSuites,[SUITE]);}
+  else if(c.REVIEWED_DEVELOPMENT_PATCH.files[e.path]){same([e.beforeSha256,e.afterSha256],c.REVIEWED_DEVELOPMENT_PATCH.files[e.path]);assert.equal(e.kind,'reviewed-equivalent');same(e.affectedSuites,[]);assert.equal(e.reviewedEvidenceSha256,c.REVIEWED_DEVELOPMENT_PATCH.reviewedEvidenceSha256);}
+  else if(EXISTING_CI.includes(e.path)||STRICT.includes(e.path)){assert.equal(e.kind,e.path.startsWith('backend/tests/')?'test-fixture':'ci-control');same(e.affectedSuites,e.path==='backend/tests/ciWorkflowContract.test.js'?['tests/ciWorkflowContract.test.js']:e.path==='backend/scripts/guard-ci-artifact-budget.js'?['tests/ciArtifactBudget.test.js']:e.path==='backend/scripts/verify-ci-jest-continuation.js'?['tests/ciJestShards.test.js']:[]);if(e.path==='backend/scripts/guard-ci-artifact-budget.js')runtimeAffected.add('tests/ciArtifactBudget.test.js');if(e.path==='backend/scripts/verify-ci-jest-continuation.js')runtimeAffected.add('tests/ciJestShards.test.js');}
+  else if(CI_ADDITIONS.includes(e.path)){assert.equal(e.beforeSha256,null);assert.equal(e.kind,e.path.startsWith('backend/tests/')?'test-fixture':'ci-control');same(e.affectedSuites,[]);}
+  else if(BROWSER_ONLY_PRODUCTS[e.path]){assert.equal(e.kind,'browser-only-product');assert.equal(e.backendRuntimeImpact,'none-reviewed');assert.equal(e.browserAcceptanceRequired,true);same(sorted(e.affectedSuites),sorted(BROWSER_ONLY_PRODUCTS[e.path]));for(const file of e.affectedSuites)browserAffected.add(file);}
+  else if(BROWSER_FIXTURES.includes(e.path)){assert.equal(e.kind,'test-fixture');same(e.affectedSuites,[]);assert.equal(e.backendRuntimeImpact,'none-reviewed');assert.equal(e.browserAcceptanceRequired,true);}
+  else if(BROWSER_CONFIGS.includes(e.path)){assert.equal(e.kind,'reviewed-equivalent');same(e.affectedSuites,[]);assert.equal(e.backendRuntimeImpact,'none-reviewed');assert.equal(e.browserAcceptanceRequired,true);}
+  else if(DOCS.includes(e.path)){assert.equal(e.kind,'documentation-only');same(e.affectedSuites,[]);}
+  else throw Error('Unreviewed changed source cannot reuse J evidence: '+e.path);
+ }
+ const aggregateRuntime=['backend/ai/aggregateOverviewGrounding.js','backend/ai/attorneyResponseValidator.js','backend/ai/supportManagerAgent.js'];
+ if(aggregateRuntime.some(p=>current.files[p]===BACKEND_RUNTIME_CHANGES[p].pins[1]))for(const p of ["backend/ai/aggregateOverviewGrounding.js", "backend/ai/attorneyResponseValidator.js", "backend/ai/supportManagerAgent.js", "backend/tests/attorneyAggregateOverviewGrounding.test.js", "backend/tests/attorneyEvidenceContract.test.js", "backend/tests/supportManagerAgent.test.js"])assert.equal(current.files[p],BACKEND_RUNTIME_CHANGES[p].pins[1],'Aggregate overview correction requires its exact six-path component and focused controls: '+p);
+ for(const[p,pins]of Object.entries(PRODUCTS)){const amendment=BACKEND_RUNTIME_CHANGES[p];same([prior.files[p],current.files[p]],amendment&&current.files[p]===amendment.pins[1]?amendment.pins:pins);if(amendment&&current.files[p]===amendment.pins[1])assert.equal(current.files['backend/tests/attorneyRefundConcurrency.test.js'],BACKEND_RUNTIME_CHANGES['backend/tests/attorneyRefundConcurrency.test.js'].pins[1],'Refund correction requires its exact concurrency/negative controls');}
+ const bridge={schemaVersion:1,mode:'explicit-source-bound-jest-continuation',priorCommit:J,currentCommit:current.commit,priorSourceSha256:hash(JSON.stringify(prior)),currentSourceSha256:hash(JSON.stringify(current)),changes:changes.map(e=>({...e,afterSha256:e.path===PLAN?approved:e.afterSha256})),...(current.files['backend/package-lock.json']!==prior.files['backend/package-lock.json']?{reviewedDevelopmentDependencyChange:c.REVIEWED_DEVELOPMENT_PATCH}:{})};same(sorted([...c.validateBridge(prior,current,discovered,bridge,hash(JSON.stringify(bridge)))]),sorted([...new Set([SUITE,'tests/ciWorkflowContract.test.js',...browserAffected,...runtimeAffected])]));
+ return{sourceBridge:bridge,sourceBridgeSha256:hash(JSON.stringify(bridge)),affectedBrowserSourceSuites:sorted(browserAffected),affectedBackendRuntimeSuites:sorted(runtimeAffected),affectedBrowserSourceProofBoundary:'Affected frontend source-contract suites require actual current raw evidence in strict local union, outside this final17 job.',affectedBackendRuntimeProofBoundary:'Exact reviewed backend corrections require actual source-bound replacement evidence in strict local union; this final17 job does not execute or qualify them.',ciAdaptation:validateCiEvidence(plan,current,prior,ciBytes),reviewedImpactSha256:IMPACT};
+}
+function standalonePriorSource(plan){
+ const spec=plan.backendReturn.singleFileRecovery,mode=spec.priorEvidenceMode;
+ if(mode===undefined)return null;
+ assert.equal(mode,'standalone-current-final17-local-prior-union','Unknown prior-evidence mode');
+ const receipt=spec.archivedPriorSource;assert.equal(receipt?.proofClass,'PRIOR_SOURCE_ONLY_NOT_RAW_UNION');assert.equal(receipt?.originalPlanSha256,plan.backendReturn.priorJ.planSha256);assert.equal(receipt?.originalArchiveSha256,plan.backendReturn.priorJ.artifacts.find(row=>row.name==='jest-plan-38682387920-1')?.sha256);
+ const source=receipt?.source;assert.equal(source?.commit,J);assert.equal(Object.keys(source.files).length,2397);assert.equal(hash(JSON.stringify(source)),receipt.sourceSha256);return source;
+}
+function standaloneResult(current,discovered,qualified,bridge){
+ assert.equal(discovered.length,539+ADDED_BACKEND_TESTS.filter(file=>current.files['backend/'+file]).length);same(qualified.suites,[SUITE]);assert.equal(qualified.identities.length,17);
+ return{schemaVersion:1,status:'QUALIFIED_CURRENT_FINAL17_LOCAL_PRIOR_UNION_REQUIRED',currentHead:current.commit,currentSource:current,currentFinalFile:qualified,sourceBridge:bridge,requiredLocalAffectedSourceContracts:bridge.affectedBrowserSourceSuites||[],requiredLocalAffectedBackendSuites:bridge.affectedBackendRuntimeSuites||[],requiredLocalCurrentReplacementSuites:sorted([...new Set([...(bridge.affectedBrowserSourceSuites||[]),...(bridge.affectedBackendRuntimeSuites||[])])]),priorUnionVerifiedInThisJob:false,priorRawArtifactsImportedInThisJob:0,originalPassingSuitesRepeated:0,singleCompleteJestExecution:false,syntheticJestReport:false,nativeAcceptance:false,hostedProviderAcceptance:false,limits:['Only actual current final17 raw callbacks and exact source bridge qualify in this job.','Root must independently verify the preserved original eighteen raw ZIPs and source-bound J538/7745 union with these current17 before crediting combined backend acceptance.','The archived prior source snapshot is source custody only; it cannot substitute for the required local raw archive validation.']};
+}
+function verifyFinalFile(plan,record,report,mongo,http,current,planSha256,now){
+ const {planId,...payload}=plan;assert.equal(planId,hash(JSON.stringify(payload)));same(plan.source,current);same(plan.required,coverage.REQUIRED_SUBSETS);
+ assert.equal(plan.mode,'strict-single-final-file');assert.equal(plan.shards.length,1);same(plan.shards,[{id:1,suites:[SUITE]}]);same(plan.suites,[SUITE]);assert.equal(plan.originalConfigSHA256,current.files['backend/jest.config.js']);assert.equal(current.files['backend/'+SUITE],SPEC);assert.equal(record.shardCount,1);
+ const qualified=h.verifyShard(plan,record,report,mongo,http,current,planSha256,now);assert.equal(qualified.identities.length,17);same(sorted(qualified.identities.map(x=>x.title)),sorted(TITLES));return qualified;
+}
+function combine(j,current,currentDiscovery,qualified,bridge){
+ assert.equal(bridge.affectedBrowserSourceSuites?.length||0,0,'Affected frontend source contracts require explicit strict local replacement proof; final17 cannot qualify them');
+ assert.equal(bridge.affectedBackendRuntimeSuites?.length||0,0,'Affected backend corrections require explicit strict local replacement proof; final17 cannot qualify them');
+ assert.equal(j.status,'SOURCE_BOUND_COMPLETE_ORIGINAL_JEST_UNION');assert.equal(j.currentSource.commit,J);assert.equal(j.completeSuites,538);assert.equal(j.proofs.length,538);assert.equal(j.proofs.reduce((n,p)=>n+p.passedCallbacks,0),7745);assert.equal(new Set(j.proofs.map(p=>p.file)).size,538);
+ same(sorted(currentDiscovery),sorted([...j.proofs.map(p=>p.file),SUITE]));same(qualified.suites,[SUITE]);assert.equal(qualified.identities.length,17);
+ for(const p of j.proofs){assert(!p.file.endsWith('paymentAttentionSignedRecovery.test.js'));if(p.file!=='tests/ciWorkflowContract.test.js')assert.equal(p.sourceSha256,current.files['backend/'+p.file],'Unreviewed original suite source changed');}
+ for(const files of Object.values(coverage.REQUIRED_SUBSETS))for(const file of files)assert(j.proofs.some(p=>p.file===file&&p.passedCallbacks>0),'Required substantive auth/payment proof missing');
+ const originalCi=j.proofs.find(p=>p.file==='tests/ciWorkflowContract.test.js');assert(originalCi);const currentCi=bridge.ciAdaptation.callbacks;
+ return{schemaVersion:1,status:'SOURCE_BOUND_J538_AND_ACTUAL_FINAL17_VERIFIED',singleCompleteJestExecution:false,syntheticJestReport:false,currentHead:current.commit,priorJ:{suites:538,callbacks:7745,proofs:j.proofs,source:j.currentSource},currentFinalFile:qualified,sourceBridge:bridge,currentSourceAccounting:{discoveredSuiteFiles:currentDiscovery.length,currentFinalFileCallbacks:qualified.identities.length,originalJCiCallbacks:originalCi.passedCallbacks,separateCurrentLocalCiCallbacks:currentCi,callbacksFromExplicitMixedDispositions:7745-originalCi.passedCallbacks+currentCi+qualified.identities.length,proofClass:'Derived from actual discovery, prior J raw callbacks, current final-file raw callbacks and separately current local CI evidence. Not all-current Linux callback coverage.'},ciAdaptationClass:'Separate source-only CI controls; old36prefix preserved, no new protected Linux full-suite aggregate inferred.',nativeAcceptance:false,hostedProviderAcceptance:false,limits:['Actual prior J538/7745 plus current exact one-file17 with CI-adaptation counted separately; no hard539/7762 current-corpus certification.','Qualified source-attributed19local controls stay separate; no fabricated final-file report.','Current native/provider/release gates remain separate.']};
+}
+function validateCaptures(rows){
+ const expected=TITLES.map(title=>({name:title.replace(/[^a-z0-9]+/ig,'-')+'.json',observation:title.startsWith('authentic ')}));same(sorted(rows.map(row=>row.name)),sorted(expected.map(row=>row.name)));assert.equal(new Set(rows.map(row=>row.name)).size,17);let stages=0;
+ for(const row of rows){const definition=expected.find(value=>value.name===row.name),capture=row.capture,keys=sorted(Object.keys(capture.before||{}));assert.equal(keys.length,100);for(const stage of ['before','prepared','after',...(definition.observation?['afterObservation']:[])]){same(sorted(Object.keys(capture[stage]||{})),keys);assert(Object.values(capture[stage]).every(Array.isArray));stages++;}if(!definition.observation)assert.equal(capture.afterObservation,undefined);same(capture.providerWrites,[]);}assert.equal(stages,53);return{captures:17,stages};
+}
+function validatePriorJobs(rows,shards){
+ same(sorted(shards),sorted(J_SHARD_JOBS));assert.equal(new Set(shards).size,8);same(sorted(rows.map(row=>row.id)),sorted([...J_SHARD_JOBS,...J_SOURCE_JOBS]));for(const row of rows){assert.equal(row.run_id,38682387920);assert.equal(row.head_sha,J);assert.equal(row.status,'completed');assert.equal(row.conclusion,'success');}return{sourceJobs:J_SOURCE_JOBS,shardJobs:J_SHARD_JOBS,allOriginalJobsActuallySuccessful:true};
+}
+async function main(){
+ assert.equal(process.argv.length,2,'No file/grep/deadline/retry overrides');assert.equal(process.version,'v24.18.0');assert.equal(process.platform,'linux','Protected Linux execution required');assert(!process.env.NODE_OPTIONS,'Unexpected parent preload');
+ const current=coverage.snapshot(),approved=process.env.LPC_BACKEND_RETURN_BRIDGE_SHA256,bytes=fs.readFileSync(path.join(root,PLAN)),event=read(process.env.GITHUB_EVENT_PATH),dirty=cp.execFileSync('git',['status','--porcelain=v1','--untracked-files=normal'],{cwd:root,encoding:'utf8'}).trim();const{plan:shared}=validateContext(bytes,approved,current,process.env,event,dirty);
+ const output=path.join(backend,'test-results/jest/shards/single-file-final-recovery');assert(!fs.existsSync(output),'Preserve prior output; no retry in place');fs.mkdirSync(output,{recursive:true,mode:0o700});write(path.join(output,'preflight.json'),{head:current.commit,approvedPlanSha256:approved,startedAt:new Date().toISOString(),mode:'Exact final17 only; no original suite repeat'});
+ try{
+  const sourceOnly=standalonePriorSource(shared);let prior,j,priorJobs;
+  if(!sourceOnly){
+   const legacy=fs.readFileSync(path.join(backend,'tests/ci-jest-continuation-plan.json'));assert.equal(hash(legacy),'58dfb36e9b854e7a4e989bb4e66b17785451a21316d88e0e2fb8b584ea02f22a');const g=require('./import-ci-jest-prior').loadPrior(JSON.parse(legacy));j=require('./verify-source-bound-backend-return').importJ(shared.backendReturn.priorJ);
+   prior=c.verifyContinuation({priorPlan:g.plan,priorInputs:g.inputs,current:j.plan.source,discovered:j.plan.continuation.currentDiscovery,bridge:j.plan.continuation.sourceBridge,currentPlan:j.plan,currentInputs:j.inputs,currentPlanSha256:j.planSha256,approvedBridgeSha256:j.plan.continuation.sourceBridgeSha256,now:Date.now()});
+   priorJobs=validatePriorJobs([...J_SOURCE_JOBS,...J_SHARD_JOBS].map(id=>JSON.parse(cp.execFileSync('gh',['api','repos/thegitsss/lets-para3/actions/jobs/'+id],{encoding:'utf8',maxBuffer:4*1024*1024,stdio:['ignore','pipe','pipe']}))),shared.backendReturn.originalShardJobIds);
+  }
+  const discovered=h.discover(),bridge=validateSource(shared,approved,current,sourceOnly||prior.currentSource,discovered,fs.readFileSync(path.join(backend,'tests/ciWorkflowContract.test.js')));coverage.assertOriginalConfig(require(path.join(backend,'jest.config.js')));const pkg=read(path.join(backend,'package.json'));assert.equal(pkg.scripts.test,'node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand');for(const name of Object.keys(coverage.REQUIRED_SUBSETS))coverage.focusedFiles(pkg,name);
+  require('../utils/frontendAssets').verifyFrontendBuild(root);const build=fs.readFileSync(path.join(root,'.lpc-build/manifest.json'));const payload={schemaVersion:2,mode:'strict-single-final-file',preparedAt:new Date().toISOString(),executionId:process.env.GITHUB_RUN_ID+':'+process.env.GITHUB_RUN_ATTEMPT,source:current,approvedSharedPlanSha256:approved,originalConfigSHA256:current.files['backend/jest.config.js'],required:coverage.REQUIRED_SUBSETS,suites:[SUITE],shards:[{id:1,suites:[SUITE]}],sourceBridgeSha256:bridge.sourceBridgeSha256,frontendBuildManifestSha256:hash(build)},plan={...payload,planId:hash(JSON.stringify(payload))};write(path.join(output,'plan.json'),plan);const planSha256=hash(fs.readFileSync(path.join(output,'plan.json')));
+  for(const name of ['mongo.jsonl','http.jsonl'])fs.writeFileSync(path.join(output,name),'',{mode:0o600});const observer=path.join(__dirname,'ci-jest-owned-observer.cjs'),namespace='ci-final-file-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT;process.env.LPC_TEST_MONGO_NAMESPACE=namespace;
+  const command=h.expectedJestArgs(backend,output,[SUITE]),record={schemaVersion:2,shardId:1,shardCount:1,executionId:plan.executionId,planId:plan.planId,planSHA256:planSha256,backendRoot:backend,outputRoot:output,namespace,suites:[SUITE],sourceBefore:current,observerSHA256:hash(fs.readFileSync(observer)),startedAt:new Date().toISOString(),command};write(path.join(output,'running.json'),record);
+  const env={...process.env,NODE_ENV:'test',APP_ENV:'test',EMAIL_DISABLE:'true',MONGOMS_IP:'127.0.0.1',LPC_TEST_MONGO_NAMESPACE:namespace,LPC_CI_JEST_OBSERVATION:output,LPC_ATTENTION_EVIDENCE_DIR:path.join(output,'models'),NODE_OPTIONS:'--require='+observer,JEST_JUNIT_OUTPUT_DIR:output,JEST_JUNIT_OUTPUT_NAME:'results.xml'};for(const key of ['GH_TOKEN','GITHUB_TOKEN','ACTIONS_ID_TOKEN_REQUEST_TOKEN','ACTIONS_RUNTIME_TOKEN'])delete env[key];const fd=fs.openSync(path.join(output,'jest.log'),'wx',0o600),child=cp.spawn(process.execPath,command,{cwd:backend,env,stdio:['ignore','pipe','pipe']});record.childPid=child.pid;
+  for(const[stream,target]of[[child.stdout,process.stdout],[child.stderr,process.stderr]])stream.on('data',chunk=>{fs.writeSync(fd,chunk);target.write(chunk);});record.terminal=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',(code,signal)=>resolve({code,signal}));});fs.closeSync(fd);record.finishedAt=new Date().toISOString();record.sourceAfter=coverage.snapshot();record.harnessStateReleased=!fs.existsSync(require('../tests/helpers/mongoHarnessState').STATE_PATH);record.rawSHA256={};
+  for(const name of ['results.json','results.xml','mongo.jsonl','http.jsonl'])if(fs.existsSync(path.join(output,name)))record.rawSHA256[name]=hash(fs.readFileSync(path.join(output,name)));record.sourceAfterDirty=cp.execFileSync('git',['status','--porcelain=v1','--untracked-files=normal'],{cwd:root,encoding:'utf8'}).trim();write(path.join(output,'shard.json'),record);validateContext(bytes,approved,record.sourceAfter,process.env,event,record.sourceAfterDirty);const lines=name=>fs.readFileSync(path.join(output,name+'.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+  const qualified=verifyFinalFile(plan,record,read(path.join(output,'results.json')),lines('mongo'),lines('http'),record.sourceAfter,planSha256,Date.now());assert(fs.statSync(path.join(output,'results.xml')).size>0);
+  const captureFiles=fs.readdirSync(path.join(output,'models')).sort(),{stages}=validateCaptures(captureFiles.map(file=>({name:file,capture:read(path.join(output,'models',file))})));same(record.sourceAfter,current);
+  const combined=sourceOnly?standaloneResult(current,discovered,qualified,bridge):combine(prior,current,discovered,qualified,bridge);combined.sharedPlanSha256=approved;combined.currentRawSHA256=record.rawSHA256;combined.full100ModelStages=stages;combined.captures=captureFiles.map(file=>({file:'models/'+file,sha256:hash(fs.readFileSync(path.join(output,'models',file)))}));if(!sourceOnly){combined.priorRawJArtifacts=j.artifacts;combined.priorActualJobs=priorJobs;}write(path.join(output,'qualified-final-file.json'),qualified);write(path.join(output,sourceOnly?'qualified-current-final17-local-union-required.json':'qualified-source-bound-j-plus-final17.json'),combined);
+  assert(process.env.GITHUB_OUTPUT);fs.appendFileSync(process.env.GITHUB_OUTPUT,'checks_result=success\nshards_result=success\ncoverage_result=success\n');console.log(sourceOnly?'[single-file-return] Actual current final17/1 passed. Prior raw union was NOT imported or verified in this job; strict local J538/7745 plus final17 union remains required.':'[single-file-return] Actual final17/1 passed; J7745/538 retained; current CI-adaptation remains separately attributed. No full-suite rerun.');
+ }catch(error){write(path.join(output,'failed.json'),{status:'FAILED_OR_INCOMPLETE_NO_UNION_CREDIT',error:error.stack,at:new Date().toISOString()});throw error;}
+}
+module.exports={validateContext,validateCiEvidence,validateSource,standalonePriorSource,standaloneResult,verifyFinalFile,validateCaptures,validatePriorJobs,combine,constants:{PLAN,SUITE,J,IMPACT,SPEC,PRODUCTS,BACKEND_RUNTIME_CHANGES,ADDED_BACKEND_TESTS,ASSISTANT_DEFAULT_OFF_BRIDGE,ASSISTANT_PRESERVED_CONSUMERS,EXISTING_CI,CI_ADDITIONS,BROWSER_ONLY_PRODUCTS,BROWSER_FIXTURES,BROWSER_CONFIGS,DOCS,STRICT,TITLES,J_SHARD_JOBS,J_SOURCE_JOBS}};
+if(require.main===module)main().catch(error=>{console.error(error.stack);process.exitCode=1;});

@@ -23,10 +23,17 @@ const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
+const workspaceRelease = require("../services/workspaceRelease");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { ensureApprovedUserAuthReady, isApprovedUser } = require("../utils/authReady");
 const { createLogger } = require("../utils/logger");
+const {
+  buildAuthenticatedProfilePhotoUrl,
+  buildPublicProfilePhotoUrl,
+  hasPhotoReference,
+} = require("../services/profilePhotoDelivery");
+const { hasRequiredParalegalFieldsForPublic } = require("../utils/paralegalProfile");
 const verifyToken = require("../utils/verifyToken");
 const { requireGuardedSupportReset } = require("../utils/supportAccountBoundary");
 const { validateNewPassword } = require("../utils/passwordPolicy");
@@ -121,11 +128,7 @@ const registrationUpload = multer({
 const s3 = createS3Client();
 const BUCKET = process.env.S3_BUCKET || "";
 
-function sseParams() {
-  return process.env.S3_SSE_KMS_KEY_ID
-    ? { ServerSideEncryption:'aws:kms', SSEKMSKeyId:process.env.S3_SSE_KMS_KEY_ID }
-    : { ServerSideEncryption:'AES256' };
-}
+const { confidentialStorageEncryption: sseParams } = require("../utils/storageEncryption");
 
 function safeSegment(value) {
   return String(value || "")
@@ -326,10 +329,15 @@ function googleErrorRedirect(code, intent = "login", requestedTarget = "") {
 }
 
 async function roleDashboard(user) {
-  const role=String(user?.role || '').toLowerCase();
-  if(role==='admin') return '/admin-dashboard.html';
-  if(role==='director') return '/director-portal.html';
-  return role==='paralegal' ? '/dashboard-paralegal.html' : '/dashboard-attorney.html';
+  const normalizedRole = String(user?.role || "").toLowerCase();
+  if (normalizedRole === "admin") return "/admin-dashboard.html";
+  if (normalizedRole === "director") return "/director-portal.html";
+  if (["attorney", "paralegal"].includes(normalizedRole)) {
+    try { return (await workspaceRelease.readDecision(user)).defaultDestination; }
+    catch (error) { authLogger.error("Workspace routing unavailable after sign-in", { name: error?.name || "Error" }); }
+  }
+  if (normalizedRole === "paralegal") return "/paralegal-v2.html#/home";
+  return "/attorney-v2.html#/home";
 }
 
 async function startGoogleTwoFactor(req, res, user) {
@@ -1208,7 +1216,7 @@ router.post(
     });
 
     try {
-      const { enqueueAlert, processAlerts } = require('../services/authSignupAlerts');
+      const { enqueueAlert, processAlerts } = require('../services/adminAlertService');
       const key = `signup:${user._id}`;
       await enqueueAlert({ key, kind: 'signup', targetId: user._id });
       await processAlerts({ key, limit: 1 });
@@ -1622,7 +1630,7 @@ router.post(
     const challengeToken = String(req.body?.challengeToken || "");
     if (challengeToken) {
       const challengeUser = await User.findOne({ twoFactorChallengeHash: hashOpaqueToken(challengeToken) })
-        .select("_id twoFactorEnabled twoFactorExpiresAt");
+        .select("_id twoFactorEnabled +twoFactorExpiresAt");
       if (!challengeUser?.twoFactorEnabled || !challengeUser.twoFactorExpiresAt || challengeUser.twoFactorExpiresAt <= new Date()) {
         return res.status(400).json({ error: "Invalid sign-in challenge." });
       }
@@ -1725,26 +1733,40 @@ router.post(
 // ME
 // GET /api/auth/me  (reads Bearer token)
 // ----------------------------------------
+router.get("/workspace-release", verifyToken, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json({ workspace: await workspaceRelease.readDecision(req.user) });
+  } catch (error) {
+    if (error?.statusCode === 403) return res.status(403).json({ error: error.message, code: error.code });
+    throw error;
+  }
+}));
+
 router.get(
   "/me",
   verifyToken.optional,
   asyncHandler(async (req, res) => {
     if (!req.user?.id) return res.json({ user: null });
-    const hdr = req.headers.authorization || "";
-    const bearer = hdr.startsWith("Bearer ") ? hdr.slice(7) : "";
-    const cookieToken =
-      req.cookies?.token ||
-      req.cookies?.[process.env.JWT_COOKIE_NAME || "access"];
-    const token = cookieToken || bearer;
-    if (!token) return res.json({ user: null });
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      // freshen user info (role/status might have changed)
-      const u = await User.findById(payload.id).lean();
+      const u = await User.findById(req.user.id).lean();
       if (!u) return res.json({ user: null });
       if (isDeactivatedUser(u)) {
         return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
       }
+      const hasApprovedPhoto = hasPhotoReference(u, "approved");
+      const hasPendingPhoto = hasPhotoReference(u, "pending");
+      const publicPhotoReady =
+        String(u.role || "").toLowerCase() === "paralegal" &&
+        String(u.profilePhotoStatus || "").toLowerCase() === "approved" &&
+        !hasPendingPhoto &&
+        u.preferences?.hideProfile !== true &&
+        hasRequiredParalegalFieldsForPublic(u);
+      const approvedPhotoUrl = hasApprovedPhoto
+        ? publicPhotoReady
+          ? buildPublicProfilePhotoUrl(u)
+          : buildAuthenticatedProfilePhotoUrl(u)
+        : null;
       res.json({
         user: {
           id: u._id,
@@ -1754,9 +1776,11 @@ router.get(
           pendingEmailRequestedAt: u.pendingEmailRequestedAt || null,
         firstName: u.firstName,
         lastName: u.lastName,
-        avatarURL: u.avatarURL || null,
-        profileImage: u.profileImage || null,
-        pendingProfileImage: u.pendingProfileImage || null,
+        avatarURL: approvedPhotoUrl,
+        profileImage: approvedPhotoUrl,
+        pendingProfileImage: hasPendingPhoto
+          ? buildAuthenticatedProfilePhotoUrl(u, { variant: "pending" })
+          : null,
         profilePhotoStatus: u.profilePhotoStatus || null,
         status: u.status,
         state: u.state || "",
@@ -1764,9 +1788,10 @@ router.get(
           stateExperience: Array.isArray(u.stateExperience) ? u.stateExperience : [],
           disabled: Boolean(u.disabled),
           preferences: {
-            theme:
-              (u.preferences && typeof u.preferences === "object" && u.preferences.theme) ||
-              "mountain",
+            accentColor: ["cornflower","violet","teal","rose"].includes(u.preferences?.accentColor) ? u.preferences.accentColor : "cornflower",
+            theme: normalizeAccountTheme(
+              u.preferences && typeof u.preferences === "object" ? u.preferences.theme : ""
+            ),
             fontSize:
               (u.preferences && typeof u.preferences === "object" && u.preferences.fontSize) ||
               "md",
@@ -1775,8 +1800,8 @@ router.get(
           pendingHire: serializePendingHire(u.pendingHire || {}),
         },
       });
-    } catch {
-      res.json({ user: null });
+    } catch (error) {
+      throw error;
     }
   })
 );

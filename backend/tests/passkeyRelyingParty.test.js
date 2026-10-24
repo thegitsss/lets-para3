@@ -1,10 +1,10 @@
 const { relyingParty } = require('../services/passkeyService');
-const keys = ['NODE_ENV','APP_ENV','APP_BASE_URL','WEBAUTHN_ORIGIN','WEBAUTHN_RP_ID'];
+const keys=['NODE_ENV','APP_ENV','APP_BASE_URL','WEBAUTHN_ORIGIN','WEBAUTHN_RP_ID'];
 let previous;
-const request = (host='www.lets-paraconnect.com',protocol='https') => ({protocol,headers:{host},get:()=>host});
-beforeEach(()=>{previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));process.env.NODE_ENV='production';delete process.env.APP_ENV;process.env.APP_BASE_URL='lets-paraconnect.com';delete process.env.WEBAUTHN_ORIGIN;delete process.env.WEBAUTHN_RP_ID;});
+const request=(host='localhost:5050')=>({protocol:'http',headers:{host},get:()=>host});
+beforeEach(()=>{previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));process.env.NODE_ENV='development';process.env.APP_ENV='development';process.env.APP_BASE_URL='https://www.lets-paraconnect.com';delete process.env.WEBAUTHN_ORIGIN;delete process.env.WEBAUTHN_RP_ID;});
 afterEach(()=>{for(const key of keys){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}});
-test('the hosted bare site address generates the actual HTTPS credential origin',()=>{expect(relyingParty(request())).toMatchObject({origin:'https://www.lets-paraconnect.com',rpID:'www.lets-paraconnect.com'});});
-test('an unrelated Host cannot replace the configured credential origin',()=>{expect(relyingParty(request('untrusted.example'))).toMatchObject({origin:'https://lets-paraconnect.com',rpID:'lets-paraconnect.com'});});
-test('an explicit WebAuthn origin and relying-party ID remain authoritative',()=>{process.env.WEBAUTHN_ORIGIN='https://accounts.example.com';process.env.WEBAUTHN_RP_ID='example.com';expect(relyingParty(request())).toMatchObject({origin:'https://accounts.example.com',rpID:'example.com'});});
-test('localhost credentials remain local in development',()=>{process.env.NODE_ENV='development';expect(relyingParty(request('localhost:5050','http'))).toMatchObject({origin:'http://localhost:5050',rpID:'localhost'});});
+test('development loopback credentials belong to the browser origin rather than the public website',()=>{expect(relyingParty(request())).toMatchObject({origin:'http://localhost:5050',rpID:'localhost'});expect(relyingParty(request('127.0.0.1:5050'))).toMatchObject({origin:'http://127.0.0.1:5050',rpID:'127.0.0.1'});});
+test.each(['production','staging'])('deployed %s origins cannot be replaced by a loopback Host header',mode=>{process.env.APP_ENV=mode;expect(relyingParty(request())).toMatchObject({origin:'https://www.lets-paraconnect.com',rpID:'www.lets-paraconnect.com'});});
+test('explicit WebAuthn configuration remains authoritative in development',()=>{process.env.WEBAUTHN_ORIGIN='https://accounts.example.com';expect(relyingParty(request())).toMatchObject({origin:'https://accounts.example.com',rpID:'accounts.example.com'});delete process.env.WEBAUTHN_ORIGIN;process.env.WEBAUTHN_RP_ID='lets-paraconnect.com';expect(relyingParty(request())).toMatchObject({origin:'https://www.lets-paraconnect.com',rpID:'lets-paraconnect.com'});});
+test('an arbitrary nonlocal Host header does not replace the configured origin',()=>{expect(relyingParty(request('untrusted.example'))).toMatchObject({origin:'https://www.lets-paraconnect.com',rpID:'www.lets-paraconnect.com'});});

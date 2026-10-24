@@ -1,0 +1,174 @@
+import { withMatterReturn } from "./matter-return.mjs";
+import { node, button, link, recoveryButton, setRecovery } from "./dom.mjs";
+import { matterLink, objectId } from "./workspace-model.mjs";
+import { readDates, readDateOperation, dateTypes, dateFields, dateChanges, calendarLabel, wallInstants, occurrenceLabel, validDate } from "./dates-model.mjs";
+
+export function createWorkspaceDates(caseId, { api, signal, ownerId, route, privateState }) {
+  const section = node("section", { "aria-label": "Your Matter calendar", "data-workspace-dates": "" }), feedback = node("p", { role: "status" }), count = node("p", { className: "av2-muted" }), list = node("ol", { className: "av2-calendar-list" }), detail = node("div", { "data-calendar-detail": "" }), editor = node("dialog", { "data-calendar-editor": "",className:"av2-matter-dialog", "aria-modal":"true", "aria-labelledby":`av2-calendar-editor-title-${caseId}` });
+  const displayTimezone=Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const today=new Intl.DateTimeFormat("en-CA",{timeZone:displayTimezone,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const state = privateState.dateReviews.get(caseId) || { draft: null, pending: null, from: today, to: "", selectedId: null };
+  privateState.dateReviews.set(caseId, state); state.busy = false;
+  let review = null, rows = [], cursor = null, reading = false, transfer = null, selectedId = objectId(route.query.get("eventId")) || state.selectedId;
+  const options = { signal, ownerId }, refresh = recoveryButton("Retry calendar", () => void load()), more = button("Show more dates", () => void load({ more: true })), add = button("Add calendar entry", event => state.draft ? renderEditor(event.currentTarget) : openEditor("create",null,event.currentTarget), "av2-button");
+  const from = node("input", { id: `av2-date-from-${caseId}`, type: "date", value: state.from }), to = node("input", { id: `av2-date-to-${caseId}`, type: "date", value: state.to });
+  const filters = node("div", { className: "av2-date-grid" }, [node("label", { for: from.id, text: "From date" }), from, node("label", { for: to.id, text: "Through date" }), to]);
+  const apply = button("Filter dates", () => { if (from.value && !validDate(from.value) || to.value && !validDate(to.value) || from.value && to.value && from.value > to.value) { feedback.textContent = "Enter a valid date range."; return; } state.from = from.value; state.to = to.value; updateRange(); void load(); });
+  const reset = button("Show all dates", () => { state.from = ""; state.to = ""; from.value = ""; to.value = ""; updateRange(); void load(); });
+  const recovery = node("div", { "data-calendar-recovery": "" }), check = button("Check saved action", () => void checkPending()), retry = button("Retry the reviewed action", () => void perform());
+  const stop = button("Stop waiting", () => transfer?.abort()); stop.hidden = true;
+  const filterDisclosure=node("details",{className:"av2-calendar-filters"},[node("summary",{text:"Date filters"}),filters,node("p",{className:"av2-muted",text:`Dates and times use ${displayTimezone}. All-day dates keep their calendar date.`}),node("div",{className:"av2-actions"},[apply,reset])]);
+  function updateRange() { filterDisclosure.querySelector('summary').textContent = state.from || state.to ? `Date filters · ${state.from === today && !state.to ? 'upcoming' : [state.from && `from ${state.from}`,state.to && `through ${state.to}`].filter(Boolean).join(' ')}` : 'Date filters · all dates'; }
+  updateRange();
+  section.append(node("div",{className:"av2-section-heading"},[node("h3",{text:"Your private calendar"}),node("div",{className:"av2-actions"},[add,refresh,filterDisclosure])]),node("p",{className:"av2-muted",text:"Your private calendar entries do not change the agreed Matter deadline."}),feedback,count,list,more,detail,editor,recovery,stop);
+  let editorReturnFocus=null;
+  function closeEditor(){if(editor.open)editor.close();section.append(feedback,recovery,stop);(editorReturnFocus?.isConnected ? editorReturnFocus : add).focus({preventScroll:true});controls();}
+  editor.addEventListener("cancel",event=>{event.preventDefault();if(state.busy || state.pending){feedback.textContent="Check the saved calendar action before closing this review.";return;}closeEditor();});
+  function localBoundary(value,end=false){const day=new Date(`${value}T12:00:00.000Z`);if(end)day.setUTCDate(day.getUTCDate()+1);const options=wallInstants(day.toISOString().slice(0,10),"00:00",displayTimezone);if(!options.length)throw new Error("This calendar day does not exist in your time zone.");return new Date(Date.parse(options[0])-(end ? 1 : 0)).toISOString();}
+  function controls() {
+    add.disabled = !review || reading || state.busy || Boolean(state.pending); add.textContent=state.draft ? "Resume calendar changes" : "Add calendar entry";
+    refresh.disabled = reading || state.busy; more.disabled = reading || state.busy; more.hidden = !cursor;
+    for (const control of [apply, reset, from, to]) control.disabled = reading || state.busy;
+    for (const control of [...detail.querySelectorAll("button"), ...editor.querySelectorAll("button,input,textarea,select")]) control.disabled = reading || state.busy || Boolean(state.pending) && !recovery.contains(control);
+    check.disabled = reading || state.busy; retry.disabled = reading || state.busy || !state.retryReviewed; stop.hidden = !state.busy;
+  
+    setRecovery(refresh, section);
+  }
+  function denied() {
+    state.draft = null; state.pending = null; state.selectedId = null; privateState.dateReviews.delete(caseId); rows = []; review = null; cursor = null; list.replaceChildren(); detail.replaceChildren(); closeEditor();editor.replaceChildren(); recovery.replaceChildren(); count.textContent = ""; section.dataset.state = "error";
+  }
+  const currentEntry = () => review?.selectedEvent || rows.find(entry => entry.id === selectedId) || null;
+  function showDetails() {
+    detail.replaceChildren(); const entry = currentEntry(); if (!entry) { if (selectedId) detail.append(node("p", { text: "This calendar entry is no longer available to your account." })); return; }
+    detail.append(node("h4", { text: entry.title }), node("p", { text: calendarLabel({...entry,timezone:displayTimezone}) }));
+    if (entry.end && !entry.isAllDay && entry.end !== entry.start) detail.append(node("p", { text: `Ends: ${calendarLabel({ ...entry, start: entry.end,timezone:displayTimezone })}` }));
+    if (entry.where) detail.append(node("p", { className: "av2-preserve-lines", text: `Location: ${entry.where}` }));
+    if (entry.notes) detail.append(node("p", { className: "av2-preserve-lines", text: entry.notes }));
+    if (entry.rrule) detail.append(node("p", { text: "A repeat rule is recorded for this entry. Repeated occurrences are not added to this calendar list." }), node("code", { text: entry.rrule }));
+    if (entry.attendees.length) detail.append(node("h5", { text: "Recorded attendees" }), node("ul", {}, entry.attendees.map(value => node("li", { text: `${value.name || value.email || "Attendee"}${value.name && value.email ? ` · ${value.email}` : ""} · ${{ needsAction: "No response recorded", accepted: "Accepted", declined: "Declined", tentative: "Tentative" }[value.response] || "Response unavailable"}${value.required ? " · Required" : ""}` }))));
+    if (entry.reminders.length) detail.append(node("h5", { text: "Recorded reminders" }), node("ul", {}, entry.reminders.map(value => node("li", { text: `${value.method === "none" ? "No delivery method" : value.method === "email" ? "Email" : value.method === "push" ? "Push" : "Method unavailable"} · ${value.minutesBefore === null ? "Timing not recorded" : `${value.minutesBefore} minutes before`}` }))), node("p", { className: "av2-muted", text: "Reminder delivery status is not available here." }));
+    detail.append(node("div", { className: "av2-actions" }, [button("Edit calendar entry", event => openEditor("update", entry,event.currentTarget)), button("Remove calendar entry", event => openEditor("delete", entry,event.currentTarget)), button("Add attendee record", event => openEditor("attendee", entry,event.currentTarget)), button("Record reminder", event => openEditor("reminder", entry,event.currentTarget)), link("Link to this date", withMatterReturn(matterLink(caseId, "deadlines", new URLSearchParams({ eventId: entry.id })),route))]));
+  }
+  function render() {
+    const focus = document.activeElement, focusedRow = focus?.closest?.("[data-event-id]")?.dataset.eventId, focusedDetail = detail.contains(focus) && focus?.tagName === "BUTTON" ? focus.textContent : null;
+    list.replaceChildren(...rows.map(entry => node("li", { "data-event-id": entry.id }, [node("strong", { text: entry.title }), node("p", { text: `${dateTypes[entry.type] || "Calendar entry"} · ${calendarLabel({...entry,timezone:displayTimezone})}` }), button("Review date", () => { selectedId = entry.id; state.selectedId = entry.id; void load(); })])));
+    count.textContent = !review.total ? "" : `${review.total} ${review.total === 1 ? "entry" : "entries"} in this date range${cursor ? ` · ${rows.length} shown` : ""}.`;
+    if (!rows.length) list.append(node("li", { text: "No calendar entries are recorded in this date range." }));
+    showDetails(); showRecovery(); controls();
+    if (focusedRow || focusedDetail) requestAnimationFrame(() => {
+      if (signal.aborted || document.activeElement !== document.body && document.activeElement !== focus) return;
+      if (focusedRow) list.querySelector(`[data-event-id="${focusedRow}"] button`)?.focus({ preventScroll: true });
+      else [...detail.querySelectorAll("button")].find(control => control.textContent === focusedDetail)?.focus({ preventScroll: true });
+    });
+  }
+  function showRecovery() {
+    recovery.replaceChildren(); if (!state.pending) return;
+    recovery.append(node("h4", { text: "Check the calendar action" }), node("p", { text: state.busy ? "Saving the reviewed action…" : "The action is not yet confirmed. Check its saved status before making another change." }), node("div", { className: "av2-actions" }, [check, retry]));
+  }
+  function openEditor(action, entry = null, trigger = document.activeElement) {
+    if (state.busy || state.pending) return;
+    editorReturnFocus=trigger;
+    state.draft = { action, entry, fields: action === "create" || action === "update" ? dateFields(entry) : action === "attendee" ? { name: "", email: "", role: "guest", response: "needsAction", required: true } : action === "reminder" ? { minutesBefore: "30", method: "email" } : {} };
+    renderEditor(); controls(); (editor.querySelector("input,select,textarea") || editor.querySelector("button"))?.focus();
+  }
+  function renderEditor(trigger) {
+    if(trigger)editorReturnFocus=trigger;
+    editor.replaceChildren(); const draft = state.draft; if (!draft) return;
+    const labels = { create: "Add calendar entry", update: "Edit calendar entry", delete: "Remove this calendar entry?", attendee: "Add attendee record", reminder: "Record reminder" };
+    const close = button("×",()=>closeEditor(),"av2-text-link");
+    close.setAttribute("aria-label","Close calendar editor");
+    editor.append(node("div",{className:"av2-section-heading"},[node("h2", { id:`av2-calendar-editor-title-${caseId}`,text: labels[draft.action] }),close]));
+    const grid = node("div", { className: "av2-date-grid" }), fields = draft.fields, formControls = {};
+    function field(key, label, type = "text", choices = null, max = null) {
+      const fieldId = `av2-calendar-${caseId}-${key}`;
+      const control = choices ? node("select", { id: fieldId }, Object.entries(choices).map(([value, text]) => node("option", { value, text }))) : node(type === "textarea" ? "textarea" : "input", { id: fieldId, ...(type === "textarea" ? { rows: "4" } : { type }), ...(max ? { maxlength: String(max) } : {}) });
+      if (type === "checkbox") control.checked = fields[key]; else control.value = fields[key] ?? "";
+      control.addEventListener(type === "checkbox" || choices ? "change" : "input", () => { fields[key] = type === "checkbox" ? control.checked : control.value; if (["isAllDay", "timezone", "startDate", "startTime", "endDate", "endTime"].includes(key)) updateTimes(); });
+      grid.append(node("div", { className: "lpc-popup-calendar-field", "data-calendar-field": key }, [node("label", { for: fieldId, text: label }), control])); formControls[key] = control; return control;
+    }
+    const occurrences = {};
+    function updateTimes() {
+      if (!formControls.startTime) return;
+      for (const prefix of ["start", "end"]) {
+        const time = formControls[`${prefix}Time`]; time.hidden = fields.isAllDay; grid.querySelector(`label[for="${time.id}"]`).hidden = fields.isAllDay;
+        const container = occurrences[prefix]; if (!container) continue; container.replaceChildren();
+        const values = fields.isAllDay ? [] : wallInstants(fields[`${prefix}Date`], fields[`${prefix}Time`], fields.timezone);
+        if (values.length > 1) {
+          const fieldId = `av2-calendar-${caseId}-${prefix}-occurrence`, select = node("select", { id: fieldId }, [node("option", { value: "", text: "Choose an occurrence" }), ...values.map((value, index) => node("option", { value, text: `${index === 0 ? "First" : "Second"} · ${occurrenceLabel(value, fields.timezone)}` }))]);
+          select.value = values.includes(fields[`${prefix}Occurrence`]) ? fields[`${prefix}Occurrence`] : "";
+          select.addEventListener("change", () => { fields[`${prefix}Occurrence`] = select.value; }); container.append(node("label", { for: fieldId, text: `Which ${prefix} time?` }), select);
+        }
+      }
+    }
+    if (["create", "update"].includes(draft.action)) {
+      field("title", "Entry title", "text", null, 500); field("type", "Type of date", "text", dateTypes); field("isAllDay", "All-day entry", "checkbox"); field("timezone", "Time zone", "text", null, 100);
+      for (const prefix of ["start", "end"]) { field(`${prefix}Date`, `${prefix === "start" ? "Start" : "End"} date${prefix === "end" ? " (optional)" : ""}`, "date"); field(`${prefix}Time`, `${prefix === "start" ? "Start" : "End"} time`, "time"); occurrences[prefix] = node("div", { className: "av2-date-occurrence" }); grid.append(occurrences[prefix]); }
+      field("where", "Location or meeting link", "text", null, 2000); field("notes", "Calendar notes", "textarea", null, 20000); updateTimes();
+    } else if (draft.action === "attendee") {
+      editor.append(node("p", { text: "Record an attendee and their response. No invitation is sent." })); field("name", "Attendee name", "text", null, 300); field("email", "Attendee email (optional)", "email", null, 320); field("role", "Role", "text", { guest: "Guest", attorney: "Attorney", paralegal: "Paralegal", admin: "LPC administrator" }); field("response", "Recorded response", "text", { needsAction: "No response recorded", accepted: "Accepted", declined: "Declined", tentative: "Tentative" }); field("required", "Attendance required", "checkbox");
+    } else if (draft.action === "reminder") {
+      editor.append(node("p", { text: "Record reminder settings. This does not confirm delivery." })); field("minutesBefore", "Minutes before the entry", "number"); formControls.minutesBefore.min = "0"; formControls.minutesBefore.max = "20160"; formControls.minutesBefore.step = "1"; field("method", "Recorded delivery method", "text", { email: "Email", push: "Push", none: "None" });
+    } else editor.append(node("p", { text: draft.entry.title }), node("p", { text: "The Matter’s deadline and other records will stay." }));
+    editor.append(grid, feedback,recovery,stop,node("div", { className: "av2-actions" }, [button(draft.action === "delete" ? "Confirm removal" : "Save calendar entry", () => void beginSave(), draft.action === "delete" ? "av2-button av2-danger" : "av2-button"), button(draft.action === "delete" ? "Keep calendar entry" : "Discard calendar changes", () => { state.draft = null; closeEditor(); editor.replaceChildren(); controls(); })]));
+    requestAnimationFrame(()=>{if(!signal.aborted && state.draft && editor.isConnected && !editor.open){editor.showModal();(editor.querySelector("input,select,textarea") || editor.querySelector("button"))?.focus();}});
+  }
+  async function beginSave() {
+    if (!state.draft || !review || state.pending || state.busy || reading || signal.aborted) return;
+    const draft = state.draft;
+    try {
+      const values = ["create", "update"].includes(draft.action) ? dateChanges(draft.fields, draft.entry) : draft.action === "reminder" ? { method: draft.fields.method, minutesBefore: Number(draft.fields.minutesBefore) } : draft.action === "attendee" ? Object.fromEntries(Object.entries(draft.fields).filter(([key, value]) => key !== "email" || value)) : {};
+      if (draft.action === "update" && !Object.keys(values).length) { feedback.textContent = "No calendar changes to save."; return; }
+      state.pending = { requestId: crypto.randomUUID(), action: draft.action, values, reviewedMatterRevision: review.revision, ...(draft.entry ? { eventId: draft.entry.id, reviewedRevision: draft.entry.revision } : {}) }; state.retryReviewed = false;
+      await perform();
+    } catch (error) { if (!signal.aborted) feedback.textContent = error.message; }
+  }
+  async function confirmed(value) {
+    const operation = readDateOperation(value, caseId);
+    if (operation.status !== "recorded" || operation.action !== state.pending?.action || state.pending.eventId && state.pending.eventId !== operation.eventId) throw new Error("unconfirmed_calendar_action");
+    const action = operation.action; selectedId = operation.event?.id || null; state.selectedId = selectedId; state.pending = null; state.draft = null; state.retryReviewed = false; closeEditor(); editor.replaceChildren(); recovery.replaceChildren(); await load();
+    if (section.dataset.state === "ready") feedback.textContent = operation.changedSinceSave ? "The action was recorded. This entry has changed or been removed since then; its current record is shown." : action === "delete" ? "Calendar entry removed." : action === "attendee" ? "Attendee recorded." : action === "reminder" ? "Reminder settings recorded." : "Calendar entry saved.";
+  }
+  async function perform() {
+    if (!state.pending || state.busy || signal.aborted) return;
+    const controller = new AbortController(); transfer = controller; const abort = () => controller.abort(); signal.addEventListener("abort", abort, { once: true }); const timer = setTimeout(abort, 120000);
+    state.busy = true; state.retryReviewed = false; showRecovery(); controls(); feedback.textContent = "Saving calendar entry…";
+    try { const result = await api.saveWorkspaceDate(caseId, state.pending, { ...options, signal: controller.signal }); if (!signal.aborted && !controller.signal.aborted) await confirmed(result.operation); }
+    catch (error) {
+      if (signal.aborted) return;
+      if ([401, 403].includes(error.status) || error.kind === "authentication") { denied(); feedback.textContent = "Calendar access changed. Refresh the Matter before continuing."; }
+      else if ([400, 422].includes(error.status)) { state.pending = null; recovery.replaceChildren(); feedback.textContent = "The calendar entry was not saved. Check the dates, time zone and other fields before trying again."; }
+      else feedback.textContent = error.status === 409 ? "The entry or Matter changed. Check the saved action and review the current entry before trying again." : "The calendar action could not be confirmed. Check its saved status before trying again.";
+    } finally { clearTimeout(timer); signal.removeEventListener("abort", abort); transfer = null; state.busy = false; if (!signal.aborted) { showRecovery(); controls(); } }
+  }
+  async function checkPending() {
+    if (!state.pending || state.busy || reading || signal.aborted) return;
+    reading = true; controls();
+    try {
+      const next = readDates(await api.readWorkspaceDates(caseId, { ...options, requestId: state.pending.requestId, ...(state.pending.eventId ? { eventId: state.pending.eventId } : {}) }), caseId, ownerId);
+      if (signal.aborted) return;
+      if (next.operation.status === "recorded") { reading = false; await confirmed(next.operation); return; }
+      review = next; state.retryReviewed = false; showRecovery();
+      const current = next.selectedEvent;
+      recovery.append(node("p", { text: "No completed action is recorded for this request." }));
+      if (state.pending.action !== "create" && !current) { recovery.append(node("p", { text: "The selected entry is no longer available. Its removal cannot be attributed to this request." }), button("Close these unsaved calendar changes", () => { state.pending = null; state.draft = null; closeEditor(); editor.replaceChildren(); recovery.replaceChildren(); void load(); })); return; }
+      if (current) recovery.append(node("p", { className: "av2-preserve-lines", text: `Current entry: ${current.title}\n${calendarLabel(current)}\n${current.notes}` }));
+      recovery.append(button("Use the current record for this action", () => { state.pending.reviewedMatterRevision = next.revision; if (current) state.pending.reviewedRevision = current.revision; state.retryReviewed = true; feedback.textContent = "Current record reviewed. Retry the same action when ready."; controls(); }));
+    } catch (error) { if (!signal.aborted) { if ([401, 403].includes(error.status)) denied(); feedback.textContent = "The saved action couldn’t be checked. No retry has been sent."; } }
+    finally { reading = false; if (!signal.aborted) controls(); }
+  }
+  async function load({ more: append = false, quiet = false } = {}) {
+    if (reading || signal.aborted) return;
+    reading = true; const retained = rows; controls(); if (!quiet) { section.dataset.state = "loading"; feedback.textContent = "Loading your calendar…"; }
+    try {
+      const query = { ...options, ...(selectedId ? { eventId: selectedId } : {}), ...(state.from ? { from: localBoundary(state.from),allDayFrom:`${state.from}T00:00:00.000Z` } : {}), ...(state.to ? { to: localBoundary(state.to,true),allDayTo:`${state.to}T23:59:59.999Z` } : {}) };
+      let page = readDates(await api.readWorkspaceDates(caseId, { ...query, ...(append ? { cursor } : {}) }), caseId, ownerId); if (signal.aborted) return;
+      const added = [...page.items], seen = new Set();
+      while (quiet && added.length < retained.length && page.nextCursor) { if (seen.has(page.nextCursor)) throw new Error("repeated_calendar_page"); seen.add(page.nextCursor); page = readDates(await api.readWorkspaceDates(caseId, { ...query, cursor: page.nextCursor }), caseId, ownerId); if (signal.aborted) return; added.push(...page.items); }
+      rows = append ? [...retained, ...added] : added; if (new Set(rows.map(entry => entry.id)).size !== rows.length) throw new Error("repeated_calendar_entry"); review = page; cursor = page.nextCursor; section.dataset.state = "ready"; if (!quiet) feedback.textContent = ""; render();
+    } catch (error) { if (!signal.aborted) { if ([401, 403, 404].includes(error.status)) denied(); else { rows = []; cursor = null; review = null; list.replaceChildren(); detail.replaceChildren(); count.textContent = ""; section.dataset.state = "error"; } feedback.textContent = "Your calendar couldn’t load. Refresh it to try again."; } }
+    finally { reading = false; if (!signal.aborted) controls(); }
+  }
+  signal.addEventListener("abort", () => { transfer?.abort();if(editor.open)editor.close(); state.busy = false; section.replaceChildren(); }, { once: true });
+  section.sync = () => state.draft || state.pending || state.busy ? Promise.resolve() : load({ quiet: true });
+  renderEditor(); showRecovery(); section.readiness = load(); return section;
+}

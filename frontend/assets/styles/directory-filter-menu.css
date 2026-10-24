@@ -1,0 +1,73 @@
+/* White directory panels with label/control rows and inline checkbox choices. */
+.lpc-directory-filter-menu, .lpc-directory-sort-menu, .browse-paralegals-page #sortMenuOptions {
+ --ldf-surface:#fff; --ldf-panel:#fff;
+ --ldf-ink:#2e3035; --ldf-muted:#6f737c;
+ --ldf-line:#e3e4e8; --ldf-filled:#f1f2f4;
+ --ldf-accent:#5e6ad2; --ldf-check:#fff;
+ position:fixed; z-index:150; box-sizing:border-box; width:292px; color-scheme:light;
+ color:var(--ldf-ink); background:var(--ldf-surface); border:1px solid var(--ldf-line); border-radius:8px;
+ box-shadow:0 2px 5px rgb(24 32 51 / 8%),0 12px 30px -8px rgb(24 32 51 / 17%);
+ font:400 calc(12 * var(--lpc-reading-unit, 1px))/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; letter-spacing:-.01em;
+}
+.lpc-directory-filter-menu { display:flex; flex-direction:column; overflow:hidden; }
+.lpc-directory-filter-menu[hidden], .lpc-directory-filter-menu [hidden], .lpc-directory-sort-menu[hidden], .lpc-directory-filter-chips[hidden] { display:none !important; }
+.lpc-directory-filter-menu *, .lpc-directory-sort-menu * { box-sizing:border-box; }
+.lpc-directory-filter-menu button, .lpc-directory-sort-menu button { font:inherit; color:inherit; letter-spacing:inherit; cursor:pointer; }
+.lpc-directory-filter-menu .ldf-header { display:flex; align-items:center; justify-content:space-between; gap:10px; flex:0 0 auto; padding:6px 12px; border-top:1px solid var(--ldf-line); background:var(--ldf-surface); }
+.lpc-directory-filter-menu .ldf-clear, .lpc-directory-filter-menu .ldf-done { min-height:24px; padding:3px 8px; border:1px solid transparent; border-radius:5px; box-shadow:none; font-size:calc(11 * var(--lpc-reading-unit, 1px)); }
+.lpc-directory-filter-menu .ldf-clear { padding-left:0; background:transparent; color:var(--ldf-muted); }
+.lpc-directory-filter-menu .ldf-clear:disabled { opacity:.45; cursor:default; }
+.lpc-directory-filter-menu .ldf-done { border-color:var(--ldf-line); background:var(--ldf-filled); color:var(--ldf-ink); font-weight:500; }
+.lpc-directory-filter-menu .ldf-done:hover { filter:brightness(.97); }
+.lpc-directory-filter-menu .ldf-body { min-height:0; padding:12px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.lpc-directory-filter-menu .ldf-filter-section + .ldf-filter-section { margin-top:6px; }
+.lpc-directory-filter-menu .ldf-section-heading { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,142px); align-items:center; gap:8px; min-height:28px; }
+.lpc-directory-filter-menu .ldf-field-label { display:flex; align-items:center; gap:6px; min-width:0; color:var(--ldf-muted); font:inherit; }
+.lpc-directory-filter-menu .ldf-field-label > span { min-width:0; }
+.lpc-directory-filter-menu .ldf-category { display:flex; align-items:center; gap:8px; width:100%; min-width:0; min-height:28px; padding:4px 8px; border:1px solid var(--ldf-line); border-radius:6px; background:var(--ldf-filled); text-align:left; font:inherit; box-shadow:none; }
+.lpc-directory-filter-menu .ldf-category:hover { border-color:#cdd0d7; }
+.lpc-directory-filter-menu .ldf-group-count { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ldf-ink); }
+.lpc-directory-filter-menu .ldf-chevron { display:block; width:6px; height:6px; flex:0 0 6px; border:solid #93969e; border-width:0 1px 1px 0; transform:rotate(45deg); margin:0 1px 3px auto; }
+.lpc-directory-filter-menu .is-expanded .ldf-category .ldf-chevron { transform:rotate(225deg); margin-bottom:-2px; }
+.lpc-directory-filter-menu .ldf-filter-values { margin-top:6px; padding:6px; border:1px solid var(--ldf-line); border-radius:6px; background:var(--ldf-surface); }
+.lpc-directory-filter-menu .ldf-search-row { display:flex; align-items:center; gap:7px; width:100%; padding:0 9px; border:1px solid transparent; border-radius:5px; background:var(--ldf-filled); box-shadow:none; }
+.ldf-row-icon { display:block; width:14px; height:14px; flex:0 0 14px; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; color:var(--ldf-muted); }
+body .lpc-directory-filter-menu .ldf-search { appearance:none; width:100%; min-width:0; min-height:28px; margin:0; padding:4px 0; border:0; border-radius:0; background:transparent; color:var(--ldf-ink); font:inherit; outline:none !important; box-shadow:none !important; }
+.lpc-directory-filter-menu .ldf-search::placeholder { color:#696d76; }
+.lpc-directory-filter-menu .ldf-search-row:has(input:focus-visible) { outline:2px solid var(--ldf-accent); outline-offset:1px; }
+.lpc-directory-filter-menu .ldf-options { max-height:168px; margin-top:5px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--ldf-line) transparent; }
+.lpc-directory-filter-menu .ldf-choice { display:flex; align-items:center; gap:8px; min-height:28px; padding:4px 3px; border-radius:4px; color:var(--ldf-ink); font:inherit; cursor:pointer; overflow-wrap:anywhere; }
+.lpc-directory-filter-menu .ldf-choice > span { min-width:0; }
+.lpc-directory-filter-menu .ldf-choice:has(input:checked), .lpc-directory-filter-menu .ldf-choice:hover { background:color-mix(in srgb,var(--ldf-ink) 5%,transparent); }
+.lpc-directory-filter-menu input[type=checkbox] { appearance:none; display:inline-block; width:14px; min-width:14px; height:14px; min-height:14px; margin:0; padding:0; flex:0 0 14px; border:1px solid #c3c8d2; border-radius:4px; background:var(--ldf-surface); box-shadow:none; cursor:pointer; }
+.lpc-directory-filter-menu input[type=checkbox]:checked { border-color:var(--ldf-accent); background:var(--ldf-accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8 2.5 2.5L12 5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px 14px no-repeat; }
+.lpc-directory-filter-menu .ldf-empty { padding:8px 4px; margin:0; color:var(--ldf-muted); font-size:calc(12 * var(--lpc-reading-unit, 1px)); }
+.lpc-directory-filter-menu .ldf-experience { margin-top:6px; }
+.ldf-control-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,142px); align-items:center; gap:6px; min-width:0; color:var(--ldf-muted); font:inherit; }
+.ldf-control-label { display:flex; align-items:center; gap:6px; min-width:0; }
+body .lpc-directory-filter-menu .ldf-filled-select, body .lpc-directory-sort-menu .ldf-filled-select { appearance:none; display:block; width:100%; min-width:0; min-height:28px; margin:0; padding:4px 25px 4px 8px; border:1px solid var(--ldf-line); border-radius:6px; color:var(--ldf-ink); background:var(--ldf-filled) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23888b97' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 9px center/12px no-repeat; font:inherit; box-shadow:none; }
+.lpc-directory-filter-menu :focus-visible, .lpc-directory-sort-menu :focus-visible { outline:2px solid var(--ldf-accent); outline-offset:2px; }
+.lpc-directory-sort-menu, .browse-paralegals-page #sortMenuOptions { width:292px; padding:12px; overflow-y:auto; }
+.lpc-directory-sort-menu::before, .browse-paralegals-page #sortMenuOptions::before { content:none; }
+.lpc-directory-filter-chips { display:flex; flex-wrap:wrap; gap:6px; min-width:0; margin:0 0 14px; }
+.ldf-chip { display:inline-flex; align-items:center; gap:7px; max-width:100%; padding:4px 7px; border:1px solid var(--av2-line,#e8e8eb); border-radius:5px; color:var(--av2-muted,#64656e); background:var(--av2-bg,#fff); font:400 calc(12 * var(--lpc-reading-unit, 1px))/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; cursor:pointer; text-align:left; overflow-wrap:anywhere; }
+.ldf-chip > span:first-child { min-width:0; }
+.lpc-directory-sort-control { display:inline-flex; }
+.lpc-directory-icon { display:inline-flex; justify-content:center; align-items:center; width:44px; min-width:44px; height:44px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--av2-ink,#27394d); cursor:pointer; }
+.lpc-directory-icon svg { width:20px; height:20px; stroke:currentColor; stroke-width:1.5; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+@media (pointer:coarse), (max-width:767px) {
+ .lpc-directory-filter-menu .ldf-clear, .lpc-directory-filter-menu .ldf-done, .lpc-directory-filter-menu .ldf-category, .lpc-directory-filter-menu .ldf-choice { min-height:44px; }
+ body .lpc-directory-filter-menu .ldf-search, body .lpc-directory-filter-menu .ldf-filled-select, body .lpc-directory-sort-menu .ldf-filled-select { min-height:44px; font-size:calc(16 * var(--lpc-reading-unit, 1px)); }
+ .lpc-directory-filter-menu .ldf-options { max-height:176px; }
+ .ldf-control-row, .lpc-directory-filter-menu .ldf-section-heading { grid-template-columns:minmax(0,1fr) minmax(0,174px); gap:8px; }
+ .ldf-chip { min-height:36px; }
+}
+@media (forced-colors:active) {
+ .lpc-directory-filter-menu input[type=checkbox] { appearance:auto; background:revert !important; border:revert; box-shadow:none; }
+}
+
+/* Keep keyboard focus visible without changing resting directory geometry. */
+body.browse-paralegals-page .lpc-directory-filter-menu .ldf-search:focus-visible {
+  outline: 2px solid #2b5caa !important;
+  outline-offset: 2px;
+}

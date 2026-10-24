@@ -11,7 +11,8 @@ export function projectIdentity(user) {
     firstName: text(user.firstName), lastName: text(user.lastName), name: text(user.name, 160),
     profileImage: text(user.profileImage, 2000), avatarURL: text(user.avatarURL, 2000),
     preferences: {
-      theme: /dark$/i.test(text(user.preferences?.theme)) ? "dark" : "light",
+      theme: text(user.preferences?.theme) === 'system' ? 'system' : /dark$/i.test(text(user.preferences?.theme)) ? 'dark' : 'light',
+      accentColor: ['cornflower','violet','teal','rose'].includes(user.preferences?.accentColor) ? user.preferences.accentColor : 'cornflower',
       fontSize: ["xs", "sm", "md", "lg", "xl"].includes(user.preferences?.fontSize) ? user.preferences.fontSize : "md",
     },
   };

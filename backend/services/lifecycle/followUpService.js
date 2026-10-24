@@ -75,9 +75,11 @@ async function resolveLifecycleFollowUps({
   dedupeKeys = [],
   subject = null,
   resolutionReason = "",
+  noLaterThan = null,
   resolvedBy = { actorType: "system", label: "Lifecycle Service" },
 } = {}) {
   const query = { actionType: "lifecycle_follow_up", status: "open" };
+  if (noLaterThan) query.lastSeenAt = { $lte: noLaterThan };
   const cleanKeys = (Array.isArray(dedupeKeys) ? dedupeKeys : []).map((value) => String(value || "").trim()).filter(Boolean);
   if (cleanKeys.length) {
     query.dedupeKey = { $in: cleanKeys };

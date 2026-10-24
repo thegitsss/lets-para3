@@ -1,0 +1,44 @@
+# Attorney withdrawal decisions
+
+Bounded decision controls verified locally, September 9, 2026. Shared expiry convergence remains open. The [LPC Product North Star](../LPC_PRODUCT_NORTH_STAR.md) controls this work. This slice implements the attorney's actual withdrawal decisions in Matter Financials and moves the existing attorney/admin decision routes through the same server guard. It does not certify the complete attorney experience or provider/retention convergence.
+
+## Behavior
+
+- Read the withdrawn paralegal, assignment work, original and remaining amounts, exact fee, decision cap, review deadlines, final decision, payout evidence and relisting from current records. Reads do not call Stripe, finalize expiry, repair ledgers or send notifications. Failed reads remove earlier permission.
+- Review a partial payout with the gross amount, fee, net paralegal payout and remaining funds before one explicit confirmation. Preserve integer cents, existing 70% rounding for attorneys and full-amount administrator authority through the existing administrator route. The existing partial-payout route does not require partially completed work; declining release does require some but not all work completed. Do not conflate these rules.
+- Preserve the existing zero-amount decision: it records no payout and relists the remaining work. Declining release instead starts the existing 24-hour payment-review window. The confirmation explains each consequence. No expired window is presented as finalized until the server has recorded its actual outcome.
+- Relist a finalized, verified positive remaining balance without changing the earlier payout decision. Repeated legacy relisting reads the already recorded outcome without another mutation. An administrator may set a payout after an expired window under the existing authority; no caller may restart that window through the new rejection flow.
+- Keep automatic-zero, attorney partial, full, administrator and expired-zero outcome labels separate from a verified payout. Reversed, inconsistent and unresolved payment evidence blocks another decision. The API does not expose Connect IDs, operation keys, claim tokens or private provider errors. The legacy response retains its existing transfer ID; the V2 reader excludes it.
+
+## Decision and recovery boundary
+
+The displayed review binds the owner, raw Case fields and aliases, work, payee, payout/operation evidence and related Job. A new UUID identifies one exact action, amount and reviewed revision. A durable Case claim and audit entry precede a positive transfer. A reused UUID reads its recorded outcome; it never makes another transfer request, including after an uncertain response.
+
+Before transfer, recheck the account, work/funding-related Case facts, payee, posting and chargeback hold. Verify the returned transfer's amount, currency, destination, source charge, Matter metadata/group, mode and reversal facts. Retain a known transfer ID before accepting its remaining evidence. A mismatch, unknown provider response, changed payee/posting, account loss or subsequent local write failure retains a reconciliation claim and leaves the decision unfinalized.
+
+Payout, platform fee, exact payment-operation completion, Case balance/decision, posting and decision audits commit together in a local database transaction. Only an exact positive transfer-created handoff may finish a pending ledger; a negative/reversed Case state is never overwritten. Business notifications and generated receipt copies follow the confirmed commit. Fresh reads remain available if a notification fails. A recovered uncertain commit can skip these best-effort side effects; durable notification delivery remains a broader convergence dependency.
+
+Stopping the browser wait does not cancel a transfer. The pending request stays in private tab memory across Matter tabs, and the attorney can check that exact decision without resending it. Account loss clears private content. Changed review facts remove an earlier confirmation. Typed amounts are cleared when a fresh read shows no remaining decision.
+
+Stripe documents that a transfer can have a positive `amount_reversed` while `reversed` is false, and that idempotency keys may be removed after at least 24 hours. The explicit reversal check and durable local recovery therefore remain necessary: [Transfer object](https://docs.stripe.com/api/transfers/object), [Idempotent requests](https://docs.stripe.com/api/idempotent_requests).
+
+## Existing compatibility and open boundaries
+
+The existing `/partial-payout`, `/reject-payout` and `/relist` routes use the reviewed decision service, with fresh server-created review/UUID values for older callers. Existing CSRF, Case access and administrator role rules remain in force. Closed Matters, active assignments, inconsistent balances, open disputes and pending financial claims cannot request a payout through an older control.
+
+The claim also fences reviewed completion, archive preparation, dispute opening and the expiry worker's atomic update. The older request-time expiry helper still mutates a previously loaded document before its caller saves it. Completed-history GET, legacy hiring and Matter GET can therefore race an administrator payout after the deadline; those reads omit the new claim fields. This is the immediate next implementation dependency, not covered by the new worker fence. The worker's full posting/receipt transaction, old funding/completion writers, chargeback/provider callback ordering, cross-role earnings and financial summaries remain P8-09/P8-08 work. A new posting retains the original Matter budget required by the existing Job contract; its remaining assignment amount remains the Case's remaining amount. P5 posting/application projection agreement and subsequent-hire convergence still need final acceptance.
+
+No real transfer, card charge, external message, storage mutation, deployment, cohort activation, V1 removal, commit or push is included. All provider tests use synthetic responses. Real provider callback acceptance, S3/CORS/late-upload and retained-object deletion remain operational gates.
+
+## Checkpoint and current evidence
+
+Checkpoint: `backend/backups/attorney-v2-withdrawal-start/`. It began with 3,752 file hashes and owns 21 paths. The existing root `workspace.mjs` changes were compared with the preceding isolated candidate and retained in `adopted-workspace.diff`: optional embedded titles and a closed-work notice. Other root changes are not implicitly part of the tested candidate.
+
+- Candidate 1: 29/31 withdrawal checks passed. Two test assumptions were corrected: the withdrawn paralegal receives the existing privacy-preserving 404, and legacy dispute opening uses `/api/disputes/:caseId`.
+- Candidate 2: 96/105 checks passed across withdrawal/completion/disputes/expiry. Nine withdrawal failures exposed the multi-document audit write's missing `ordered: true` transaction option. The transaction rolled back instead of confirming a partial decision. The remaining 70 affected checks passed.
+- Candidate 3: the transaction correction and first client checks passed 39/39. The runtime checker also identified a newly unused import left by removing the old relist handler; it was removed.
+- Candidate 4: 120/120 checks passed across withdrawal, client validation, completion, disputes and expiry (88.359 seconds). All 60 withdrawal/completion browser scenarios passed across Chromium, Firefox and WebKit, one worker and no retries (3.7 minutes).
+- Candidate 5: 177/177 checks passed across withdrawal/client, existing payouts, cross-role Case flow, receipt history, financial history and archive consumers (129.57 seconds). Supplemental owned frontend checks report no issues in five modules and 101 reachable modules. All 461 frontend API literals resolve to 429 mounted routes. The runtime checker reports only the inherited `services/support/zohoMailbox.js:34` unused parameter; it is not part of this slice.
+- Candidate 6 adds a replacement-hire journey after a positive withdrawal decision; that focused check passed (1 selected, 46 skipped, 18.504 seconds). All 39 final withdrawal browser scenarios passed across three engines (2.6 minutes), including background input/cursor preservation and a mismatched recovery request. Initial screenshots exposed an inadequate capture position; final captures explicitly show the withdrawal heading and the lower decision controls separately. Chromium desktop heading and 390px decision screenshots were visually inspected. The larger Financials composition and persistent Matter header remain part of the full editorial/layout pass.
+
+Final acceptance for the full attorney experience remains open in [FINAL_REVIEW_PREPARATION.md](FINAL_REVIEW_PREPARATION.md) and [BUILD_CHECKLIST.md](BUILD_CHECKLIST.md).

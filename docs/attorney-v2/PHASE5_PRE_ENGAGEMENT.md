@@ -1,0 +1,25 @@
+# Pre-engagement — local workflow acceptance
+
+September 7, 2026. This is part of preparing the attorney experience for final owner review. Production release remains disabled. The preceding application-decision candidate is separately verified and retained.
+
+Checkpoint: `backend/backups/attorney-v2-phase5-pre-engagement-start/`, with 2,017 initial file hashes and exact owned source baselines.
+
+The first correction protects an existing confidentiality agreement when a concurrent request wins. The unsuccessful request removes only a document it newly uploaded; reusing a saved document no longer makes that document eligible for cleanup. Synthetic regression checks cover reuse on conflict, cleanup of a newly uploaded replacement, and successful reuse without storage deletion.
+
+Both dashboards now provide request and review controls within the application review. The attorney can send a confidentiality agreement, a conflicts check, or both; inspect acknowledgement, disclosure and response dates; prepare access to the saved documents; request changes; and approve a complete submitted response. These are the two requirements supported by the existing backend, not a new arbitrary questionnaire builder. Hiring and funding remain separate actions.
+
+The new read contract is `GET /api/cases/:caseId/pre-engagement/review/:applicantId`. V2 and the shared application review send `reviewedRevision` and `expectedOwnerId` through the existing request/review routes. These writes recheck the current application, Matter, account, profile and block state, then compare the exact reviewed Matter fields before committing. They increment the retained Matter revision used by the hire interlock. A newer response with the same status cannot receive an earlier approval. Existing clients retain their earlier request contract. Older text identifiers and unrelated evidence survive the bounded raw update.
+
+Required fields and response completeness control approval. Security checks still gate approval and document access. A confidentiality document reused from the saved request is never deleted merely because the new request loses a race; only a newly uploaded replacement is eligible for unsuccessful-request cleanup. Signed document access uses the existing permission/security route, with review checks before and after preparing the link. Links expire from the interface and disappear on account or route loss. This does not establish immutable object versions or new document-retention guarantees.
+
+Unsent form values and file selections stay only in tab memory. Account protection erases them. Saves are not automatically retried. After an interrupted response, the attorney reads the actual saved requirements and reviews them before another action; the interface does not identify the earlier uploaded bytes by filename or imply that a current record proves the original request succeeded. Waiting is bounded and can be stopped.
+
+## Verification
+
+- **22/22 backend/client checks** passed on the fixed candidate, including exact reviewed revisions, account changes, record changes, legacy identifiers, document retention, client validation, CSRF and single-submit behavior. Initial failures exposed the Mongoose validation API mismatch and the earlier identifier check; both were corrected before acceptance. A test-wrapper return-value failure was also corrected without weakening assertions.
+- **33/33 browser scenarios** passed across Chromium, Firefox and WebKit, one worker and no retries. These include real request → paralegal response → changes requested → revised response → approval, stale response rejection, interrupted saves, account loss, security/expiry presentation, keyboard access, and 320px/1366px layouts in both dashboards. The document-link browser scenario uses synthetic storage responses, not a live S3 object.
+- Existing consumer checks passed: **8 response/notification cases**, plus **3 confidentiality/document-access cases**. These filtered runs do not claim the skipped cases passed.
+- All **1,388 candidate source files** remained unchanged during browser verification. Candidate: `/private/tmp/lpc-attorney-review-20260907-pre-engagement-2`. The first fixed-copy Jest run passed all 22 assertions but failed teardown because its older harness imported an undeclared top-level MongoDB driver. The accepted candidate incorporates the independently corrected shared teardown helper; complete rerun and cleanup passed. This harness refresh is recorded separately from this slice's 15 owned paths.
+- Four Chromium screenshots were visually inspected: current and V2 at 320px and 1366px. Matter/applicant context, effect and confirmation controls are readable. The current dashboard uses its scrolling modal; the broad authenticated-brand, real-device and screen-reader review remains open.
+
+Exact baselines, accepted sources, bounded diff, hashes, failed and passing logs, screenshots and traces are retained in the private checkpoint. P5-04 is locally implemented and verified. Full Phase 5, the full Matter workspace, final editorial acceptance, production enablement and V1 retirement remain open.

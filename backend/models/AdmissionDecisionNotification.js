@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const schema = new mongoose.Schema({
-  releaseKey: {type:String, default:"signup-signin-20261023", index:true},
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },
   auditIndex: { type: Number, required: true },
   decision: { type: String, enum: ['approved', 'denied'], required: true },

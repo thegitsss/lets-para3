@@ -1,7 +1,26 @@
 const path = require("path");
+const assert = require("node:assert/strict");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 process.env.OPENAI_SUPPORT_MANAGER_ENABLED = "true";
+
+// This evaluation owns only synthetic billing identities. Like the Paralegal
+// evaluator, it never sends its fake customer/card identifiers to Stripe.
+function createSyntheticStripeFixture() {
+  return {
+    customers: { retrieve: async (id) => {
+      assert.equal(id, "cus_p6_saved", "Only the owned synthetic customer may be read");
+      return { id, invoice_settings: { default_payment_method: "pm_package7_saved" } };
+    } },
+    paymentMethods: { retrieve: async (id) => {
+      assert.equal(id, "pm_package7_saved", "Only the exact synthetic card may be read");
+      return { id, type: "card", card: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2099 } };
+    } },
+  };
+}
+const stripeModulePath = require.resolve("../utils/stripe");
+require.cache[stripeModulePath] = { id: stripeModulePath, filename: stripeModulePath,
+  loaded: true, exports: createSyntheticStripeFixture() };
 
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
@@ -27,6 +46,27 @@ function numberFlag(name, fallback, { min = 1, max = 10 } = {}) {
   return Math.max(min, Math.min(max, Number.isFinite(parsed) ? Math.floor(parsed) : fallback));
 }
 
+// Optional exact original-slot continuation. The default still executes every
+// original scenario twice; no filter silently changes the default corpus.
+function selectScenarioSlots(scenarioIds, repetitions, selection = "") {
+  assert(Array.isArray(scenarioIds) && new Set(scenarioIds).size === scenarioIds.length);
+  const all = Array.from({ length: repetitions }, (_, i) => scenarioIds.map(id => ({ scenarioId: id, repetition: i + 1 }))).flat();
+  if (!selection) return all;
+  const requested = selection.split(",");
+  assert(requested.length > 0 && requested.length <= all.length && new Set(requested).size === requested.length, "Exact unique original slots required");
+  for (const slot of requested) assert(all.some(row => slot === row.scenarioId + "@" + row.repetition), "Unknown scenario/repetition slot");
+  const chosen = new Set(requested);
+  return all.filter(row => chosen.has(row.scenarioId + "@" + row.repetition));
+}
+function scenarioSelection(argv = process.argv) {
+  const flags = argv.filter(value => value.startsWith("--scenario="));
+  assert(flags.length <= 1, "One exact scenario selector allowed");
+  if (!flags.length) return "";
+  const value = flags[0].slice("--scenario=".length);
+  assert(value, "Empty scenario selection forbidden");
+  return value;
+}
+
 function countSentences(value = "") {
   return String(value || "")
     .split(/(?<=[.!?])\s+/)
@@ -46,6 +86,60 @@ function refusalLanguage(value = "") {
 
 function rate(passed, total) {
   return total ? passed / total : 0;
+}
+
+function accuratePostingPaymentAnswer(value = "") {
+  const text = String(value).replace(/[’]/g, "'").toLowerCase();
+  if (/^\s*yes\b/.test(text)) return false;
+  const saysNoPrerequisite = /^\s*no\b/.test(text) || /\b(?:can|may)\s+post\b[^.!?]*\bwithout\b/.test(text) || /\b(?:do not|don't|does not|doesn't)\s+need\b/.test(text) || /\b(?:card|payment method)\b[^.!?]*\b(?:is not|isn't|not)\s+(?:required|needed|necessary|mandatory)\b/.test(text);
+  if (!saysNoPrerequisite) return false;
+  for (const clause of text.split(/[.!?;]|\bbut\b|\bwhile\b|,(?=\s*(?:you|a |the |saved |payment |card))/)) {
+    if (!/\b(?:before|to)\s+(?:you\s+(?:can\s+)?)?(?:post|posting)\b/.test(clause) || !/\b(?:card|payment method)\b/.test(clause)) continue;
+    if (/\b(?:cannot|can't|may not)\s+post\b[^.!?]*\bwithout\b/.test(clause)) return false;
+    if (/\b(?:need|needs|needed|required|requires|necessary|mandatory|must)\b/.test(clause) && !/\b(?:do not|don't|does not|doesn't)\s+need\b|\b(?:is not|isn't|not)\s+(?:required|needed|necessary|mandatory)\b|\bno\s+(?:saved\s+)?(?:card|payment method)\s+(?:is\s+)?(?:required|needed|necessary|mandatory)\b|\bwithout\b/.test(clause)) return false;
+  }
+  return true;
+}
+
+function accurateGeneralPayoutTimingAnswer(value = "") {
+  const text = String(value).replace(/[’]/g, "'");
+  const release = "\\breleas(?:e[sd]?|ing)\\b";
+  const completion = "\\bcomplet(?:e[sd]?|ing|ion)\\b";
+  const sentences = text.split(/[.!?\n]+/);
+  const premature = new RegExp(`${release}[^.!?]{0,160}\\b(?:before|without)\\b[^.!?]{0,160}${completion}|\\bbefore\\b[^.!?]{0,120}${completion}[^.!?]{0,120}${release}`, "i");
+  const deniedRelease = new RegExp(`\\b(?:not|never|cannot|can't|doesn't|don't)\\b[^.!?]{0,45}${release}`, "i");
+  const heldUntilComplete = new RegExp(`\\b(?:not|cannot|can't|isn't|won't)\\b[^.!?]{0,25}${release}[^.!?]{0,25}\\b(?:until|before)\\b[^.!?]{0,120}${completion}`, "i");
+  if (sentences.some(sentence => (premature.test(sentence) || deniedRelease.test(sentence)) && !heldUntilComplete.test(sentence))) return false;
+  if (/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:(?:–|-|to)\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*)?(?:business\s+)?days?\b/i.test(text)) return false;
+  const bankGuarantee = /\b(?:guarantee[sd]?|always|fixed|instant(?:ly)?|immediate(?:ly)?)\b[^.!?]{0,100}\b(?:bank|deposit|arrival|payout schedule)\b|\b(?:bank|deposit|arrival)\b[^.!?]{0,100}\b(?:guaranteed|fixed|instant(?:ly)?|immediate(?:ly)?)\b/i;
+  if (sentences.flatMap(sentence => sentence.split(/;|\bbut\b/i)).some(clause => bankGuarantee.test(clause) && !/\b(?:not|never|cannot|can't|isn't|aren't|no)\b[^.!?]{0,35}\b(?:guarantee[sd]?|fixed|instant(?:ly)?|immediate(?:ly)?)\b/i.test(clause))) return false;
+  if (/\b(?:does\s+not|doesn't|do\s+not|don't|never)\s+(?:depend\s+on|vary\s+(?:by|with)|follow|rely\s+on)\b[^.!?]{0,100}\bStripe\b|\b(?:bank|arrival|deposit|timing)\b[^.!?]{0,100}\b(?:independent of|unaffected by|unrelated to|regardless of)\b[^.!?]{0,100}\bStripe\b|\bStripe\b[^.!?]{0,120}\b(?:does not|doesn't|cannot|can't)\s+(?:affect|govern|determine|influence|change)\b[^.!?]{0,100}\b(?:bank|arrival|deposit|timing)\b/i.test(text)) return false;
+  const positiveRelation = new RegExp(`${release}[^.!?]{0,160}\\b(?:when|once|after|upon)\\b[^.!?]{0,160}${completion}|\\b(?:when|once|after|upon)\\b[^.!?]{0,160}${completion}[^.!?]{0,160}${release}|${completion}[^.!?]{0,100}\\b(?:triggers?|then)\\b[^.!?]{0,80}${release}`, "i");
+  const releaseOnMatterCompletion = sentences.some(sentence => /\bmatter\b/i.test(sentence) && (positiveRelation.test(sentence) || heldUntilComplete.test(sentence)));
+  const stripeBankTiming = /\bStripe\b[^.!?]{0,260}\b(?:estimated arrival|payout schedule)\b/i.test(text)
+    && /\b(?:depend[s]?|var(?:y|ies|iable)|estimated|govern[s]?|based on|subject to)\b/i.test(text)
+    && /\b(?:bank|arrival|deposit|financial institution)\b/i.test(text);
+  return releaseOnMatterCompletion && stripeBankTiming;
+}
+
+async function pinInaccessibleMatterFixture(fixture, collection = Case.collection) {
+  const fixed = new mongoose.Types.ObjectId("67000000000000000000f017");
+  const originalId = fixture.caseIds.inaccessible;
+  assert(!Object.values(fixture.caseIds).some(id => String(id) === String(fixed)), "Fixed synthetic ID must not collide with another fixture");
+  assert.equal(await collection.countDocuments({ _id: fixed }), 0, "Fixed synthetic ID must be absent");
+  const original = await collection.findOne({ _id: originalId });
+  assert(original && String(original.attorneyId) === String(fixture.ids.otherAttorney));
+  assert.notEqual(String(original.attorneyId), String(fixture.ids.owner));
+  const replacement = { ...original, _id: fixed };
+  await collection.insertOne(replacement);
+  const deleted = await collection.deleteOne({ _id: originalId, attorneyId: original.attorneyId });
+  assert.equal(deleted.deletedCount, 1);
+  assert.deepEqual(await collection.findOne({ _id: fixed }), replacement);
+  assert.equal(await collection.countDocuments({ _id: originalId }), 0);
+  assert.equal(await collection.countDocuments({ _id: { $in: [originalId, fixed] } }), 1);
+  fixture.caseIds.inaccessible = fixed;
+  fixture.cases.inaccessible = { ...fixture.cases.inaccessible, _id: fixed };
+  return { fixedId: String(fixed), previouslyAbsent: true, oneForeignRecordRetained: true, originalRemoved: true, nonIdRecordFieldsPreserved: true, ownerIsolationPreserved: true };
 }
 
 function evaluateCommonReply(reply, scenario) {
@@ -126,8 +220,8 @@ function syntheticWorkflowExecutor(fixture) {
         isExpired: false,
       },
       requirements: {
-        paymentMethodRequiredBeforePosting: true,
-        paymentMethodRequiredBeforeApplications: true,
+        paymentMethodRequiredBeforePosting: false,
+        paymentMethodRequiredBeforeApplications: false,
         paymentMethodRequiredBeforeHiring: true,
         chargeTiming: "charged_when_hire_is_confirmed",
         postHireWorkflow: {
@@ -144,13 +238,17 @@ function syntheticWorkflowExecutor(fixture) {
           allScopeTasksCompleteRequired: true,
           verifiedFundingRequired: true,
           paralegalPayoutSetupRequired: true,
-          bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-          bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+          bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+          bankDepositTimingDependsOn: [
+            "stripe_account_country",
+            "stripe_payout_schedule",
+            "financial_institution",
+          ],
         },
       },
       stages: {
-        post_matter: { label: "Post a matter", paymentMethodRequired: true, ready: true, blocker: "" },
-        receive_applications: { label: "Receive applications", paymentMethodRequired: true, ready: true, blocker: "" },
+        post_matter: { label: "Post a matter", paymentMethodRequired: false, ready: true, blocker: "" },
+        receive_applications: { label: "Receive applications", paymentMethodRequired: false, ready: true, blocker: "" },
         invite_paralegal: { label: "Invite a paralegal", paralegalApprovalRequired: true },
         pre_engagement: { label: "Request pre-engagement items", scopeTaskRequired: true },
         hire_and_fund: {
@@ -357,6 +455,7 @@ async function main() {
   try {
     await mongoose.connect(memoryServer.getUri("package7-attorney-live-eval"));
     const fixture = await seedAttorneySupportFixtures();
+    const immutablePromptFixture = await pinInaccessibleMatterFixture(fixture);
     const user = { ...fixture.users.owner, id: fixture.ids.owner };
     const pageContext = { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" };
     const financialConversationId = new mongoose.Types.ObjectId();
@@ -447,8 +546,8 @@ async function main() {
         name: "posting prerequisite matches executable payment policy",
         messageText: "Do I need a saved payment method before I can post a matter?",
         expectedTools: ["get_attorney_workflow_readiness"],
-        answerPattern: /\b(?:yes|required|need)\b[\s\S]*\b(?:before|post)\b/i,
-        forbiddenPatterns: [/not required/i, /don(?:'|’)t need/i],
+        answerPattern: { test: accuratePostingPaymentAnswer },
+        forbiddenPatterns: [/^\s*yes\b/i],
         toolExecutor: syntheticWorkflowExecutor(fixture),
         sentenceLimit: 3,
         dimensions: ["workflow_policy", "payment_method"],
@@ -459,8 +558,13 @@ async function main() {
         name: "general paralegal payout timing uses executable workflow policy",
         messageText: "When does the paralegal get paid?",
         expectedTools: ["get_attorney_workflow_readiness"],
-        answerPattern: /(?:complete|completion)[\s\S]*(?:release|payout)[\s\S]*3\s*(?:–|-|to)\s*5\s+business days|(?:release|payout)[\s\S]*(?:complete|completion)[\s\S]*3\s*(?:–|-|to)\s*5\s+business days/i,
-        forbiddenPatterns: [/couldn(?:'|’)t verify/i, /check the matter(?:'|’)s payout status/i, /which matter/i],
+        answerPattern: { test: accurateGeneralPayoutTimingAnswer },
+        forbiddenPatterns: [
+          /\b\d+\s*(?:–|-|to)\s*\d+\s+business days\b/i,
+          /couldn(?:'|’)t verify/i,
+          /check the matter(?:'|’)s payout status/i,
+          /which matter/i,
+        ],
         toolExecutor: syntheticWorkflowExecutor(fixture),
         sentenceLimit: 2,
         dimensions: ["financial", "workflow_policy", "factual_accuracy", "concision"],
@@ -552,11 +656,11 @@ async function main() {
       },
       {
         id: "authorized_navigation",
-        name: "billing navigation is exact and uncluttered",
-        messageText: "Where is Billing & Payments?",
+        name: "Payments navigation is exact and uncluttered",
+        messageText: "Where is Payments?",
         expectedTools: ["find_navigation_destination"],
-        answerPattern: /billing/i,
-        expectedNavigationHref: "dashboard-attorney.html#billing",
+        answerPattern: /payments/i,
+        expectedNavigationHref: "dashboard-attorney.html#funds",
         dimensions: ["navigation", "concision", "ui_relevance"],
         criticalGates: ["privacy_sensitive_fields"],
       },
@@ -569,14 +673,20 @@ async function main() {
         user: { email: user.email, role: user.role },
       });
     }
+    const scenarioIds = [...scenarios.map(entry => entry.id), "multiturn_pronoun_refresh", "multiturn_explicit_correction"];
+    const selectedSlots = selectScenarioSlots(scenarioIds, repetitions, scenarioSelection());
+    const selectedScenarioIds = [...new Set(selectedSlots.map(row => row.scenarioId))];
     const preflight = {
       passed: true,
       dataClassification: "synthetic_only",
-      scenarioCount: scenarios.length + 2,
+      scenarioCount: selectedScenarioIds.length,
+      fullCorpusScenarioCount: scenarioIds.length,
+      selectedOriginalSlots: selectedSlots,
       repetitions,
       store: false,
       database: "MongoMemoryServer",
       externalProcessorCalls: false,
+      immutablePromptFixture,
     };
     if (process.argv.includes("--dry-run")) {
       console.log(JSON.stringify({
@@ -591,10 +701,10 @@ async function main() {
     const results = [];
     for (let repetition = 1; repetition <= repetitions; repetition += 1) {
       for (const scenario of scenarios) {
-        results.push(await runSingleScenario({ scenario, user, pageContext, repetition }));
+        if (selectedSlots.some(row => row.scenarioId === scenario.id && row.repetition === repetition)) results.push(await runSingleScenario({ scenario, user, pageContext, repetition }));
       }
-      results.push(await runReferenceScenario({ fixture, user, pageContext, repetition }));
-      results.push(await runCorrectionScenario({ fixture, user, pageContext, repetition }));
+      if (selectedSlots.some(row => row.scenarioId === "multiturn_pronoun_refresh" && row.repetition === repetition)) results.push(await runReferenceScenario({ fixture, user, pageContext, repetition }));
+      if (selectedSlots.some(row => row.scenarioId === "multiturn_explicit_correction" && row.repetition === repetition)) results.push(await runCorrectionScenario({ fixture, user, pageContext, repetition }));
     }
 
     const passed = results.filter((result) => result.passed).length;
@@ -631,7 +741,9 @@ async function main() {
       completedAt: new Date().toISOString(),
       preflight,
       repetitions,
-      selectedScenarioCount: scenarios.length + 2,
+      selectedScenarioCount: selectedScenarioIds.length,
+      selectedOriginalSlots: selectedSlots,
+      fullCorpusScenarioCount: scenarioIds.length,
       runCount: results.length,
       managerIterationCount: results.reduce((total, result) => total + result.managerIterations, 0),
       validationRetryCount: results.reduce((total, result) => total + result.validationRetries, 0),
@@ -658,7 +770,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error(error?.message || error);
   process.exitCode = 1;
 });
+module.exports = { accuratePostingPaymentAnswer, createSyntheticStripeFixture,
+  selectScenarioSlots, scenarioSelection, evaluateCommonReply };

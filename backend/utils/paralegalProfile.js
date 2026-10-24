@@ -3,7 +3,16 @@ function hasNonEmptyString(value) {
 }
 
 function hasNonEmptyArray(value) {
-  return Array.isArray(value) && value.filter(Boolean).length > 0;
+  return Array.isArray(value) && value.some(hasNonEmptyString);
+}
+
+// Earlier admitted accounts retain About and specialties as their saved fields.
+// Resolve them for reads; current writers synchronize both names when clearing.
+function resolveParalegalProfileFields(user = {}) {
+  return {
+    bio: hasNonEmptyString(user.bio) ? user.bio : user.about || "",
+    practiceAreas: hasNonEmptyArray(user.practiceAreas) ? user.practiceAreas : Array.isArray(user.specialties) ? user.specialties : [],
+  };
 }
 
 function hasUploadedPhoto(user = {}) {
@@ -24,32 +33,42 @@ function hasApprovedPhoto(user = {}) {
 
 function hasRequiredParalegalFieldsForSave(user = {}, opts = {}) {
   const allowMissingPhoto = Boolean(opts.allowMissingPhoto);
+  const fields = resolveParalegalProfileFields(user);
   return (
-    hasNonEmptyString(user.bio) &&
+    hasNonEmptyString(fields.bio) &&
     hasNonEmptyArray(user.skills) &&
-    hasNonEmptyArray(user.practiceAreas) &&
+    hasNonEmptyArray(fields.practiceAreas) &&
     hasNonEmptyString(user.resumeURL) &&
     (allowMissingPhoto || hasUploadedPhoto(user))
   );
 }
 
 function hasRequiredParalegalFieldsForPublic(user = {}) {
+  const fields = resolveParalegalProfileFields(user);
   return (
-    hasNonEmptyString(user.bio) &&
+    hasNonEmptyString(fields.bio) &&
     hasNonEmptyArray(user.skills) &&
-    hasNonEmptyArray(user.practiceAreas) &&
+    hasNonEmptyArray(fields.practiceAreas) &&
     hasNonEmptyString(user.resumeURL) &&
     hasApprovedPhoto(user)
   );
 }
 
+function publicParalegalPracticeFilter(tokens) {
+  const current = { practiceAreas: { $elemMatch: { $type: "string", $regex: /\S/ } } };
+  return { $or: [
+    { $and: [current, { practiceAreas: { $in: tokens } }] },
+    { $and: [{ $nor: [current] }, { specialties: { $in: tokens } }] },
+  ] };
+}
+
 function applyPublicParalegalFilter(filter) {
   if (!filter || typeof filter !== "object") return;
   const conditions = [
-    { bio: { $nin: ["", null] } },
-    { resumeURL: { $nin: ["", null] } },
-    { "skills.0": { $exists: true } },
-    { "practiceAreas.0": { $exists: true } },
+    { $or: [{ bio: { $type: "string", $regex: /\S/ } }, { about: { $type: "string", $regex: /\S/ } }] },
+    { resumeURL: { $type: "string", $regex: /\S/ } },
+    { skills: { $elemMatch: { $type: "string", $regex: /\S/ } } },
+    { $or: [{ practiceAreas: { $elemMatch: { $type: "string", $regex: /\S/ } } }, { specialties: { $elemMatch: { $type: "string", $regex: /\S/ } } }] },
     { profilePhotoStatus: "approved" },
     { pendingProfileImage: { $in: ["", null] } },
     {
@@ -66,6 +85,8 @@ function applyPublicParalegalFilter(filter) {
 }
 
 module.exports = {
+  resolveParalegalProfileFields,
+  publicParalegalPracticeFilter,
   applyPublicParalegalFilter,
   hasApprovedPhoto,
   hasRequiredParalegalFieldsForPublic,

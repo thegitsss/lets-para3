@@ -1,0 +1,56 @@
+const { test, expect } = require('playwright/test');
+const fs = require('node:fs/promises');
+const start = require('../../helpers/paralegalFinancialBrowserServer');
+let server;
+test.beforeAll(async () => { test.setTimeout(180000); server = await start(); });
+test.afterAll(async () => { await server?.close(); });
+for (const status of ['completed', 'closed']) test(`History opens ${status} and withdrawn records without reopening workspaces or blocking on inspection`, async ({ page, context }, info) => {
+  const record = await server.seed();
+  const Case = require('../../../models/Case');
+  await Case.updateOne({ _id: record.activeId }, { $set: { status, completedAt: new Date('2026-09-05T12:00:00Z') } });
+  const before = await server.inspect(record.activeId), withdrawnBefore = await server.inspect(record.historyId);
+  await context.addCookies([record.para.cookie]);
+  await context.route('**/*', route => new URL(route.request().url()).origin === server.origin ? route.continue() : route.abort('blockedbyclient'));
+  const writes = [], errors = [], workspaceReads = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith('/api/') && !['GET', 'HEAD'].includes(request.method())) writes.push(url.pathname);
+    if (/^\/api\/cases\/[a-f0-9]{24}$/.test(url.pathname)) workspaceReads.push(url.pathname);
+  });
+  await page.goto('/paralegal-v2.html#/work?section=history');
+  const row = page.locator(`[data-work-history-id="${record.activeId}"]`), title = row.getByRole('button', { name: 'Remaining assignment', exact: true });
+  await expect(title).toBeVisible(); await title.focus(); await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Remaining assignment', exact: true });
+  await expect(dialog).toBeVisible(); await expect(dialog).toContainText(status === 'completed' ? 'Completed' : 'Closed');
+  await expect(dialog).toContainText('Read-only work and payment history.');
+  await expect(dialog.getByRole('heading', { name: 'Payment record' })).toBeVisible();
+  for (const [width, theme] of [[1366, 'light'], [320, 'dark']]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(theme => { for (const element of [document.documentElement, document.body]) { element.classList.remove('theme-light', 'theme-dark'); element.classList.add(`theme-${theme}`); } }, theme);
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`history-detail-${status}-${width}-${theme}.png`) });
+  }
+  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(title).toBeFocused();
+  await expect(row.locator('.v2-work-record-menu')).toHaveCount(0);
+  await row.click({position:{x:150,y:10}});
+  await expect(dialog).toBeVisible(); await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(title).toBeFocused();
+  await title.click(); await dialog.getByText('More actions',{exact:true}).click(); await dialog.getByRole('button',{name:'Block attorney',exact:true}).click();
+  const block = page.getByRole('dialog', { name: 'Block this attorney?', exact: true });
+  await expect(block).toBeVisible(); await expect(block).toContainText('across LPC');
+  await block.getByRole('button', { name: 'Cancel', exact: true }).click(); await expect(dialog.getByRole('button',{name:'Block attorney',exact:true})).toBeFocused(); await dialog.getByRole('button',{name:'Done',exact:true}).click();
+  const withdrawn = page.locator(`[data-work-history-id="${record.historyId}"]`);
+  await withdrawn.getByRole('button', { name: 'River Street retained assignment', exact: true }).click();
+  const retained = page.getByRole('dialog', { name: 'River Street retained assignment', exact: true });
+  await expect(retained).toContainText('Withdrawn'); await expect(retained).toContainText('No payout');
+  await retained.getByText('Earlier receipts (1)', { exact: true }).click(); await expect(retained).toContainText('$81.00');
+  await page.screenshot({ path: info.outputPath('history-detail-withdrawn-expanded-320-dark.png') });
+  const downloadEvent = page.waitForEvent('download'); await retained.getByRole('button', { name: /^Download earlier receipt/ }).click();
+  const download = await downloadEvent, filename = info.outputPath('history-detail-retained-receipt.pdf');
+  await download.saveAs(filename); expect((await fs.readFile(filename)).subarray(0, 5).toString()).toBe('%PDF-');
+  await retained.getByRole('button', { name: 'Close matter history', exact: true }).click();
+  expect(workspaceReads).toEqual([]); expect(writes).toEqual([]); expect(errors).toEqual([]);
+  expect(server.evidence().provider).toEqual([]); expect(server.evidence().mail).toEqual([]);
+  expect(await server.inspect(record.activeId)).toEqual(before); expect(await server.inspect(record.historyId)).toEqual(withdrawnBefore);
+});

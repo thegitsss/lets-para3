@@ -1,3 +1,4 @@
+const { aggregateCountClaims, supportedAccountOverviewSentence } = require("./aggregateOverviewGrounding");
 const MONTH_PATTERN = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
 const STATUS_CLAIMS = Object.freeze([
   "open",
@@ -157,7 +158,8 @@ function normalizedEvidenceFacts(toolOutputs = []) {
     : []);
 }
 
-function statusClaimSupportedByFacts(status = "", sentence = "", toolOutputs = [], legacyEvidenceText = "") {
+function statusClaimSupportedByFacts(status = "", sentence = "", toolOutputs = [], legacyEvidenceText = "", accountContext = {}) {
+  if (supportedAccountOverviewSentence(sentence, toolOutputs, accountContext)) return true;
   const facts = normalizedEvidenceFacts(toolOutputs);
   if (!facts.length) return statusSupported(status, legacyEvidenceText);
   const expected = normalize(status);
@@ -320,6 +322,8 @@ function auditAttorneySemanticResponse({
   detailLevel = "concise",
   evidencePlan = {},
   includeOptionalUi = true,
+  accountOwnerId = "",
+  now = Date.now(),
 } = {}) {
   const errors = [];
   const evidenceText = flattenEvidence(toolOutputs);
@@ -332,6 +336,13 @@ function auditAttorneySemanticResponse({
     /\b(?:evidence state|capability id|source ref|policy or live state)\s*:/i.test(reply)
   ) {
     errors.push("raw_evidence_fields_exposed");
+  }
+
+  if (
+    /\binvoices?\b/i.test(reply) &&
+    !/\b(?:does not|doesn't|doesn’t|do not|don't|don’t|no)\b[^.!?]{0,60}\binvoices?\b|\binvoices?\b[^.!?]{0,60}\b(?:not created|not provided|not available)\b/i.test(reply)
+  ) {
+    errors.push("unsupported_invoice_record_claim");
   }
 
   const normalizedReply = normalize(reply);
@@ -353,8 +364,12 @@ function auditAttorneySemanticResponse({
       if (!evidenceText.includes(claim)) errors.push("unsupported_name_or_title_claim");
     }
     for (const sentence of splitSentences(reply)) {
+      if (aggregateCountClaims(sentence).length && !supportedAccountOverviewSentence(sentence, toolOutputs, { accountOwnerId, now })) {
+        errors.push("unsupported_status_or_lifecycle_claim");
+        break;
+      }
       for (const status of extractStatusClaims(sentence)) {
-        if (!statusClaimSupportedByFacts(status, sentence, toolOutputs, evidenceText)) {
+        if (!statusClaimSupportedByFacts(status, sentence, toolOutputs, evidenceText, { accountOwnerId, now })) {
           errors.push("unsupported_status_or_lifecycle_claim");
           break;
         }
@@ -417,9 +432,10 @@ function hasLiveMatterEvidence(toolOutputs = []) {
   });
 }
 
-function auditPolicyLiveStateConfusion(reply = "", toolOutputs = []) {
-  const assertsCompletedLiveState = /\b(?:your|this|that)\s+(?:case|matter|payment|payout)\s+(?:is|was|has been|already)\b/i.test(reply) ||
-    /\b(?:you|your paralegal)\s+(?:have|has|were|was)\s+(?:been\s+)?(?:paid|funded|completed|released)\b/i.test(reply);
+function auditPolicyLiveStateConfusion(reply = "", toolOutputs = [], accountContext = {}) {
+  const individualClaims = splitSentences(reply).filter(sentence => !supportedAccountOverviewSentence(sentence, toolOutputs, accountContext)).join(" ");
+  const assertsCompletedLiveState = /\b(?:your|this|that)\s+(?:case|matter|payment|payout)\s+(?:is|was|has been|already)\b/i.test(individualClaims) ||
+    /\b(?:you|your paralegal)\s+(?:have|has|were|was)\s+(?:been\s+)?(?:paid|funded|completed|released)\b/i.test(individualClaims);
   if (!assertsCompletedLiveState || hasLiveMatterEvidence(toolOutputs)) return [];
   const hasPolicy = (toolOutputs || []).some((entry) =>
     (entry?.result?.evidence?.facts || []).some((fact) => fact.policyOrLiveState === "policy")

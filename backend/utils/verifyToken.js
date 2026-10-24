@@ -184,7 +184,7 @@ function makeVerifier(required = true) {
           if (!required) return next();
           return res.status(403).json({ msg: "Session expired" });
         }
-      } else if (requireManagedSession && Object.hasOwn(payload, "av")) {
+      } else if (requireManagedSession) {
         if (!required) return next();
         return res.status(403).json({ msg: "Session expired" });
       }

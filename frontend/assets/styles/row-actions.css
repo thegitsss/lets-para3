@@ -1,0 +1,7 @@
+/* Larger pointer targets; original controls still own keyboard interaction. */
+body [data-lpc-row-clickable] {cursor:pointer;}
+body.lpc-v2 .v2-settings-preference-row:has(input[type=checkbox]:not(:disabled)),
+body.lpc-v2 .av2-account-toggle:has(input[type=checkbox]:not(:disabled)) {cursor:pointer;}
+body.lpc-v2 .v2-settings-preference-row:has(input:disabled),
+body.lpc-v2 .av2-account-toggle:has(input:disabled) {cursor:default;}
+body.lpc-v2 .av2-account-preference>.av2-account-toggle {width:100%;box-sizing:border-box;}

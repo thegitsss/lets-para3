@@ -1,0 +1,293 @@
+{
+  "config": {
+    "argv": [
+      "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/samanthasider/Desktop/lets-para3/backend/node_modules/playwright/cli.js",
+      "test",
+      "-c",
+      "tests/playwright/attorney-v2/playwright.config.js",
+      "workspace.spec.js",
+      "--grep",
+      "Matter switcher",
+      "--output",
+      "../outputs/completion-2026-09-29/attorney-matter-switcher-exact-artifacts",
+      "--reporter=line,json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/playwright.config.js",
+    "rootDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+    "failOnFlakyTests": true,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/support/global.setup.js",
+    "globalTeardown": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/global.teardown.js",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-exact-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-exact-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-exact-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node \"/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/control-room/webServer.js\"",
+      "cwd": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T",
+      "port": 5051,
+      "reuseExistingServer": false,
+      "timeout": 240000,
+      "env": {
+        "APPLICATION_INSIGHTS_NO_STATSBEAT": "true",
+        "CODEX_CI": "1",
+        "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
+        "CODEX_PERMISSION_PROFILE": ":workspace",
+        "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+        "CODEX_SESSION_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_THREAD_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_VERSION": "0.155.0-alpha.16.3",
+        "COLORTERM": "",
+        "COMMAND_MODE": "unix2003",
+        "DEBUG": "release",
+        "ELECTRON_RUN_AS_NODE": "1",
+        "GH_PAGER": "cat",
+        "GIT_PAGER": "cat",
+        "HOME": "/Users/samanthasider",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.UTF-8",
+        "LOGNAME": "samanthasider",
+        "MACH_PORT_RENDEZVOUS_PEER_VALDATION": "1",
+        "MallocNanoZone": "0",
+        "NVM_CD_FLAGS": "-q",
+        "NVM_DIR": "/Users/samanthasider/.nvm",
+        "OLDPWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "PAGER": "cat",
+        "PATH": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Users/samanthasider/.codex/tmp/arg0/codex-arg0x2rsES:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/Users/samanthasider/.vscode/extensions/openai.chatgpt-26.5917.62051-darwin-x64/bin/macos-x86_64",
+        "PWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "RUST_LOG": "warn",
+        "SHELL": "/bin/zsh",
+        "SHLVL": "0",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.bG4A0cldCu/Listeners",
+        "TERM": "dumb",
+        "TMPDIR": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T/",
+        "USER": "samanthasider",
+        "VSCODE_CODE_CACHE_PATH": "/Users/samanthasider/Library/Application Support/Code/CachedData/2242ebbb54efeeb0129e08e919e7e8d43033cd83",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE": "extensionHost",
+        "VSCODE_CWD": "/",
+        "VSCODE_ESM_ENTRYPOINT": "vs/workbench/api/node/extensionHostProcess",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS": "true",
+        "VSCODE_IPC_HOOK": "/Users/samanthasider/Library/Application Support/Code/1.13-main.sock",
+        "VSCODE_NLS_CONFIG": "{\"userLocale\":\"en-us\",\"osLocale\":\"en-us\",\"resolvedLanguage\":\"en\",\"defaultMessagesFile\":\"/Applications/Visual Studio Code.app/Contents/Resources/app/out/nls.messages.json\",\"locale\":\"en-us\",\"availableLanguages\":{}}",
+        "VSCODE_PID": "21447",
+        "XPC_FLAGS": "0x0",
+        "XPC_SERVICE_NAME": "application.com.microsoft.VSCode.177186350.177186356",
+        "__CFBundleIdentifier": "com.microsoft.VSCode",
+        "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+        "PLAYWRIGHT_JSON_OUTPUT_NAME": "../outputs/completion-2026-09-29/attorney-matter-switcher-exact.json",
+        "_": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+        "PLAYWRIGHT_BASE_URL": "http://127.0.0.1:5051",
+        "EMAIL_DISABLE": "true",
+        "OPENAI_API_KEY": "",
+        "DATA_ENCRYPTION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "PLAYWRIGHT_MONGO_REPLICA_SET": "true",
+        "PLAYWRIGHT_INITIALIZE_ATTORNEY_MODELS": "true",
+        "PLAYWRIGHT_MONGO_PORT": "5889",
+        "PORT": "5051",
+        "NODE_ENV": "test"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "workspace.spec.js",
+      "file": "workspace.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Matter switcher preserves the inventory return and recovers failed searches",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2073,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:42:28.040Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-037d64f8c7913d6b6467",
+          "file": "workspace.spec.js",
+          "line": 18,
+          "column": 1
+        },
+        {
+          "title": "Matter switcher preserves the inventory return and recovers failed searches",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8774,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:42:30.947Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-39ed0729e9486212c66e",
+          "file": "workspace.spec.js",
+          "line": 18,
+          "column": 1
+        },
+        {
+          "title": "Matter switcher preserves the inventory return and recovers failed searches",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3715,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:42:41.754Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-5304e87a4b62efab5ae2",
+          "file": "workspace.spec.js",
+          "line": 18,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T16:41:30.029Z",
+    "duration": 75967.06,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

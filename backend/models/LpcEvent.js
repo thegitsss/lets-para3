@@ -132,6 +132,11 @@ const routingSchema = new Schema(
     actionKeys: { type: [String], default: [] },
     lastRoutedAt: { type: Date, default: null },
     error: { type: String, trim: true, default: "", maxlength: 4000 },
+    claimToken: { type: String, default: "" },
+    leaseExpiresAt: { type: Date, default: null },
+    nextAttemptAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
+    supportKickoff: { type: Schema.Types.Mixed, default: null },
   },
   { _id: false, strict: true }
 );
@@ -166,7 +171,8 @@ lpcEventSchema.index(
   { idempotencyKey: 1 },
   {
     unique: true,
-    partialFilterExpression: { idempotencyKey: { $type: "string", $ne: "" } },
+    // Nonempty string keys: $ne is unsupported in MongoDB partial indexes.
+    partialFilterExpression: { idempotencyKey: { $type: "string", $gt: "" } },
   }
 );
 lpcEventSchema.index({ "subject.entityType": 1, "subject.entityId": 1, occurredAt: -1 });

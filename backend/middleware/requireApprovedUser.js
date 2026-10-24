@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("middleware:requireApprovedUser");
 // backend/middleware/requireApprovedUser.js
 const User = require("../models/User");
 
@@ -23,7 +25,7 @@ module.exports = async function requireApprovedUser(req, res, next) {
 
     return res.status(403).json({ error: "Account pending approval" });
   } catch (err) {
-    console.error("[requireApprovedUser] failed", err);
+    runtimeLogger.error("[requireApprovedUser] failed", err);
     return res.status(500).json({ error: "Server error" });
   }
 };

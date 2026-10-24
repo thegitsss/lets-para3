@@ -1,0 +1,3638 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-06",
+  "checklist": "docs/attorney-v2/BUILD_CHECKLIST.md",
+  "meaning": "Requirement assignment only, not implementation or acceptance evidence. All API mappings include preservation/characterization; they do not authorize extra UI actions or backend changes.",
+  "limits": [
+    "Inventories are the recorded audit snapshot, not a claim of a fresh exhaustive runtime audit. G-01 requires a fresh census before phase closure.",
+    "Historical plan/Phase 0 authorization language is not current session authority; Phase 1 decisions and later user instructions control their approved scope.",
+    "Existing known failures and production prerequisites remain open unless separately evidenced."
+  ],
+  "sourceSha256": {
+    "docs/attorney-v2/routes.json": "1de3eb7649b73dbd83c67170b01e3442b478d6974a43b2aeda9f0192c2a6f47a",
+    "docs/attorney-v2/api-dependencies.json": "5b7edf78e266389d48e377fa25e7afbe079023b5c29c19eceeb86e7c9b561c31",
+    "docs/attorney-v2/lifecycle-fixtures.json": "dc00af8f3e96c82f82c8f349e5ae1e720ad24c6e1099490b0a5f0377c434cc56",
+    "docs/attorney-v2/DEFECT_REGISTER.md": "5817f8bf317a1c3c6f4ed225815fb5034884c7724090f96cd7d341752caa131e",
+    "ATTORNEY_APPLICATION_V2_MIGRATION_AND_V1_RETIREMENT_PLAN.md": "fda5346abf436302b3bd2638023b10ba481be920e672020dbf5aca3787cf9776",
+    "ATTORNEY_TEST_CHECKLIST.md": "7f9334d9c4cb14addda9244e137444d29aad76ceee9288440cc73993ee0e7a0b",
+    "docs/RELEASE_GATES.md": "dc14aa0fbc23f8819bef5b6beedb3561b18164ac6abedbd136a583caba6d2aa9",
+    "docs/BROWSER_SUPPORT.md": "41968315259c1247e6d0a58cf1cc1a9f081811204dd431ff6201bf76794cdbd4"
+  },
+  "counts": {
+    "routeGroups": 17,
+    "apiFamilies": 18,
+    "endpointEntries": 151,
+    "lifecycleScenarios": 19,
+    "defectEntries": 23,
+    "manualJourneySections": 14,
+    "checklistItems": 99
+  },
+  "routeGroups": [
+    {
+      "id": "attorney-home",
+      "v1": "dashboard-attorney.html#home",
+      "checklistIds": [
+        "P2-01",
+        "P2-02",
+        "P2-04",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-matters",
+      "v1": "dashboard-attorney.html#cases",
+      "checklistIds": [
+        "P2-03",
+        "P4-03",
+        "P5-01",
+        "G-01",
+        "X-01",
+        "P2-05"
+      ]
+    },
+    {
+      "id": "attorney-private-tasks",
+      "v1": "dashboard-attorney.html#tasks",
+      "checklistIds": [
+        "P3-01",
+        "P3-02",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-payments",
+      "v1": "dashboard-attorney.html#funds",
+      "checklistIds": [
+        "P8-01",
+        "P8-02",
+        "P8-03",
+        "P8-04",
+        "P8-09",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-create-matter",
+      "v1": "create-case.html#details",
+      "checklistIds": [
+        "P4-01",
+        "P4-02",
+        "P4-04",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-applications-redirect",
+      "v1": "case-applications.html",
+      "checklistIds": [
+        "P5-01",
+        "G-01",
+        "P12-01",
+        "P12-05",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-workspace",
+      "v1": "case-detail.html?caseId=:caseId",
+      "checklistIds": [
+        "P6-01",
+        "P6-02",
+        "P6-03",
+        "P6-04",
+        "P7-01",
+        "P7-02",
+        "P7-03",
+        "P7-04",
+        "P7-05",
+        "P7-06",
+        "P7-07",
+        "P8-05",
+        "P8-06",
+        "P8-07",
+        "P8-08",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-paralegal-directory",
+      "v1": "browse-paralegals.html",
+      "checklistIds": [
+        "P3-03",
+        "P3-04",
+        "P5-03",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-candidate-profile",
+      "v1": "profile-paralegal.html?paralegalId=:paralegalId",
+      "checklistIds": [
+        "P3-04",
+        "P5-03",
+        "P5-04",
+        "P5-05",
+        "P5-06",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-profile",
+      "v1": "profile-attorney.html",
+      "checklistIds": [
+        "P9-01",
+        "P9-02",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-settings-directory",
+      "v1": "profile-settings.html",
+      "checklistIds": [
+        "P9-01",
+        "P9-03",
+        "P9-04",
+        "P9-05",
+        "P9-06",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-settings-profile",
+      "v1": "profile-settings.html#profile:personal",
+      "checklistIds": [
+        "P9-01",
+        "P9-02",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-settings-security",
+      "v1": "profile-settings.html#securitySection",
+      "checklistIds": [
+        "P9-04",
+        "P9-06",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-settings-preferences",
+      "v1": "profile-settings.html#preferencesSection",
+      "checklistIds": [
+        "P9-03",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-help",
+      "v1": "help.html",
+      "checklistIds": [
+        "P9-07",
+        "P9-10",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-auth-return",
+      "v1": "login.html",
+      "checklistIds": [
+        "F-06",
+        "P9-07",
+        "X-05",
+        "X-06",
+        "G-01",
+        "X-01"
+      ]
+    },
+    {
+      "id": "attorney-supporting-public-content",
+      "v1": "attorney-faq.html",
+      "checklistIds": [
+        "P9-07",
+        "P10-03",
+        "P10-04",
+        "G-01",
+        "X-01"
+      ]
+    }
+  ],
+  "apiFamilies": [
+    {
+      "id": "session",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "purpose": "session identity, role and account state",
+          "checklistIds": [
+            "F-06",
+            "P9-07",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/logout",
+          "purpose": "terminate current authenticated session",
+          "checklistIds": [
+            "F-06",
+            "P9-07",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/request-password-reset",
+          "purpose": "Assistant-supported recovery action",
+          "checklistIds": [
+            "P9-07",
+            "P9-10",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/csrf",
+          "purpose": "obtain mutation token",
+          "checklistIds": [
+            "X-05",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attorney-dashboard",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/attorney/dashboard",
+          "purpose": "home overview projection",
+          "checklistIds": [
+            "P2-02",
+            "P2-04",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-user",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/users/me",
+          "purpose": "authoritative current profile and account projection",
+          "checklistIds": [
+            "P9-01",
+            "G-04",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/users/me",
+          "purpose": "profile update",
+          "checklistIds": [
+            "P9-01",
+            "G-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/me/onboarding",
+          "purpose": "persisted onboarding state",
+          "checklistIds": [
+            "P2-01",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/users/me/onboarding",
+          "purpose": "onboarding progress",
+          "checklistIds": [
+            "P2-01",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/me/pending-hire",
+          "purpose": "recover hire after payment-method setup",
+          "checklistIds": [
+            "P5-05",
+            "P8-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/api/users/me/pending-hire",
+          "purpose": "store pending hire context",
+          "checklistIds": [
+            "P5-05",
+            "P8-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/users/me/pending-hire",
+          "purpose": "clear pending hire context",
+          "checklistIds": [
+            "P5-05",
+            "P8-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/me/weekly-notes",
+          "purpose": "attorney weekly private notes",
+          "checklistIds": [
+            "P3-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/api/users/me/weekly-notes",
+          "purpose": "save attorney weekly private notes",
+          "checklistIds": [
+            "P3-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/users/me/notification-prefs",
+          "purpose": "notification preference update",
+          "checklistIds": [
+            "P9-03",
+            "P9-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/attorneys/:attorneyId",
+          "purpose": "authorized attorney profile",
+          "checklistIds": [
+            "P3-04",
+            "P9-01",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/profile-preview/:userId",
+          "purpose": "context panel preview",
+          "checklistIds": [
+            "P3-04",
+            "P9-01",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "account-security-preferences",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/account/preferences",
+          "purpose": "theme/font/preferences",
+          "checklistIds": [
+            "P9-03",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/preferences",
+          "purpose": "update preferences",
+          "checklistIds": [
+            "P9-03",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/account/dashboard-views",
+          "purpose": "saved Matter views",
+          "checklistIds": [
+            "P2-03",
+            "P4-03",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/dashboard-views",
+          "purpose": "save Matter view",
+          "checklistIds": [
+            "P2-03",
+            "P4-03",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/account/dashboard-views/:scope/:viewId",
+          "purpose": "delete saved view",
+          "checklistIds": [
+            "P2-03",
+            "P4-03",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/update-password",
+          "purpose": "change password",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/account/2fa",
+          "purpose": "2FA status",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/2fa-toggle",
+          "purpose": "toggle supported 2FA mode",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/2fa/authenticator/setup",
+          "purpose": "begin authenticator setup",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/2fa/authenticator/confirm",
+          "purpose": "confirm authenticator",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/account/passkeys",
+          "purpose": "list passkeys",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/passkeys/registration-options",
+          "purpose": "begin passkey registration",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/passkeys/register",
+          "purpose": "register passkey",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/account/passkeys/:passkeyId",
+          "purpose": "remove passkey",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/2fa-backup-codes",
+          "purpose": "generate backup codes",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/account/sessions",
+          "purpose": "list sessions",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/account/sessions/:sessionId",
+          "purpose": "revoke session",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/account/sessions/revoke-others",
+          "purpose": "revoke other sessions",
+          "checklistIds": [
+            "P9-04",
+            "X-05",
+            "X-06",
+            "G-02",
+            "X-01",
+            "X-03"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/account/deactivate-status",
+          "purpose": "account action eligibility",
+          "checklistIds": [
+            "P9-06",
+            "P8-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/account/deactivate",
+          "purpose": "deactivate eligible account",
+          "checklistIds": [
+            "P9-06",
+            "P8-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/account/delete",
+          "purpose": "request eligible account deletion",
+          "checklistIds": [
+            "P9-06",
+            "P8-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "case-drafts",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/case-drafts",
+          "purpose": "list attorney drafts",
+          "checklistIds": [
+            "P4-01",
+            "P4-04",
+            "G-02",
+            "X-01",
+            "P2-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/case-drafts/:draftId",
+          "purpose": "resume owned draft",
+          "checklistIds": [
+            "P4-01",
+            "P4-04",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/case-drafts",
+          "purpose": "create draft",
+          "checklistIds": [
+            "P4-01",
+            "P4-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/api/case-drafts/:draftId",
+          "purpose": "autosave draft",
+          "checklistIds": [
+            "P4-01",
+            "P4-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/case-drafts/:draftId",
+          "purpose": "delete draft",
+          "checklistIds": [
+            "P4-01",
+            "P4-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cases-lifecycle-workspace",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/cases/search",
+          "purpose": "authenticated role-safe search",
+          "checklistIds": [
+            "P9-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases",
+          "purpose": "publish Matter and invoke existing posting behavior",
+          "checklistIds": [
+            "P4-02",
+            "P4-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/my",
+          "purpose": "role-specific Matter lists with query projections",
+          "checklistIds": [
+            "P2-03",
+            "P3-04",
+            "P6-01",
+            "P6-03",
+            "G-02",
+            "X-01",
+            "P2-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/my-active",
+          "purpose": "attorney open/active Matter choices",
+          "checklistIds": [
+            "P2-03",
+            "P3-04",
+            "P6-01",
+            "P6-03",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId",
+          "purpose": "authorized Matter/workspace projection",
+          "checklistIds": [
+            "P6-01",
+            "P6-04",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/cases/:caseId",
+          "purpose": "eligible Matter/task update",
+          "checklistIds": [
+            "P4-02",
+            "P4-04",
+            "P7-05",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/cases/:caseId",
+          "purpose": "delete never-engaged eligible Matter",
+          "checklistIds": [
+            "P4-02",
+            "P4-04",
+            "P7-05",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/status-history",
+          "purpose": "Matter status history",
+          "checklistIds": [
+            "P4-03",
+            "P6-01",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/applicants",
+          "purpose": "candidate projection",
+          "checklistIds": [
+            "P5-01",
+            "P5-02",
+            "P5-03",
+            "P6-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/invites",
+          "purpose": "invitation projection",
+          "checklistIds": [
+            "P5-01",
+            "P5-02",
+            "P5-03",
+            "P6-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/invite/:paralegalId",
+          "purpose": "directory invitation",
+          "checklistIds": [
+            "P5-03",
+            "P5-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/invite",
+          "purpose": "workspace/profile invitation compatibility path",
+          "checklistIds": [
+            "P5-03",
+            "P5-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/invite/revoke",
+          "purpose": "revoke pending/accepted invitation per current contract",
+          "checklistIds": [
+            "P5-03",
+            "P5-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/applicants/:paralegalId/star",
+          "purpose": "star/shortlist candidate",
+          "checklistIds": [
+            "P5-01",
+            "P5-02",
+            "P6-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/applicants/:paralegalId/reject",
+          "purpose": "reject candidate",
+          "checklistIds": [
+            "P5-01",
+            "P5-02",
+            "P6-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/applications/:applicantId/preview",
+          "purpose": "authorized application preview",
+          "checklistIds": [
+            "P5-01",
+            "P5-02",
+            "P6-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/pre-engagement/:paralegalId/request",
+          "purpose": "request pre-engagement answers",
+          "checklistIds": [
+            "P5-04",
+            "P5-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/pre-engagement/review",
+          "purpose": "approve or request changes with revision",
+          "checklistIds": [
+            "P5-04",
+            "P5-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/hire/:paralegalId",
+          "purpose": "claim hire and fund through existing backend",
+          "checklistIds": [
+            "P5-05",
+            "P5-06",
+            "P5-07",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/notes",
+          "purpose": "attorney private Matter note",
+          "checklistIds": [
+            "P4-03",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/api/cases/:caseId/notes",
+          "purpose": "save attorney private Matter note",
+          "checklistIds": [
+            "P4-03",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/flags/mark-resolved",
+          "purpose": "attorney moderation resolution action",
+          "checklistIds": [
+            "P4-03",
+            "P8-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/complete",
+          "purpose": "complete eligible Matter",
+          "checklistIds": [
+            "P8-05",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/partial-payout",
+          "purpose": "attorney withdrawal payout decision",
+          "checklistIds": [
+            "P8-06",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/reject-payout",
+          "purpose": "reject withdrawal payout for review",
+          "checklistIds": [
+            "P8-06",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/relist",
+          "purpose": "request eligible relist after withdrawal",
+          "checklistIds": [
+            "P8-06",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/stream",
+          "purpose": "Matter lifecycle realtime stream",
+          "checklistIds": [
+            "P6-04",
+            "P7-07",
+            "P7-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/archive/download",
+          "purpose": "authorized archive download",
+          "checklistIds": [
+            "P6-03",
+            "P8-08",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "applications",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/applications/my-postings",
+          "purpose": "applications for attorney-owned postings",
+          "checklistIds": [
+            "P2-03",
+            "P5-01",
+            "P5-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/applications/for-job/:jobId",
+          "purpose": "legacy attorney/admin Job application projection",
+          "checklistIds": [
+            "P2-03",
+            "P5-01",
+            "P5-02",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "messages",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/messages/unread-count",
+          "purpose": "global unread badge",
+          "checklistIds": [
+            "P7-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/messages/summary",
+          "purpose": "Matter unread summary",
+          "checklistIds": [
+            "P7-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/messages/threads",
+          "purpose": "home recent thread projection",
+          "checklistIds": [
+            "P2-02",
+            "P7-01",
+            "P7-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/messages/:caseId",
+          "purpose": "authorized thread and last-viewed behavior",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/messages/:caseId",
+          "purpose": "send message",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/messages/:caseId/file",
+          "purpose": "send file message",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/messages/:caseId/read",
+          "purpose": "mark thread read",
+          "checklistIds": [
+            "P7-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/messages/:caseId/:messageId",
+          "purpose": "edit authorized message",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/messages/:caseId/:messageId/react",
+          "purpose": "add reaction",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/messages/:caseId/:messageId/react",
+          "purpose": "remove reaction",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/messages/:caseId/:messageId",
+          "purpose": "soft-delete authorized message",
+          "checklistIds": [
+            "P7-01",
+            "P7-02",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/uploads/profile-photo",
+          "purpose": "profile photo upload",
+          "checklistIds": [
+            "P9-02",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/uploads/profile-photo/original",
+          "purpose": "authorized photo editing source",
+          "checklistIds": [
+            "P9-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/uploads/view",
+          "purpose": "authorized inline view compatibility",
+          "checklistIds": [
+            "P3-04",
+            "P7-03",
+            "P9-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/uploads/signed-get",
+          "purpose": "authorized signed preview/download",
+          "checklistIds": [
+            "P3-04",
+            "P7-03",
+            "P9-02",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/uploads/case/:caseId",
+          "purpose": "upload Matter file",
+          "checklistIds": [
+            "P7-03",
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/uploads/case/:caseId",
+          "purpose": "Matter file projection",
+          "checklistIds": [
+            "P7-03",
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/uploads/case/:caseId/:fileId",
+          "purpose": "delete authorized Matter file",
+          "checklistIds": [
+            "P7-03",
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/uploads/case/:caseId/:fileId/security-status",
+          "purpose": "scan status",
+          "checklistIds": [
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/uploads/case/:caseId/:fileId/download",
+          "purpose": "authorized file download",
+          "checklistIds": [
+            "P7-03",
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/files",
+          "purpose": "legacy/embedded Case file upload path",
+          "checklistIds": [
+            "P7-03",
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:caseId/files/signed-get",
+          "purpose": "legacy signed file path",
+          "checklistIds": [
+            "P7-03",
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/cases/:caseId/files/:fileId/status",
+          "purpose": "attorney approve/request-revision status",
+          "checklistIds": [
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/files/:fileId/revision-request",
+          "purpose": "request file revision",
+          "checklistIds": [
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:caseId/files/:fileId/replace",
+          "purpose": "replace file with lineage",
+          "checklistIds": [
+            "P7-04",
+            "P7-08",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "payments",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/payments/config",
+          "purpose": "client-safe payment configuration",
+          "checklistIds": [
+            "P8-01",
+            "P8-02",
+            "P5-05",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/payment-method/default",
+          "purpose": "default payment method state",
+          "checklistIds": [
+            "P8-01",
+            "P8-02",
+            "P5-05",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/payment-method/setup-intent",
+          "purpose": "create SetupIntent",
+          "checklistIds": [
+            "P8-01",
+            "P8-02",
+            "P5-05",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/payment-method/default",
+          "purpose": "set default payment method",
+          "checklistIds": [
+            "P8-01",
+            "P8-02",
+            "P5-05",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/portal",
+          "purpose": "create safe billing portal session",
+          "checklistIds": [
+            "P8-01",
+            "P8-02",
+            "P5-05",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/start-escrow",
+          "purpose": "legacy/current escrow initiation contract",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/intent/:caseId",
+          "purpose": "funding intent",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/confirm/:caseId",
+          "purpose": "funding confirmation",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/payments/reconcile/:caseId",
+          "purpose": "authorized funding reconciliation",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/payments/:caseId/budget",
+          "purpose": "eligible budget update",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/summary",
+          "purpose": "authoritative role payment summary",
+          "checklistIds": [
+            "P8-04",
+            "P8-09",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/escrow/active",
+          "purpose": "attorney active escrow table",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/escrow/pending",
+          "purpose": "attorney pending escrow projection",
+          "checklistIds": [
+            "P8-03",
+            "P8-09",
+            "P5-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/receipt/attorney/:caseId",
+          "purpose": "attorney receipt",
+          "checklistIds": [
+            "P8-04",
+            "P8-09",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/history",
+          "purpose": "attorney payment history",
+          "checklistIds": [
+            "P8-04",
+            "P8-09",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/export/csv",
+          "purpose": "attorney receipt export",
+          "checklistIds": [
+            "P8-04",
+            "P8-09",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/payments/receipts",
+          "purpose": "receipt listing compatibility",
+          "checklistIds": [
+            "P8-04",
+            "P8-09",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "private-checklist",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/checklist",
+          "purpose": "private task list/overdue projection",
+          "checklistIds": [
+            "P3-01",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/checklist",
+          "purpose": "create private task",
+          "checklistIds": [
+            "P3-01",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/checklist/:id/toggle",
+          "purpose": "toggle private task",
+          "checklistIds": [
+            "P3-01",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/checklist/:id",
+          "purpose": "delete private task",
+          "checklistIds": [
+            "P3-01",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "events-deadlines",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/events",
+          "purpose": "authorized event/deadline list",
+          "checklistIds": [
+            "P7-06",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/events",
+          "purpose": "create event/deadline",
+          "checklistIds": [
+            "P7-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/events/:id",
+          "purpose": "update event",
+          "checklistIds": [
+            "P7-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/events/:id/attendees",
+          "purpose": "attendee response",
+          "checklistIds": [
+            "P7-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/events/:id/reminders",
+          "purpose": "event reminder",
+          "checklistIds": [
+            "P7-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/events/:id",
+          "purpose": "delete authorized event",
+          "checklistIds": [
+            "P7-06",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "notifications",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/notifications",
+          "purpose": "notification list",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications/unread-count",
+          "purpose": "unread count",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications/stream",
+          "purpose": "notification SSE",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/notifications/:id/read",
+          "purpose": "mark read",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/notifications/read-all",
+          "purpose": "mark all read",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/notifications",
+          "purpose": "clear notifications",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/notifications/:id",
+          "purpose": "dismiss notification",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/notifications/workspace-presence",
+          "purpose": "presence heartbeat",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/notifications/workspace-presence",
+          "purpose": "clear presence",
+          "checklistIds": [
+            "P9-09",
+            "P7-02",
+            "P7-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "blocks",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/blocks",
+          "purpose": "active blocks",
+          "checklistIds": [
+            "P9-05",
+            "X-04",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/blocks",
+          "purpose": "create qualifying future-interaction block",
+          "checklistIds": [
+            "P9-05",
+            "X-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/blocks/:blockedId",
+          "purpose": "remove own block",
+          "checklistIds": [
+            "P9-05",
+            "X-04",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "disputes",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/disputes/:caseId",
+          "purpose": "authorized Matter dispute",
+          "checklistIds": [
+            "P8-07",
+            "P8-09",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/disputes/:caseId",
+          "purpose": "open dispute",
+          "checklistIds": [
+            "P8-07",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/disputes/:caseId/:disputeId/comment",
+          "purpose": "participant comment",
+          "checklistIds": [
+            "P8-07",
+            "P8-09",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "assistant-support",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/support/conversation",
+          "purpose": "load/create current support context per existing contract",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/support/conversation/:id/events",
+          "purpose": "Assistant live updates",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/support/conversation/:id/messages",
+          "purpose": "Assistant thread",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/support/conversation/:id/messages",
+          "purpose": "send support message",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/support/conversation/:id/messages/:messageId/feedback",
+          "purpose": "rate response",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/support/conversation/:id/restart",
+          "purpose": "restart conversation",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/support/conversation/:id/escalate",
+          "purpose": "request human escalation",
+          "checklistIds": [
+            "P9-10",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "candidate-presentation",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/paralegals/:paralegalId",
+          "purpose": "authenticated candidate profile",
+          "checklistIds": [
+            "P3-03",
+            "P3-04",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/public/paralegals/:paralegalId",
+          "purpose": "public fallback profile",
+          "checklistIds": [
+            "P3-03",
+            "P3-04",
+            "G-02",
+            "X-01"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/paralegals",
+          "purpose": "authenticated directory compatibility",
+          "checklistIds": [
+            "P3-03",
+            "P3-04",
+            "G-02",
+            "X-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "incident-intake",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/incidents",
+          "purpose": "attorney help issue report",
+          "checklistIds": [
+            "P9-07",
+            "G-02",
+            "X-01",
+            "X-03",
+            "X-05"
+          ]
+        }
+      ]
+    }
+  ],
+  "lifecycleScenarios": [
+    {
+      "id": "S00-access-boundary",
+      "checklistIds": [
+        "F-06",
+        "P6-04",
+        "X-05",
+        "X-06",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S01-onboarding-profile-payment-first-matter",
+      "checklistIds": [
+        "P2-01",
+        "P2-02",
+        "P9-01",
+        "P8-01",
+        "P8-02",
+        "P4-01",
+        "P4-02",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S02-draft-publish",
+      "checklistIds": [
+        "P4-01",
+        "P4-02",
+        "P4-04",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S03-open-edit-delete",
+      "checklistIds": [
+        "P4-02",
+        "P4-04",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S04-application-review",
+      "checklistIds": [
+        "P5-01",
+        "P5-02",
+        "P5-07",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S05-invitation",
+      "checklistIds": [
+        "P5-03",
+        "P5-07",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S06-pre-engagement",
+      "checklistIds": [
+        "P5-04",
+        "P5-07",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S07-hire-and-fund",
+      "checklistIds": [
+        "P5-05",
+        "P5-06",
+        "P5-07",
+        "P8-01",
+        "P8-02",
+        "P8-03",
+        "P8-09",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S08-active-workspace",
+      "checklistIds": [
+        "P6-01",
+        "P6-02",
+        "P6-04",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S09-messages",
+      "checklistIds": [
+        "P7-01",
+        "P7-02",
+        "P7-07",
+        "P7-08",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S10-files",
+      "checklistIds": [
+        "P7-03",
+        "P7-04",
+        "P7-08",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S11-tasks-deadlines",
+      "checklistIds": [
+        "P3-01",
+        "P3-02",
+        "P7-05",
+        "P7-06",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S12-completion",
+      "checklistIds": [
+        "P8-05",
+        "P8-08",
+        "P8-09",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S13-withdrawal-and-relist",
+      "checklistIds": [
+        "P8-06",
+        "P8-08",
+        "P8-09",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S14-dispute",
+      "checklistIds": [
+        "P8-07",
+        "P8-08",
+        "P8-09",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S15-payment-integrity",
+      "checklistIds": [
+        "P8-01",
+        "P8-02",
+        "P8-03",
+        "P8-04",
+        "P8-09",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S16-block-and-account-actions",
+      "checklistIds": [
+        "P9-05",
+        "P9-06",
+        "X-04",
+        "X-06",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S17-global-tools",
+      "checklistIds": [
+        "P9-07",
+        "P9-08",
+        "P9-09",
+        "P9-10",
+        "X-04",
+        "P10-01"
+      ]
+    },
+    {
+      "id": "S18-mixed-version-rollback",
+      "checklistIds": [
+        "X-12",
+        "P10-06",
+        "P11-02",
+        "P12-01",
+        "P12-05",
+        "X-04",
+        "P10-01"
+      ]
+    }
+  ],
+  "defectRegister": [
+    {
+      "id": "A-01",
+      "checklistIds": [
+        "G-05",
+        "P2-02",
+        "P8-04",
+        "P8-09"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-02",
+      "checklistIds": [
+        "G-05",
+        "P7-02"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-03",
+      "checklistIds": [
+        "G-05",
+        "P4-02",
+        "P8-06",
+        "X-04"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-04",
+      "checklistIds": [
+        "G-05",
+        "P5-02"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-05",
+      "checklistIds": [
+        "G-05",
+        "P4-02"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-06",
+      "checklistIds": [
+        "G-05",
+        "G-06",
+        "P3-01",
+        "P3-02",
+        "P7-05",
+        "P7-06"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-07",
+      "checklistIds": [
+        "G-05",
+        "G-03",
+        "P6-01"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-08",
+      "checklistIds": [
+        "G-05",
+        "P9-01"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-09",
+      "checklistIds": [
+        "G-05",
+        "P6-03",
+        "P7-03"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-10",
+      "checklistIds": [
+        "G-05",
+        "P12-01",
+        "P12-03",
+        "P12-05"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-11",
+      "checklistIds": [
+        "G-05",
+        "G-03",
+        "X-01",
+        "P12-04"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-12",
+      "checklistIds": [
+        "G-05",
+        "P9-03",
+        "P12-04"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-13",
+      "checklistIds": [
+        "G-05",
+        "X-04",
+        "X-12"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-14",
+      "checklistIds": [
+        "G-05",
+        "P9-10"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-15",
+      "checklistIds": [
+        "G-05",
+        "G-01",
+        "P5-01",
+        "P12-01"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-16",
+      "checklistIds": [
+        "G-05",
+        "P3-04",
+        "P5-05",
+        "X-05"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-17",
+      "checklistIds": [
+        "G-05",
+        "F-03",
+        "X-13"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-18",
+      "checklistIds": [
+        "G-05",
+        "P3-02",
+        "X-09"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-19",
+      "checklistIds": [
+        "G-05",
+        "P2-01",
+        "X-08"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-20",
+      "checklistIds": [
+        "G-05",
+        "P4-01",
+        "X-08"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-21",
+      "checklistIds": [
+        "G-05",
+        "P6-01",
+        "X-08"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-22",
+      "checklistIds": [
+        "G-05",
+        "F-09",
+        "G-08",
+        "X-07",
+        "P9-10"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    },
+    {
+      "id": "A-23",
+      "checklistIds": [
+        "G-05",
+        "P3-01",
+        "X-08"
+      ],
+      "status": "Consult defect register and implementation evidence; mapping does not close this finding."
+    }
+  ],
+  "manualJourneySections": [
+    {
+      "number": 1,
+      "title": "Landing + Access",
+      "checklistIds": [
+        "P9-07",
+        "P10-04",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Attorney Sign Up",
+      "checklistIds": [
+        "P9-07",
+        "X-05",
+        "P10-03",
+        "X-13"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Login",
+      "checklistIds": [
+        "F-06",
+        "P9-07",
+        "X-06",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 4,
+      "title": "First-Time Onboarding",
+      "checklistIds": [
+        "P2-01",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 5,
+      "title": "Attorney Profile / Account Settings",
+      "checklistIds": [
+        "P9-01",
+        "P9-02",
+        "P9-03",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Payments / Payment Method",
+      "checklistIds": [
+        "P8-01",
+        "P8-02",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 7,
+      "title": "Create a Matter",
+      "checklistIds": [
+        "P4-01",
+        "P4-02",
+        "P4-04",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 8,
+      "title": "Drafts / Matter Management",
+      "checklistIds": [
+        "P2-03",
+        "P4-01",
+        "P4-03",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 9,
+      "title": "Browse Paralegals / Applications",
+      "checklistIds": [
+        "P3-03",
+        "P3-04",
+        "P5-01",
+        "P5-03",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 10,
+      "title": "Hire + Funding Flow",
+      "checklistIds": [
+        "P5-05",
+        "P5-06",
+        "P5-07",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 11,
+      "title": "Matter Workspace",
+      "checklistIds": [
+        "P6-01",
+        "P6-02",
+        "P6-04",
+        "P7-01",
+        "P7-03",
+        "P7-05",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 12,
+      "title": "Notifications",
+      "checklistIds": [
+        "P9-09",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 13,
+      "title": "Completion / Archive / Payment History",
+      "checklistIds": [
+        "P8-04",
+        "P8-05",
+        "P8-08",
+        "X-13",
+        "P10-03"
+      ]
+    },
+    {
+      "number": 14,
+      "title": "Overall Quality",
+      "checklistIds": [
+        "X-02",
+        "X-07",
+        "X-08",
+        "X-09",
+        "X-10",
+        "X-11",
+        "P10-03",
+        "X-13"
+      ]
+    }
+  ],
+  "masterPlanSections": [
+    {
+      "section": "4.1",
+      "checklistIds": [
+        "G-04",
+        "P9-01",
+        "P9-02",
+        "P9-03",
+        "P9-04",
+        "P9-05",
+        "P9-06",
+        "X-05",
+        "X-06"
+      ]
+    },
+    {
+      "section": "4.2",
+      "checklistIds": [
+        "G-03",
+        "P5-01",
+        "P5-02",
+        "P5-03",
+        "P5-04",
+        "P6-04",
+        "P8-08"
+      ]
+    },
+    {
+      "section": "4.3",
+      "checklistIds": [
+        "P4-01",
+        "P8-01",
+        "P8-02",
+        "P8-03",
+        "P8-04",
+        "P8-09",
+        "X-03"
+      ]
+    },
+    {
+      "section": "4.4",
+      "checklistIds": [
+        "G-03",
+        "X-01",
+        "X-02"
+      ]
+    },
+    {
+      "section": "5",
+      "checklistIds": [
+        "X-12",
+        "P12-04"
+      ]
+    },
+    {
+      "section": "7",
+      "checklistIds": [
+        "G-01",
+        "P12-01",
+        "P9-07"
+      ]
+    },
+    {
+      "section": "8.1",
+      "checklistIds": [
+        "F-05",
+        "F-06",
+        "F-07",
+        "P2-01",
+        "G-08"
+      ]
+    },
+    {
+      "section": "8.2",
+      "checklistIds": [
+        "P2-02",
+        "P2-04",
+        "P3-02"
+      ]
+    },
+    {
+      "section": "8.3",
+      "checklistIds": [
+        "P4-01",
+        "P4-02",
+        "P4-04"
+      ]
+    },
+    {
+      "section": "8.4",
+      "checklistIds": [
+        "P2-03",
+        "P4-03",
+        "P5-01",
+        "P5-02"
+      ]
+    },
+    {
+      "section": "8.5",
+      "checklistIds": [
+        "P3-03",
+        "P3-04",
+        "P5-03",
+        "P5-04",
+        "P5-05",
+        "P5-06"
+      ]
+    },
+    {
+      "section": "8.6",
+      "checklistIds": [
+        "P6-01",
+        "P6-03",
+        "P6-04",
+        "X-06"
+      ]
+    },
+    {
+      "section": "8.7",
+      "checklistIds": [
+        "P5-01",
+        "P5-02",
+        "P5-07",
+        "P6-02"
+      ]
+    },
+    {
+      "section": "8.8",
+      "checklistIds": [
+        "P3-01",
+        "P3-02",
+        "P7-05",
+        "P7-06"
+      ]
+    },
+    {
+      "section": "8.9",
+      "checklistIds": [
+        "P7-03",
+        "P7-04",
+        "P7-08"
+      ]
+    },
+    {
+      "section": "8.10",
+      "checklistIds": [
+        "P7-01",
+        "P7-02",
+        "P7-07",
+        "P7-08"
+      ]
+    },
+    {
+      "section": "8.11",
+      "checklistIds": [
+        "P8-05",
+        "P8-06",
+        "P8-07",
+        "P8-08",
+        "P8-09",
+        "X-04"
+      ]
+    },
+    {
+      "section": "8.12",
+      "checklistIds": [
+        "P8-01",
+        "P8-02",
+        "P8-03",
+        "P8-04",
+        "P8-09"
+      ]
+    },
+    {
+      "section": "8.13",
+      "checklistIds": [
+        "P9-08",
+        "P9-09",
+        "P9-10",
+        "X-04"
+      ]
+    },
+    {
+      "section": "8.14",
+      "checklistIds": [
+        "P9-01",
+        "P9-02",
+        "P9-03",
+        "P9-04",
+        "P9-05",
+        "P9-06"
+      ]
+    },
+    {
+      "section": "9",
+      "checklistIds": [
+        "G-07",
+        "X-12"
+      ]
+    },
+    {
+      "section": "10.1",
+      "checklistIds": [
+        "F-05",
+        "F-07",
+        "G-08",
+        "X-03",
+        "X-06",
+        "X-07",
+        "X-11",
+        "X-12"
+      ]
+    },
+    {
+      "section": "10.2",
+      "checklistIds": [
+        "G-07",
+        "G-01",
+        "P6-02",
+        "P12-01"
+      ]
+    },
+    {
+      "section": "11",
+      "checklistIds": [
+        "P2-01",
+        "P3-01",
+        "P4-01",
+        "P5-01",
+        "P6-01",
+        "P7-01",
+        "P8-01",
+        "P9-01",
+        "P10-01",
+        "P11-01",
+        "P12-01"
+      ]
+    },
+    {
+      "section": "12.1",
+      "checklistIds": [
+        "G-02",
+        "G-03",
+        "G-04",
+        "X-01",
+        "X-04",
+        "P12-01"
+      ]
+    },
+    {
+      "section": "12.2",
+      "checklistIds": [
+        "P4-04",
+        "P5-07",
+        "P7-08",
+        "P8-05",
+        "P8-06",
+        "P8-07",
+        "P8-09",
+        "P10-01"
+      ]
+    },
+    {
+      "section": "12.3",
+      "checklistIds": [
+        "P8-01",
+        "P8-02",
+        "P8-03",
+        "P8-04",
+        "P8-09",
+        "X-03"
+      ]
+    },
+    {
+      "section": "12.4",
+      "checklistIds": [
+        "X-05",
+        "X-06",
+        "P7-03",
+        "P7-04"
+      ]
+    },
+    {
+      "section": "12.5",
+      "checklistIds": [
+        "X-08"
+      ]
+    },
+    {
+      "section": "12.6",
+      "checklistIds": [
+        "X-09"
+      ]
+    },
+    {
+      "section": "12.7",
+      "checklistIds": [
+        "X-10"
+      ]
+    },
+    {
+      "section": "12.8",
+      "checklistIds": [
+        "X-11",
+        "P7-07",
+        "X-02"
+      ]
+    },
+    {
+      "section": "12.9",
+      "checklistIds": [
+        "X-04",
+        "X-12",
+        "P10-05",
+        "P10-06"
+      ]
+    },
+    {
+      "section": "13",
+      "checklistIds": [
+        "G-09",
+        "P10-05",
+        "P10-06",
+        "P11-01",
+        "P11-02",
+        "P11-03"
+      ]
+    },
+    {
+      "section": "14",
+      "checklistIds": [
+        "G-05"
+      ]
+    },
+    {
+      "section": "15",
+      "checklistIds": [
+        "G-06",
+        "G-07",
+        "G-09",
+        "P11-01",
+        "P12-03"
+      ]
+    },
+    {
+      "section": "16",
+      "checklistIds": [
+        "P12-01",
+        "P12-02",
+        "P12-03",
+        "P12-04",
+        "P12-05"
+      ]
+    },
+    {
+      "section": "17",
+      "checklistIds": [
+        "X-13",
+        "P10-01",
+        "P10-02",
+        "P10-03",
+        "P10-04",
+        "P10-05",
+        "P10-06",
+        "P11-01",
+        "P11-02",
+        "P11-03",
+        "P11-04",
+        "P12-01",
+        "P12-02",
+        "P12-03",
+        "P12-04",
+        "P12-05"
+      ]
+    },
+    {
+      "section": "18",
+      "checklistIds": [
+        "F-01",
+        "F-02",
+        "F-03",
+        "G-01",
+        "G-02",
+        "G-03",
+        "G-04",
+        "G-05",
+        "G-06",
+        "G-07",
+        "G-08",
+        "G-09",
+        "P12-01"
+      ]
+    }
+  ],
+  "externalAcceptanceAuthorities": [
+    {
+      "path": "docs/RELEASE_GATES.md",
+      "checklistIds": [
+        "P10-04",
+        "P10-06",
+        "P11-04"
+      ]
+    },
+    {
+      "path": "docs/BROWSER_SUPPORT.md",
+      "checklistIds": [
+        "X-08",
+        "X-09",
+        "X-10"
+      ]
+    },
+    {
+      "path": "docs/ATTORNEY_ASSISTANT_HARDENING_CHECKLIST.md",
+      "checklistIds": [
+        "P9-10",
+        "P11-04"
+      ]
+    },
+    {
+      "path": "ROLLBACK_PLAN.md",
+      "checklistIds": [
+        "P10-06",
+        "P11-03",
+        "P12-01"
+      ]
+    }
+  ],
+  "additionalDependencies": [
+    {
+      "id": "matter-list-caps",
+      "checklistIds": [
+        "P2-03",
+        "P2-04",
+        "P2-05",
+        "P10-01"
+      ],
+      "evidence": "docs/attorney-v2/PHASE2_HOME_MATTERS.md",
+      "status": "Confirmed current backend contract; UI limit notice implemented; full paging and totals remain open."
+    },
+    {
+      "id": "phase3-private-discovery-contracts",
+      "checklistIds": [
+        "P3-01",
+        "P3-02",
+        "P3-03",
+        "P3-04",
+        "X-01",
+        "X-03",
+        "X-05"
+      ],
+      "evidence": "docs/attorney-v2/PHASE3_PRIVATE_WORK_DISCOVERY.md",
+      "status": "Private tasks and directory/profile implementation; weekly notes are accepted locally in the separate PHASE3_WEEKLY_NOTES.md follow-up.",
+      "sources": [
+        "backend/routes/checklist.js",
+        "backend/routes/users.js",
+        "backend/routes/publicParalegalDirectory.js",
+        "backend/routes/uploads.js",
+        "backend/services/profilePhotoDelivery.js",
+        "backend/services/objectSystem/profileAuthorityContract.js",
+        "frontend/assets/scripts/authenticated-object-search.mjs",
+        "frontend/assets/scripts/browse-paralegals.js",
+        "frontend/assets/scripts/profile-paralegal.js"
+      ]
+    },
+    {
+      "id": "phase3-week-normalization-and-save-race",
+      "checklistIds": [
+        "P3-02",
+        "G-02",
+        "G-06",
+        "X-02",
+        "X-03",
+        "X-12"
+      ],
+      "evidence": "docs/attorney-v2/PHASE3_WEEKLY_NOTES.md",
+      "status": "D3-01/D3-02 resolved locally: preserved legacy storage dates and day positions, explicit logical week labels, atomic revision checks, compatible V1/V2 editing and monthly calendar. Production timezone/index/client-refresh and wider release gates remain open.",
+      "sources": [
+        "backend/models/WeeklyNote.js",
+        "backend/services/weeklyNotes.js",
+        "backend/routes/users.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/weekly-notes.mjs",
+        "frontend/assets/scripts/attorney-v2/monthly-notes.mjs",
+        "backend/tests/weeklyNotes.test.js",
+        "backend/tests/playwright/attorney-v2/weekly-notes.spec.js"
+      ]
+    },
+    {
+      "id": "phase4-draft-revisions-and-recovery",
+      "checklistIds": [
+        "P4-01",
+        "P4-02",
+        "P4-04",
+        "G-02",
+        "G-06",
+        "X-02",
+        "X-03",
+        "X-12"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_MATTER_DRAFTS.md",
+      "status": "P4-01 accepted locally: revisions, creation request identity, retained edits, account binding, recovery, V1 compatibility and review; final 48/48 browser checks pass. Publication idempotence, posted-edit eligibility/field gaps, index/client deployment and wider Phase 4 gates remain open. Two concurrent paralegal regression failures remain outside this draft pass.",
+      "sources": [
+        "backend/models/CaseDraft.js",
+        "backend/routes/caseDrafts.js",
+        "frontend/create-case.html",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/matter-draft-contract.mjs",
+        "frontend/assets/scripts/matter-draft-session.mjs",
+        "frontend/assets/scripts/matter-draft-recovery.mjs",
+        "frontend/assets/scripts/attorney-v2/draft-editor.mjs",
+        "backend/tests/caseDraftPersistence.test.js",
+        "backend/tests/attorneyV2DraftModel.test.js",
+        "backend/tests/playwright/attorney-v2/drafts.spec.js"
+      ]
+    },
+    {
+      "id": "phase4-publication-receipts-and-posted-edit-transactions",
+      "checklistIds": [
+        "P4-02",
+        "P4-04",
+        "G-02",
+        "G-06",
+        "X-02",
+        "X-03",
+        "X-12"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_MATTER_POSTINGS.md",
+      "status": "P4-02 and P4-04 accepted locally: final targeted regression 90/90; final browser recheck 96/96 across Chromium, Firefox and WebKit. Receipt-based publication, current/V2 compatibility, revision-checked edits/deletion and interruption recovery verified. Requires transaction-capable MongoDB, verified unique receipt indexes and coordinated refresh of old token-less publishing clients. Two unrelated paralegal regressions and all production release gates remain open.",
+      "sources": [
+        "backend/models/MatterPublication.js",
+        "backend/services/matterDraftRevision.js",
+        "backend/routes/matterPostings.js",
+        "backend/routes/cases.js",
+        "backend/routes/caseDrafts.js",
+        "backend/scripts/check-frontend-api-contract.js",
+        "frontend/assets/scripts/matter-publication.mjs",
+        "frontend/assets/scripts/attorney-v2/posting-editor.mjs",
+        "frontend/create-case.html",
+        "backend/tests/matterPostings.test.js",
+        "backend/tests/playwright/attorney-v2/postings.spec.js",
+        "backend/scripts/route-security-inventory.js",
+        "docs/LPC_ROUTE_SECURITY_INVENTORY.md"
+      ],
+      "operations": [
+        "GET /api/cases/posting/options",
+        "POST /api/cases/posting/publications",
+        "GET /api/cases/posting/publications/:requestId",
+        "POST /api/cases/posting/publications/:requestId/cleanup",
+        "GET /api/cases/posting/drafts/:draftId",
+        "GET /api/cases/posting/:caseId",
+        "PATCH /api/cases/posting/:caseId",
+        "DELETE /api/cases/posting/:caseId"
+      ]
+    },
+    {
+      "id": "phase4-matter-notes-privacy-and-revisions",
+      "checklistIds": [
+        "P4-03",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_MATTER_NOTES.md",
+      "status": "P4-03 notes/history accepted locally: all attorney targeted checks 111/111; final notes browser checks 39/39 across Chromium, Firefox and WebKit; combined-backend recheck 23/23. Shared current/V2 note editor, DTO privacy, atomic revisions/admin appends and partial-history handling verified. The broad browser batch was 113/114 before the failed scenario passed in the final notes run. Full Jest did not complete after unrelated incident timeout cascades and known paralegal failures. Saved views, remaining management/flag actions and all production release gates remain open.",
+      "sources": [
+        "backend/routes/cases.js",
+        "backend/services/matterNotes.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/matter-notes.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-note-model.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-management.mjs",
+        "backend/tests/matterNotes.test.js",
+        "backend/tests/attorneyV2MatterNoteModel.test.js",
+        "backend/tests/playwright/attorney-v2/matter-notes.spec.js"
+      ],
+      "operations": [
+        "GET /api/cases/:caseId/notes",
+        "PUT /api/cases/:caseId/notes",
+        "GET /api/cases/:caseId/status-history",
+        "POST /api/cases/:caseId/flags/resolve",
+        "POST /api/cases/:caseId/flags/request-edits",
+        "POST /api/cases/:caseId/flags/mark-resolved"
+      ]
+    },
+    {
+      "id": "phase4-saved-views-and-preferences-concurrency",
+      "checklistIds": [
+        "P4-03",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_SAVED_VIEWS.md",
+      "status": "Saved-view creation, restoration and deletion verified locally in both attorney dashboards: 27/27 browser checks across three browsers and 79/79 targeted Jest checks. Existing Matter-list/notes browser regression passed 69/69, giving 96/96 browser checks across two sequential runs. Static checks pass. The prior full Jest result remains incomplete. P4-03 remains open for remaining management/flag actions; all production gates remain open.",
+      "sources": [
+        "backend/routes/account.js",
+        "backend/services/dashboardSavedViews.js",
+        "backend/services/dashboardSavedViewPersistence.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/saved-view-model.mjs",
+        "frontend/assets/scripts/attorney-v2/saved-views.mjs",
+        "frontend/assets/scripts/attorney-v2/api-client.mjs",
+        "frontend/assets/scripts/attorney-v2/private-state.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "backend/tests/attorneySavedViewPersistence.test.js",
+        "backend/tests/attorneyV2SavedViewModel.test.js",
+        "backend/tests/playwright/attorney-v2/saved-views.spec.js"
+      ],
+      "operations": [
+        "GET /api/account/dashboard-views",
+        "POST /api/account/dashboard-views",
+        "DELETE /api/account/dashboard-views/:scope/:viewId",
+        "POST /api/account/preferences"
+      ]
+    },
+    {
+      "id": "phase4-flag-review-content-and-receipts",
+      "checklistIds": [
+        "P4-03",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_FLAG_REVIEW.md",
+      "status": "Attorney admin-edit review verified locally in both dashboards; final backend regression 71/71. Final combined browser run 93/96, with three instances of an outdated preview selector corrected and rechecked 3/3: 96 distinct scenarios have passing latest results across sequential runs. The modal Close-button correction and static checks pass. P4-03 stays open for remaining menu parity and dependent workflows. Remote cohort disabled; full repository regression remains unresolved.",
+      "sources": [
+        "backend/models/Case.js",
+        "backend/routes/cases.js",
+        "backend/routes/matterPostings.js",
+        "backend/services/matterNotes.js",
+        "backend/services/matterModeration.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/matter-moderation.mjs",
+        "frontend/assets/scripts/attorney-v2/moderation-model.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-management.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "frontend/assets/styles/matter-notes.css",
+        "backend/tests/matterModeration.test.js",
+        "backend/tests/attorneyV2ModerationModel.test.js",
+        "backend/tests/playwright/attorney-v2/flag-review.spec.js",
+        "backend/tests/playwright/attorney-v2/read-views.spec.js"
+      ],
+      "operations": [
+        "GET /api/cases/:caseId/flags/review",
+        "POST /api/cases/:caseId/flags/mark-resolved",
+        "POST /api/cases/:caseId/flags/request-edits",
+        "POST /api/cases/:caseId/flags/resolve",
+        "PATCH /api/cases/posting/:caseId"
+      ]
+    },
+    {
+      "id": "phase4-invitation-lists-and-account-boundaries",
+      "checklistIds": [
+        "P4-03",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_INVITATIONS.md",
+      "status": "Invitation viewing implemented in both attorney dashboards. Final targeted backend/model checks pass 53/53, including legacy owner IDs and no-write reads. The broader browser regression passed 93/93 before the legacy owner-filter correction; the final invitation recheck passed 24/24 after that correction. All 93 distinct browser scenarios have passing latest results across these two clean sequential runs. P4-03 stays open for archive/restore and download/receipt entry points and their dependent workflows. Remote cohort disabled; full repository regression remains unresolved.",
+      "sources": [
+        "backend/routes/cases.js",
+        "backend/services/matterInvitations.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/api-client.mjs",
+        "frontend/assets/scripts/attorney-v2/invitation-model.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-invitations.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "frontend/assets/scripts/attorney-v2/candidate-model.mjs",
+        "frontend/assets/scripts/attorney-v2/routes.mjs",
+        "frontend/assets/styles/matter-notes.css",
+        "backend/tests/matterInvitations.test.js",
+        "backend/tests/attorneyV2InvitationModel.test.js",
+        "backend/tests/playwright/attorney-v2/invitations.spec.js"
+      ],
+      "operations": [
+        "GET /api/cases/:caseId/invites"
+      ]
+    },
+    {
+      "id": "phase4-manual-archive-revisions-and-compatibility",
+      "checklistIds": [
+        "P4-03",
+        "P5-07",
+        "P6-03",
+        "P8-08",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03",
+        "X-04"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_ARCHIVE.md",
+      "status": "Manual archive/restore verified locally in both attorney dashboards, with existing admin post compatibility. Final targeted backend/model regression passes 111/111 across ten suites. All 126 distinct browser scenarios have passing latest results across sequential runs: 93 shared regressions, 30 attorney archive scenarios and the final clean 3/3 admin recheck. Test-isolation failures and exact run results are retained in the linked evidence. Static checks pass. P4-03 remains open for download/receipt entries and dependent lifecycle workflows; full repository, production and retirement gates remain open. Remote cohort disabled.",
+      "sources": [
+        "backend/models/Case.js",
+        "backend/routes/cases.js",
+        "backend/routes/jobs.js",
+        "backend/services/matterArchive.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/archive-model.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-archive.mjs",
+        "frontend/assets/scripts/attorney-v2/api-client.mjs",
+        "frontend/assets/scripts/attorney-v2/private-state.mjs",
+        "frontend/assets/scripts/attorney-v2/routes.mjs",
+        "frontend/assets/scripts/attorney-v2/views.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "frontend/assets/styles/matter-notes.css",
+        "frontend/admin-dashboard.html",
+        "frontend/assets/scripts/admin-matter-archive.mjs",
+        "backend/tests/matterArchive.test.js",
+        "backend/tests/attorneyV2ArchiveModel.test.js",
+        "backend/tests/playwright/attorney-v2/archive.spec.js"
+      ],
+      "operations": [
+        "GET /api/cases/:caseId/archive",
+        "PATCH /api/cases/:caseId/archive"
+      ],
+      "preservedDependencies": [
+        "Both hiring-claim CAS branches reject archived Cases.",
+        "Open listings check canonical and legacy Case/Job linkage without rewriting Jobs.",
+        "Existing application and invitation-response eligibility remains authoritative."
+      ]
+    },
+    {
+      "id": "phase4-individual-file-downloads",
+      "checklistIds": [
+        "P4-03",
+        "P6-03",
+        "P7-03",
+        "P7-04",
+        "P7-08",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03",
+        "X-05"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_FILE_DOWNLOADS.md",
+      "status": "Individual Matter file downloads verified locally in both attorney dashboards. Final targeted backend/model checks pass 113/113 across eight suites. All 105 distinct browser scenarios have passing latest results: initial combined run 101/105, followed by a clean 6/6 focused recheck. The linked evidence records the corrected feedback assertion and existing admin scenario timing allowance; application source was unchanged between runs. Static checks pass. Receipt funding labels and archive retention/contents/concurrency findings remain open. P4-03, full repository regression, production and retirement gates remain open. Remote cohort disabled.",
+      "sources": [
+        "backend/routes/cases.js",
+        "backend/services/matterDownloads.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/download-model.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-downloads.mjs",
+        "frontend/assets/scripts/attorney-v2/api-client.mjs",
+        "frontend/assets/scripts/attorney-v2/views.mjs",
+        "frontend/assets/scripts/attorney-v2/routes.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "frontend/assets/styles/matter-notes.css",
+        "backend/tests/matterDownloads.test.js",
+        "backend/tests/attorneyV2DownloadModel.test.js",
+        "backend/tests/playwright/attorney-v2/downloads.spec.js"
+      ],
+      "operations": [
+        "GET /api/cases/:caseId/downloads",
+        "GET /api/cases/:caseId/downloads/:fileId"
+      ],
+      "preservedDependencies": [
+        "Existing attorney signed-file lifecycle authority, same-Matter storage-key checks and current malware scans.",
+        "Legacy text owner and CaseFile references remain readable without migration; missing metadata remains explicit.",
+        "Paralegal upload/workspace and admin archive authority remain in existing endpoints.",
+        "Receipt and archive-export implementations remain unchanged pending the findings documented in the evidence."
+      ]
+    },
+    {
+      "id": "phase4-attorney-receipts",
+      "checklistIds": [
+        "P4-03",
+        "P8-04",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03",
+        "X-05",
+        "X-07",
+        "X-12"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_RECEIPTS.md",
+      "status": "Attorney receipt review/download and shared PDF corrections verified locally in both dashboards. Final targeted backend/model regression passes 103/103 across eight suites. All 108 distinct browser scenarios have passing latest results: first combined run 106/108, followed by a clean 9/9 recheck covering the final currency guard and both WebKit aggregate timeouts. Original failures, changed validation bytes and exact run limits are retained in the evidence. Four synthetic PDFs/five pages were rendered and inspected. Syntax, bindings, API contract, byte budgets and route-security checks pass; four frontend hygiene findings in concurrent admin modules remain outside this owned change. Archive exports, full receipt history, full repository acceptance, production and retirement gates remain open. Remote cohort disabled.",
+      "sources": [
+        "backend/routes/payments.js",
+        "backend/services/attorneyReceipts.js",
+        "backend/services/caseLifecycle.js",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/receipt-model.mjs",
+        "frontend/assets/scripts/attorney-v2/matter-receipts.mjs",
+        "frontend/assets/scripts/attorney-v2/api-client.mjs",
+        "frontend/assets/scripts/attorney-v2/routes.mjs",
+        "frontend/assets/scripts/attorney-v2/views.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "frontend/assets/styles/matter-notes.css",
+        "backend/tests/attorneyReceipts.test.js",
+        "backend/tests/attorneyV2ReceiptModel.test.js",
+        "backend/tests/receiptRendering.test.js",
+        "backend/tests/playwright/attorney-v2/receipts.spec.js"
+      ],
+      "operations": [
+        "GET /api/payments/receipt/attorney/:caseId/review",
+        "GET /api/payments/receipt/attorney/:caseId"
+      ],
+      "preservedDependencies": [
+        "Captured processor payment and complete refund evidence determine available payment receipts; Case status alone does not prove payment.",
+        "Historical text owner references and fee snapshot compatibility remain readable without financial or cache writes.",
+        "Withdrawal documents use the paid unreversed Payout ledger and do not imply confirmed bank arrival.",
+        "Existing direct attorney receipt links remain supported with fresh financial checks; existing paralegal receipt routes and financial builders remain in place.",
+        "Current finalized-withdrawal selection is preserved; full historical receipt listings and statements remain a Phase 8 dependency."
+      ]
+    },
+    {
+      "id": "phase4-matter-archive-exports",
+      "checklistIds": [
+        "P4-03",
+        "P6-03",
+        "P8-05",
+        "P8-08",
+        "G-02",
+        "G-04",
+        "X-02",
+        "X-03",
+        "X-05",
+        "X-07",
+        "X-12",
+        "P8-04"
+      ],
+      "evidence": "docs/attorney-v2/PHASE4_ARCHIVE_EXPORTS.md",
+      "status": "Archive review/download verified locally in both dashboards. Latest backend/model evidence covers 190 passing distinct tests across eleven suites. All 45 archive browser scenarios passed across Chromium, Firefox and WebKit; the combined shared-regression run was 56/57 and the unchanged-source Firefox note-navigation recheck passed 1/1. After the renewed-token correction, a further 9/9 real-endpoint check adds three receipt scenarios and rechecks six archive scenarios. All 60 distinct browser scenarios have passing latest results. Two synthetic PDFs/four pages and four browser screenshots were inspected. Static checks and production dependency audit pass except for 12 unowned admin frontend-hygiene findings, preserved in the evidence. P4-03, later lifecycle, full repository, production and retirement gates remain open. Remote cohort disabled.",
+      "ownedSurfaces": [
+        "backend/routes/cases.js",
+        "backend/services/matterExports.js",
+        "backend/services/matterExportContents.js",
+        "backend/services/caseLifecycle.js",
+        "backend/services/attorneyWorkflowPolicy.js",
+        "backend/utils/fileSecurity.js",
+        "backend/package.json",
+        "backend/package-lock.json",
+        "frontend/assets/scripts/attorney-tabs.js",
+        "frontend/assets/scripts/attorney-v2/matter-exports.mjs",
+        "frontend/assets/scripts/attorney-v2/export-model.mjs",
+        "frontend/assets/scripts/attorney-v2/api-client.mjs",
+        "frontend/assets/scripts/attorney-v2/routes.mjs",
+        "frontend/assets/scripts/attorney-v2/views.mjs",
+        "frontend/assets/scripts/attorney-v2/matters.mjs",
+        "frontend/assets/styles/matter-notes.css",
+        "backend/tests/matterExports.test.js",
+        "backend/tests/matterExportContents.test.js",
+        "backend/tests/attorneyV2ExportModel.test.js",
+        "backend/tests/playwright/attorney-v2/archive-exports.spec.js",
+        "backend/services/attorneyReceipts.js",
+        "backend/tests/attorneyReceipts.test.js"
+      ],
+      "operations": [
+        "GET /api/cases/:caseId/archive/export",
+        "GET /api/cases/:caseId/archive/download"
+      ],
+      "preservedDependencies": [
+        "Owning-attorney and existing administrator access, account/session revalidation and historical string references remain supported.",
+        "Retained sources are reviewed without Case, financial or archive-storage mutations; ordinary authentication session bookkeeping remains possible.",
+        "Completion uses the same validated ZIP builder with distinct storage keys; existing payment/payout authority remains unchanged.",
+        "Expired/purged/unconfirmed retention and missing/changed/unsafe documents refuse download instead of producing an incomplete archive.",
+        "Legal documents named receipt remain included; private notes, deleted messages and reserved platform receipts are excluded.",
+        "Full terminal-history, purge-worker and process-crash cleanup acceptance remains open in later lifecycle and operational gates.",
+        "Archive and receipt revalidation uses the verified av token contract, allowing valid renewed sign-ins and refusing later security-version changes."
+      ]
+    }
+  ]
+}

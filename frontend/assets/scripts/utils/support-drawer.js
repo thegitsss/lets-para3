@@ -201,6 +201,8 @@ export function configureSupportSession({ onSessionLost, navigationAdapter } = {
     ? navigationAdapter : null;
 }
 let supportIdentityRevision = 0;
+let supportOpenRevision = 0;
+let preservedPromptCleanup = () => {};
 let supportRequests = new AbortController();
 
 export function clearSupportIdentity({ preserveMatterContext = false, preservePendingRequest = false } = {}) {
@@ -307,8 +309,8 @@ function persistPinnedSupportDrawer(pinned = false) {
 }
 
 function canPinSupportDrawer() {
-  if (document.body?.classList.contains("av2")) return true;
   if (typeof window === "undefined" || !window.matchMedia) return true;
+  if (document.body?.classList.contains("av2")) return window.matchMedia("(min-width: 901px)").matches;
   const isV2Shell = document.body?.classList.contains("lpc-v2");
   return window.matchMedia(isV2Shell ? "(min-width: 1101px)" : "(min-width: 681px)").matches;
 }
@@ -1586,8 +1588,6 @@ function renderStatus() {
       action("Check result", "check", () => supportMutations.check());
       if (mutationSnapshot.canRetry) action("Retry request", "retry", () => supportMutations.retry());
     }
-  } else if (state.loadFailed) {
-    action("Try again", "history", () => ensureConversationLoaded(true), state.loadingConversation);
   }
 }
 
@@ -2111,6 +2111,8 @@ function syncSupportResponsiveState() {
 }
 
 export function closeSupportDrawer({ restoreFocus = true } = {}) {
+  preservedPromptCleanup(); preservedPromptCleanup = () => {};
+  supportOpenRevision += 1;
   if (!state.open) return;
   if (state.pinned) setSupportDrawerPinned(false);
   state.open = false;
@@ -2129,8 +2131,9 @@ export function closeSupportDrawer({ restoreFocus = true } = {}) {
   }
 }
 
-export async function openSupportDrawer({ launcher = null, focusComposer = true, promptText = "", submitPrompt = false, navigationAdapter = null } = {}) {
+export async function openSupportDrawer({ launcher = null, focusComposer = true, promptText = "", submitPrompt = false, preserveDraft = false, navigationAdapter = null } = {}) {
   scopeSupportIdentity();
+  const openRevision = ++supportOpenRevision;
   const revision = supportIdentityRevision;
   if (!isSupportSessionAllowed()) return;
   state.navigationAdapter = navigationAdapter || configuredSupportNavigationAdapter;
@@ -2139,7 +2142,7 @@ export async function openSupportDrawer({ launcher = null, focusComposer = true,
   ensureSidebarCollapseTab();
   if (!state.drawer) return;
   await ensureStylesheet();
-  if (revision !== supportIdentityRevision) return;
+  if (revision !== supportIdentityRevision || openRevision !== supportOpenRevision) return;
   revealDrawerShell();
   state.lastFocusedLauncher = launcher || document.activeElement;
   closeNotificationPanels();
@@ -2154,15 +2157,29 @@ export async function openSupportDrawer({ launcher = null, focusComposer = true,
   syncPinnedSupportDrawer();
   render();
   await ensureConversationLoaded();
-  if (revision !== supportIdentityRevision) return;
+  if (revision !== supportIdentityRevision || openRevision !== supportOpenRevision || !state.open) return;
   syncLiveUpdates();
   syncComposerPrompt();
   const normalizedPrompt = String(promptText || "").trim();
-  if (normalizedPrompt && state.textarea) {
+  preservedPromptCleanup(); preservedPromptCleanup = () => {};
+  const keepDraft = preserveDraft && Boolean(state.textarea?.value.trim());
+  if (normalizedPrompt && keepDraft) {
+    const notice = document.createElement('p');
+    notice.dataset.supportPromptPreserved = ''; notice.className = 'lpc-journey-draft-notice'; notice.setAttribute('role', 'status');
+    notice.textContent = 'Your unsent question is still here. Send or clear it before adding another question.';
+    state.form.prepend(notice);
+    const noticeEvents = new AbortController();
+    const clearNotice = () => { notice.remove(); noticeEvents.abort(); };
+    preservedPromptCleanup = clearNotice;
+    state.textarea.addEventListener('input', clearNotice, { once: true, signal: noticeEvents.signal });
+    state.form.addEventListener('submit', clearNotice, { once: true, signal: noticeEvents.signal });
+  }
+  if (normalizedPrompt && state.textarea && !keepDraft) {
     state.textarea.value = normalizedPrompt;
     state.textarea.dispatchEvent(new Event("input", { bubbles: true }));
     if (submitPrompt) await sendSupportMessage(normalizedPrompt);
   }
+  if (revision !== supportIdentityRevision || openRevision !== supportOpenRevision || !state.open) return;
   if (focusComposer && state.textarea) {
     state.textarea.focus();
   }

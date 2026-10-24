@@ -1,18 +1,24 @@
+const { createLogger: createRuntimeLogger } = require("./logger");
+const { SUPPORTED_STRIPE_API_VERSION } = require("./productionOrigin");
+const {
+  DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
+  DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
+} = require("../services/platformFeePolicy");
+const runtimeLogger = createRuntimeLogger("utils:stripe");
 // backend/utils/stripe.js
 const Stripe = require("stripe");
 
 // ----------------------------------------
 // Stripe client
 // ----------------------------------------
-const API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
 const SECRET = process.env.STRIPE_SECRET_KEY || "";
 
 if (!SECRET) {
-  console.warn("[stripe] STRIPE_SECRET_KEY is not set — Stripe calls will fail.");
+  runtimeLogger.warn("[stripe] STRIPE_SECRET_KEY is not set — Stripe calls will fail.");
 }
 
 const stripe = new Stripe(SECRET, {
-  apiVersion: API_VERSION,
+  apiVersion: process.env.STRIPE_API_VERSION || SUPPORTED_STRIPE_API_VERSION,
   maxNetworkRetries: Number(process.env.STRIPE_MAX_RETRIES || 2),
   telemetry: true,
   timeout: Number(process.env.STRIPE_TIMEOUT_MS || 20000),
@@ -26,12 +32,8 @@ function parseCents(amount) {
   return Number.isFinite(n) ? n : 0;
 }
 
-const DEFAULT_ATTORNEY_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
-);
-const DEFAULT_PARALEGAL_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
-);
+const DEFAULT_ATTORNEY_FEE_PCT = DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT;
+const DEFAULT_PARALEGAL_FEE_PCT = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 
 /**
  * Calculate fee snapshots given total amount in cents.
@@ -54,6 +56,16 @@ function calculateFees(
  */
 function caseTransferGroup(caseId) {
   return `case_${String(caseId)}`;
+}
+
+function stripeIdempotencyKey(operation, ...parts) {
+  const normalizedOperation = String(operation || "operation")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .slice(0, 48);
+  const material = parts.map((part) => String(part ?? "")).join("|");
+  const digest = require("crypto").createHash("sha256").update(material).digest("hex").slice(0, 32);
+  return `lpc_${normalizedOperation}_${digest}`;
 }
 
 /**
@@ -85,7 +97,7 @@ async function ensureEscrowIntent({
     paralegalId: paralegalId ? String(paralegalId) : "",
     paralegalName: cleanParalegalName,
   };
-  const description = `Case: ${cleanCaseName} — Job: ${cleanJobTitle} — Paralegal: ${cleanParalegalName}`;
+  const description = `Matter: ${cleanCaseName} — Posting: ${cleanJobTitle} — Paralegal: ${cleanParalegalName}`;
 
   if (existingIntentId) {
     const pi = await stripe.paymentIntents.retrieve(existingIntentId);
@@ -133,6 +145,7 @@ async function createCheckoutSession({
   successURL,
   cancelURL,
   customerEmail,
+  idempotencyKey,
 }) {
   return stripe.checkout.sessions.create({
     mode: "payment",
@@ -141,7 +154,7 @@ async function createCheckoutSession({
       {
         price_data: {
           currency,
-          product_data: { name: `Case funding #${caseId}` },
+          product_data: { name: `Matter funding #${caseId}` },
           unit_amount: parseCents(amount),
         },
         quantity: 1,
@@ -153,7 +166,7 @@ async function createCheckoutSession({
     },
     success_url: successURL,
     cancel_url: cancelURL,
-  });
+  }, idempotencyKey ? { idempotencyKey } : undefined);
 }
 
 /**
@@ -207,9 +220,14 @@ function isTransferablePaymentIntent(paymentIntent, { caseId } = {}) {
     return { transferable: false, charge: null };
   }
   const charge = getPaymentIntentCharge(paymentIntent);
+  if (!charge && !isStripeTestMode()) {
+    return { transferable: false, charge: null, reason: "missing_charge" };
+  }
   if (charge) {
+    if (!charge.id) return { transferable: false, charge, reason: "missing_charge_id" };
     if (charge.status && charge.status === "failed") return { transferable: false, charge };
     if (charge.paid === false || charge.captured === false) return { transferable: false, charge };
+    if (charge.refunded === true) return { transferable: false, charge, reason: "refunded" };
     const amount = Number(charge.amount || 0);
     const refunded = Number(charge.amount_refunded || 0);
     if (amount > 0 && refunded >= amount) return { transferable: false, charge };
@@ -218,8 +236,8 @@ function isTransferablePaymentIntent(paymentIntent, { caseId } = {}) {
   }
   const expectedGroup = caseId ? caseTransferGroup(caseId) : "";
   const transferGroup = paymentIntent.transfer_group || charge?.transfer_group || "";
-  if (expectedGroup && transferGroup && transferGroup !== expectedGroup) {
-    return { transferable: false, charge };
+  if (expectedGroup && transferGroup !== expectedGroup) {
+    return { transferable: false, charge, reason: "transfer_group_mismatch" };
   }
   return { transferable: true, charge };
 }
@@ -246,6 +264,7 @@ module.exports.createCheckoutSession = createCheckoutSession; // (kept)
 module.exports.ensureEscrowIntent = ensureEscrowIntent;
 module.exports.calculateFees = calculateFees;
 module.exports.caseTransferGroup = caseTransferGroup;
+module.exports.stripeIdempotencyKey = stripeIdempotencyKey;
 module.exports.constructWebhookEvent = constructWebhookEvent;
 module.exports.publicConfig = publicConfig;
 module.exports.isStripeTestMode = isStripeTestMode;

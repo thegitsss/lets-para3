@@ -6,10 +6,10 @@ const { isDefiniteSmtpFailure } = require("../utils/smtpDeliveryOutcome");
 // Delivery receipts describe provider acceptance, not inbox arrival. All
 // callers keep their own authorization and obligation staging boundaries.
 function createEmailNoticeDelivery({ Notice, prepare, prefix }) {
-  if (!["message", "file", "work", "payment", "withdrawal", "review", "application", "invitation", "pre-engagement", "posting", "signup-review", "admission-decision", "signup-admin"].includes(prefix)) throw new Error("Invalid email notice category.");
-  async function processNotices({ limit = 20, noticeId, releaseOnly = false, shouldStop = () => false, onProgress = async () => {} } = {}) {
+  if (!["message", "file", "work", "payment", "withdrawal", "review", "application", "invitation", "pre-engagement", "posting", "signup-review", "admission-decision"].includes(prefix)) throw new Error("Invalid email notice category.");
+  async function processNotices({ limit = 20, noticeId, shouldStop = () => false, onProgress = async () => {} } = {}) {
     if (shouldStop()) return 0;
-    const scope = { ...(noticeId ? {_id:noticeId} : {}), ...(releaseOnly ? {releaseKey:"signup-signin-20261023"} : {}) };
+    const scope = noticeId ? { _id: noticeId } : {};
     // A lost SMTP acknowledgement is not evidence of failure. Preserve it for
     // review rather than automatically sending a potentially duplicate email.
     await Notice.updateMany({ ...scope, status: "sending", claimedAt: { $lt: new Date(Date.now() - 10 * 60000) } }, {

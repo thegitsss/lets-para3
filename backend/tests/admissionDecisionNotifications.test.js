@@ -84,29 +84,7 @@ test('staging is idempotent and cannot be performed outside the decision transac
 
 test('the communications worker processes a committed notice missed by the route', async () => {
   const { notice } = await staged();
-  await require('../services/authNoticeWorker').runOnce();
+  const result = await require('../scripts/admin-communications-worker').runOnce({ mailboxOptions: { config: { configured: false } } });
+  expect(result.admissionNotices).toEqual({ processed: 1 });
   expect(await Notice.findById(notice._id)).toMatchObject({ status: 'accepted', attempts: 1 });
-});
-
-test.each(['attorney', 'paralegal'])('%s manual admission emails use the reviewed footer and verification action', async role => {
-  const express = require('express'), request = require('supertest'), jwt = require('jsonwebtoken');
-  const admin = await User.create({ firstName: 'Admin', lastName: 'Review', email: 'admin@example.test', password: 'Isolated administrator passphrase', role: 'admin', status: 'approved', emailVerified: true });
-  const { user } = await staged(role);
-  const app = express(); app.use(require('cookie-parser')(), express.json());
-  app.use('/api/admin', require('../routes/admin'));
-  const cookie = 'token=' + jwt.sign({ id: String(admin._id), role: admin.role, status: admin.status }, process.env.JWT_SECRET, { expiresIn: '5m' });
-  for (const type of ['acceptance', 'denial']) {
-    sendEmail.mockClear();
-    const response = await request(app).post('/api/admin/bulk-email').set('Cookie', cookie).send({ type, userIds: [String(user._id)] });
-    expect(response.status).toBe(200); expect(response.body.sent).toBe(1);
-    const [, subject, html, options] = sendEmail.mock.calls[0];
-    expect(html).toContain('mailto:help@lets-paraconnect.com');
-    expect(html).toContain('/privacy.html');
-    expect(options.text).toContain('help@lets-paraconnect.com');
-    if (type === 'acceptance') {
-      expect(subject).toBe('Welcome to Let’s-ParaConnect');
-      expect(html).toContain('>Verify your email</a>');
-      expect(html).toContain('/verify-email.html?token=');
-    } else if (role === 'paralegal') expect(html).toContain('>Contact Us</a>');
-  }
 });

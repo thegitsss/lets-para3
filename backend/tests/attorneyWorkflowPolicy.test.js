@@ -24,6 +24,7 @@ const {
   DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
   DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
   getCurrentPlatformFeePolicy,
+  resolvePlatformFeePolicy,
 } = require("../services/platformFeePolicy");
 
 function activeCase(overrides = {}) {
@@ -55,7 +56,6 @@ describe("attorney executable workflow policy", () => {
     });
     expect(blocked.ready).toBe(false);
     expect(blocked.blockers).toEqual(expect.arrayContaining([
-      "saved_payment_method_required",
       "title_required",
       "description_required",
       "practice_area_required",
@@ -66,7 +66,7 @@ describe("attorney executable workflow policy", () => {
     expect(getAttorneyWorkflowPolicy().post_matter.minimumMatterAmountCents).toBe(40_000);
   });
 
-  test("application policy covers payment, lifecycle, duplication, profile, payout, and blocking", () => {
+  test("application policy covers lifecycle, duplication, profile, payout, and blocking", () => {
     const result = evaluateApplicationEligibility({
       attorneyPaymentMethodSaved: false,
       applicantApproved: false,
@@ -79,7 +79,6 @@ describe("attorney executable workflow policy", () => {
     });
     expect(result.ready).toBe(false);
     expect(result.blockers).toEqual(expect.arrayContaining([
-      "attorney_payment_method_required",
       "approved_paralegal_required",
       "parties_blocked",
       "applications_closed",
@@ -106,6 +105,13 @@ describe("attorney executable workflow policy", () => {
       "conflicts_details_required",
       "confidentiality_document_required",
     ]));
+    expect(evaluateInvitationEligibility({
+      caseDoc: { status: "paused", pausedReason: "attorney_paused" },
+      ownerAuthorized: true,
+      targetSelected: true,
+      paralegalApproved: true,
+      payoutSetupReady: true,
+    }).blockers).toContain("matter_not_open");
   });
 
   test("hiring policy requires successful prerequisites and states actual charge timing", () => {
@@ -159,6 +165,14 @@ describe("attorney executable workflow policy", () => {
       ownerAuthorized: true,
     });
     expect(completed.evidenceState).toBe(EVIDENCE_STATES.NOT_APPLICABLE);
+    expect(evaluateCompletionEligibility({
+      caseDoc: activeCase({ status: "paused", pausedReason: "attorney_paused" }),
+      ownerAuthorized: true,
+    }).blockers).toContain("active_matter_required");
+    expect(evaluateCompletionEligibility({
+      caseDoc: activeCase({ disputes: [{ status: "open" }] }),
+      ownerAuthorized: true,
+    }).blockers).toContain("open_dispute");
   });
 
   test("completion policy exposes the authoritative paralegal payout and bank timing", () => {
@@ -167,8 +181,12 @@ describe("attorney executable workflow policy", () => {
       verifiedFundingRequired: true,
       paralegalPayoutSetupRequired: true,
       payoutReleaseTrigger: "when_attorney_completes_matter",
-      bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-      bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+      bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+      bankDepositTimingDependsOn: [
+        "stripe_account_country",
+        "stripe_payout_schedule",
+        "financial_institution",
+      ],
     }));
   });
 
@@ -200,26 +218,50 @@ describe("attorney executable workflow policy", () => {
       caseDoc: activeCase({ terminationStatus: "disputed" }),
       ownerAuthorized: true,
     }).blockers).toContain("termination_already_in_progress");
+    expect(evaluateTerminationEligibility({
+      caseDoc: activeCase({ status: "paused", pausedReason: "attorney_paused" }),
+      ownerAuthorized: true,
+    }).blockers).toContain("active_matter_required");
   });
 
-  test("enforcing routes import the shared policy instead of private minimum/timing rules", () => {
+  test("enforcing routes and their funding owners consume the shared minimum and timing policy", () => {
     const root = path.join(__dirname, "..");
     const sources = ["routes/cases.js", "routes/jobs.js", "routes/applications.js", "routes/messages.js", "routes/payments.js"]
       .map((relative) => fs.readFileSync(path.join(root, relative), "utf8"));
-    for (const source of sources) expect(source).toContain("attorneyWorkflowPolicy");
+    for (const source of [sources[0], sources[1], sources[3]]) {
+      expect(source).toContain("attorneyWorkflowPolicy");
+    }
+    expect(sources[4]).toContain('require("../services/attorneyFunding")');
+    expect(sources[4]).toContain('attorneyFunding.write(req, stripe)');
+    expect(sources[4]).toContain('attorneyFunding.budget(req)');
+    for (const relative of ['services/attorneyFunding.js', 'services/matterHiringReview.js']) {
+      const source = fs.readFileSync(path.join(root, relative), 'utf8');
+      expect(source).toContain('const { MIN_MATTER_AMOUNT_CENTS } = require("./attorneyWorkflowPolicy")');
+      expect(source).toContain('>= MIN_MATTER_AMOUNT_CENTS');
+      expect(source).toContain('< MIN_MATTER_AMOUNT_CENTS');
+      expect(source).not.toMatch(/(?:>=|<)\s*40_?000\b/);
+    }
+    expect(sources[2]).toContain("paralegalWorkflowPolicy");
     expect(sources[0]).toContain("evaluateCompletionEligibility");
     expect(sources[0]).toContain("evaluateHiringEligibility");
     expect(sources[0]).toContain("evaluateInvitationEligibility");
     expect(sources[0]).toContain("evaluatePreEngagementRequest");
-    expect(sources[0]).toContain("evaluateWithdrawalAndRelist");
+    expect(sources[0]).toContain('require("../services/attorneyWithdrawal")');
+    expect(sources[0]).toContain('attorneyWithdrawal.execute(req, withdrawalOptions(req))');
+    expect(sources[0]).toContain('attorneyWithdrawal.legacy(req, "relist", withdrawalOptions(req))');
     expect(sources[0]).toContain("evaluateTerminationEligibility");
-    expect(sources[0]).toContain("evaluateArchiveReadiness");
+    expect(sources[0]).toContain("matterExports");
+    expect(fs.readFileSync(path.join(__dirname, "../services/matterExports.js"), "utf8")).toContain("evaluateArchiveReadiness");
     expect(sources[0]).toContain("calculateArchivePurgeAt");
     expect(sources[1]).toContain("evaluateMatterPosting");
     expect(sources[2]).toContain("evaluateApplicationEligibility");
     expect(sources[3]).toContain("evaluateMessagingPermission");
-    expect(sources[4]).toContain("bankDepositEstimateBusinessDays");
-    expect(sources[4]).not.toContain("ranges from 3–5 business days");
+    expect(sources[0]).toContain('require("../services/matterPaymentNotifications").stageCompletion');
+    const completionNotices = fs.readFileSync(path.join(__dirname, "../services/matterPaymentNotifications.js"), "utf8");
+    expect(completionNotices).toContain('const completionSummary = "Matter completed and archived."');
+    expect(completionNotices).not.toMatch(/estimated arrival|3[–-]5 business days/);
+    expect(sources[0]).not.toContain("bankDepositEstimateBusinessDays");
+    expect(sources[0]).not.toMatch(/3[–-]5 business days/);
   });
 
   test("stage registry includes every Package 2 workflow family", () => {
@@ -229,16 +271,49 @@ describe("attorney executable workflow policy", () => {
     ]));
   });
 
-  test("case model and payment routes consume one current fee policy while historical cases retain snapshots", () => {
+  test("current fee consumers share one policy while admin reporting uses retained financial evidence", () => {
     expect(getCurrentPlatformFeePolicy()).toEqual({
       attorneyPercent: DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
       paralegalPercent: DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
       attorneyChargeTiming: "charged_when_hire_is_confirmed",
+      paralegalChargeTiming: "deducted_from_completed_paid_work_before_payout",
       historicalSource: "case_fee_snapshot",
     });
     const root = path.join(__dirname, "..");
-    for (const relative of ["models/Case.js", "routes/cases.js", "routes/payments.js"]) {
+    for (const relative of [
+      "models/Case.js",
+      "routes/cases.js",
+      "routes/payments.js",
+      "scripts/backfill-attorney-fees.js",
+      "utils/paymentIntegrity.js",
+      "utils/stripe.js",
+    ]) {
       expect(fs.readFileSync(path.join(root, relative), "utf8")).toContain("platformFeePolicy");
     }
+    const admin = fs.readFileSync(path.join(root, 'routes/admin.js'), 'utf8');
+    expect(admin).toContain('require("../services/adminFinancialReport")');
+    expect(admin).toContain('adminFinancialReport.begin(req');
+    expect(admin).toContain('value.incomeTotals.totalAmount');
+    const report = fs.readFileSync(path.join(root, 'services/adminFinancialReport.js'), 'utf8');
+    expect(report).toContain("require('../models/PlatformIncome')");
+    expect(report).toContain("basis: valid ? 'retained_platform_fee' : 'income_to_verify'");
+    const dashboard = fs.readFileSync(path.join(root, 'routes/paralegalDashboard.js'), 'utf8');
+    expect(dashboard).toContain('require("../services/paralegalExpectedCompensation")');
+    expect(dashboard).toContain('expectedCompensation.read(paralegalId, financialCases)');
+    expect(dashboard).toContain('earningsReport: earningsTotals.report');
+  });
+
+  test("fee policy defaults only missing values and rejects malformed configured percentages", () => {
+    expect(resolvePlatformFeePolicy({})).toEqual({
+      attorneyPercent: 22,
+      paralegalPercent: 18,
+      attorneyChargeTiming: "charged_when_hire_is_confirmed",
+      paralegalChargeTiming: "deducted_from_completed_paid_work_before_payout",
+      historicalSource: "case_fee_snapshot",
+    });
+    expect(() => resolvePlatformFeePolicy({ PLATFORM_FEE_ATTORNEY_PERCENT: "twenty-two" }))
+      .toThrow(/must be a percentage from 0 to 100/i);
+    expect(() => resolvePlatformFeePolicy({ PLATFORM_FEE_PARALEGAL_PERCENT: "101" }))
+      .toThrow(/must be a percentage from 0 to 100/i);
   });
 });

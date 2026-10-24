@@ -1,0 +1,208 @@
+/* Original LPC product demonstrations. Each scene plays once and settles. */
+:root body.lpc-v2 dialog.v2-onboarding-dialog { position:fixed; inset:0; width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; padding:0; border:0; border-radius:0; background:transparent; overflow:hidden; color:var(--v2-ink); }
+:root body.lpc-v2 dialog.v2-onboarding-dialog::backdrop { background:rgb(17 30 49 / .25); }
+:root body.lpc-v2 .lpc-tour-card { position:absolute; right:28px; bottom:28px; width:364px; max-width:calc(100vw - 32px); height:426px; max-height:calc(100dvh - 32px); box-sizing:border-box; display:flex; flex-direction:column; padding:24px; background:var(--v2-white); border:1px solid var(--v2-line); border-radius:14px; box-shadow:0 16px 64px #10243f26; font:200 14px/1.5 var(--v2-font-sans); overflow:auto; animation:lpc-tour-arrive .3s cubic-bezier(.2,.7,.3,1); }
+:root body.lpc-v2 [data-tour-kind="page"] .lpc-tour-card { height:366px; }
+.lpc-tour-meta { display:flex; justify-content:center; align-items:center; gap:16px; flex:none; min-height:20px; }
+.lpc-tour-meta img { display:block; width:112px; height:auto; max-height:22px; object-fit:contain; }
+:root body.lpc-v2 .lpc-tour-card .v2-onboarding-progress { margin:0; font:200 12px/1.4 var(--v2-font-sans); text-transform:none; letter-spacing:0; color:var(--v2-ink); }
+.lpc-tour-art { height:164px; flex:none; padding:8px 0 5px; }
+[data-tour-kind="page"] .lpc-tour-art { height:118px; padding:0; }
+.lpc-tour-demo { position:relative; height:100%; display:grid; place-items:center; overflow:hidden; }
+.lpc-demo-window { width:224px; border:1px solid #cbd5e4; border-radius:9px; background:var(--v2-white); box-shadow:0 10px 22px #2633470a; overflow:hidden; transform:translateY(0); animation:lpc-demo-window .65s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-demo-toolbar { height:22px; display:flex; align-items:center; gap:3px; padding:0 10px; background:var(--v2-soft); border-bottom:1px solid var(--v2-line); }
+.lpc-demo-toolbar span { width:3px; height:3px; border-radius:50%; background:#9baec9; }
+.lpc-demo-toolbar i { width:34px; height:3px; margin-left:auto; border-radius:2px; background:#b5c7e2; }
+.lpc-demo-body { padding:9px 13px; }
+.lpc-demo-row { display:flex; gap:8px; align-items:center; min-height:27px; font:200 11px/1.3 var(--v2-font-sans); color:var(--v2-ink); animation:lpc-demo-row .55s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-demo-row-0 { animation-delay:.14s; }
+.lpc-demo-row-1 { animation-delay:.28s; }
+.lpc-demo-row-2 { animation-delay:.42s; }
+.lpc-demo-dot { width:10px; height:10px; border:1px solid #b7c6de; border-radius:3px; flex:none; }
+.lpc-demo-row i { margin-left:auto; width:18px; height:3px; border-radius:2px; background:#d8e0ec; }
+.lpc-demo-cursor { position:absolute; width:15px; height:19px; left:69%; top:64%; clip-path:polygon(0 0,0 85%,35% 64%,57% 100%,75% 91%,54% 56%,95% 54%); background:#406aa8; transform:translate(0,0); animation:lpc-demo-cursor 1.5s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-tour-demo-welcome .lpc-demo-row-0 .lpc-demo-dot, .lpc-tour-demo-profile .lpc-demo-row-2 .lpc-demo-dot { background:#adbfdf; border-color:#adbfdf; animation:lpc-demo-select 1.6s ease both; }
+.lpc-tour-demo-browse .lpc-demo-row-1 { background:var(--v2-soft); border-radius:4px; }
+.lpc-tour-demo-messages .lpc-demo-dot { border-radius:50%; }
+.lpc-tour-demo-files .lpc-demo-dot { border-radius:1px; border-top:3px solid #9bb4d9; }
+[data-tour-kind="page"] .lpc-demo-window { width:204px; }
+[data-tour-kind="page"] .lpc-demo-toolbar { height:17px; }
+[data-tour-kind="page"] .lpc-demo-body { padding:4px 10px; }
+[data-tour-kind="page"] .lpc-demo-row { min-height:24px; font-size:10px; }
+:root body.lpc-v2 .lpc-tour-copy { flex:1; min-height:99px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+:root body.lpc-v2 .lpc-tour-card h2 { margin:0 0 10px; font:200 28px/1.18 var(--v2-font-sans); letter-spacing:-.025em; color:var(--v2-ink); }
+:root body.lpc-v2 [data-tour-kind="page"] .lpc-tour-card h2 { font-size:25px; }
+:root body.lpc-v2 .lpc-tour-card [data-v2-onboarding-copy] { margin:0; font:200 14px/1.5 var(--v2-font-sans); color:var(--v2-ink); }
+.lpc-tour-steps { display:flex; justify-content:center; align-items:center; gap:5px; height:16px; margin:11px 0 8px; flex:none; }
+.lpc-tour-steps span { width:4px; height:4px; border-radius:8px; background:#c9d2df; transition:width .25s ease,background-color .25s ease; }
+.lpc-tour-steps span[data-state="current"] { width:14px; background:#667fac; }
+.lpc-tour-steps span[data-state="complete"] { background:#98abcd; }
+:root body.lpc-v2 .lpc-tour-card footer { display:flex; align-items:center; justify-content:center; gap:16px; padding:6px 0 0; margin:0; border:0; background:transparent; flex:none; }
+.lpc-tour-actions { display:flex; align-items:center; gap:3px; }
+:root body.lpc-v2 .lpc-tour-card button { min-height:40px; padding:7px 10px; border-radius:6px; font:200 13px/1.3 var(--v2-font-sans); cursor:pointer; }
+:root body.lpc-v2 .lpc-tour-card .lpc-tour-dismiss, :root body.lpc-v2 .lpc-tour-card .lpc-tour-back { border:0; background:transparent; color:var(--v2-ink); padding-left:0; }
+:root body.lpc-v2 .lpc-tour-card .lpc-tour-next { background:var(--v2-blue-hover); border:1px solid var(--v2-blue-hover); color:var(--v2-white); padding-inline:13px; }
+:root body.lpc-v2 .lpc-tour-card button:hover { filter:brightness(.94); }
+:root body.lpc-v2 .lpc-tour-card button:focus-visible { outline:2px solid var(--v2-blue-hover); outline-offset:3px; }
+:root body.lpc-v2 .lpc-tour-card h2:focus { outline:none; }
+:root body.lpc-v2 .lpc-tour-card button[hidden] { display:none; }
+.lpc-tour-ring { position:absolute; box-sizing:border-box; border:1px solid #b5c9e9; border-radius:8px; box-shadow:0 0 0 3px #b5c9e926; pointer-events:none; }
+:root body.lpc-v2 .lpc-tour-replay { padding:5px 0; min-height:36px; border:0; background:transparent; color:var(--v2-blue-hover); font:200 14px/1.4 var(--v2-font-sans); cursor:pointer; text-align:left; }
+:root body.lpc-v2 .lpc-tour-replay:hover { text-decoration:underline; }
+:root body.lpc-v2 .lpc-tour-replay:focus-visible { outline:2px solid var(--v2-blue-hover); outline-offset:3px; }
+.lpc-page-tour-replays { display:flex; gap:4px 18px; flex-wrap:wrap; padding-top:6px; }
+:root.theme-dark .lpc-tour-meta img { filter:invert(1); }
+:root.theme-dark body.lpc-v2 .lpc-tour-card .lpc-tour-next { color:#142238; }
+@keyframes lpc-tour-arrive { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes lpc-demo-window { from { opacity:0; transform:translateY(7px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes lpc-demo-row { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+@keyframes lpc-demo-cursor { 0%,20% { opacity:0; transform:translate(19px,15px); } 50% { opacity:1; transform:translate(0,0); } 72% { opacity:1; transform:translate(0,0) scale(.9); } 100% { opacity:0; transform:translate(0,0); } }
+@keyframes lpc-demo-select { 0%,50% { background:transparent; } 100% { background:#adbfdf; } }
+@media(max-width:600px) {
+  :root body.lpc-v2 .lpc-tour-card { right:16px; bottom:max(16px,env(safe-area-inset-bottom)); width:364px; padding:22px; height:426px; }
+  :root body.lpc-v2 .lpc-tour-card button { min-height:44px; font-size:12px; }
+  :root body.lpc-v2 .lpc-tour-card h2 { font-size:27px; }
+}
+@media(max-width:350px) {
+  :root body.lpc-v2 .lpc-tour-card { padding:18px; }
+  :root body.lpc-v2 .lpc-tour-card h2 { font-size:25px; }
+  :root body.lpc-v2 .lpc-tour-card button { padding-inline:7px; font-size:11px; }
+  :root body.lpc-v2 .lpc-tour-card [data-v2-onboarding-copy] { font-size:13px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  :root body.lpc-v2 .lpc-tour-card, .lpc-tour-demo *, .lpc-tour-demo { animation:none !important; transition:none !important; }
+  .lpc-demo-cursor { display:none; }
+  .lpc-tour-steps span { transition:none; }
+}
+
+
+/* The welcome follows the inspected reference's centered composition.
+   All artwork below is original LPC markup; page-tip positioning is unchanged. */
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card { top:50%; left:50%; right:auto; bottom:auto; width:400px; height:450px; padding:24px; border-radius:20px; transform:translate(-50%,-50%); isolation:isolate; animation:lpc-welcome-arrive .35s cubic-bezier(.2,.7,.3,1); }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card::before { content:""; position:absolute; z-index:-1; pointer-events:none; inset:0 0 auto; height:285px; border-radius:inherit; background:radial-gradient(ellipse 105% 85% at 95% 0%,#a7bce4a3,transparent 78%),radial-gradient(ellipse 95% 85% at 0% 5%,#d7e5f6e6,transparent 80%),linear-gradient(#edf2fb,transparent); animation:lpc-welcome-wash 1s ease-out both; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-art { height:198px; padding:6px 0 8px; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-copy { min-height:84px; }
+.lpc-welcome-demo { overflow:visible; }
+.lpc-welcome-logo { display:grid; place-items:center; width:244px; max-width:100%; height:108px; border:1px solid #ffffffd9; border-radius:24px; background:#fff; box-shadow:0 14px 34px #405c9519; animation:lpc-welcome-object .85s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-welcome-logo img { display:block; width:196px; max-width:calc(100% - 32px); height:auto; }
+.lpc-welcome-panel { box-sizing:border-box; width:274px; min-height:158px; padding:16px 18px; border:1px solid #f2f5fa; border-radius:12px; background:var(--v2-white); box-shadow:0 14px 34px #405c9519; color:var(--v2-ink); font:200 12px/1.4 var(--v2-font-sans); animation:lpc-welcome-object .65s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-welcome-panel header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; min-height:20px; }
+.lpc-mini-profile header { justify-content:flex-start; }
+.lpc-mini-profile header div { flex:1; }
+.lpc-mini-profile header .lpc-mini-line { width:58px; margin-top:5px; }
+.lpc-mini-avatar { display:block; flex:none; width:26px; height:26px; border:1px solid #c8d7ee; border-radius:50%; background:linear-gradient(145deg,#e5edf9,#b7cae8); }
+.lpc-mini-line { display:block; width:100%; height:3px; border-radius:3px; background:#cbd8eb; }
+.lpc-mini-line.is-short { width:64%; }
+.lpc-mini-field { display:flex; align-items:center; gap:12px; min-height:28px; animation:lpc-mini-field-arrive .6s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-mini-field .lpc-mini-line { margin-left:auto; width:88px; background:#d9e3f2; }
+.lpc-mini-field-0 { animation-delay:.18s; }
+.lpc-mini-field-1 { animation-delay:.32s; }
+.lpc-mini-field-2 { animation-delay:.46s; }
+.lpc-mini-filter { padding:3px 7px; border:1px solid #d7e3f5; border-radius:12px; color:#406aa8; font-size:9px; animation:lpc-mini-filter-select 1.3s ease both; }
+.lpc-mini-matter { display:flex; flex-direction:column; gap:5px; padding:9px 0 8px; border-top:1px solid var(--v2-line); animation:lpc-mini-field-arrive .7s .25s ease both; }
+.lpc-mini-matter-title { font-size:13px; }
+.lpc-mini-matter-meta { font-size:9px; }
+.lpc-mini-matter .lpc-mini-line { margin-top:4px; width:94%; }
+.lpc-mini-matter .lpc-mini-line.is-short { width:68%; margin-top:1px; }
+.lpc-mini-scope { display:block; color:#406aa8; font-size:10px; margin-top:5px; animation:lpc-mini-field-arrive .6s .45s ease both; }
+.lpc-mini-status { width:5px; height:5px; border-radius:50%; background:#91add6; }
+.lpc-mini-tabs { display:flex; position:relative; justify-content:space-between; gap:12px; padding-bottom:8px; border-bottom:1px solid var(--v2-line); font-size:11px; }
+.lpc-mini-tabs span { flex:1; text-align:center; }
+.lpc-mini-tab-selection { position:absolute; bottom:-1px; left:0; width:33.33%; height:2px; background:#7897c7; transform:translateX(200%); animation:lpc-mini-select-tab 1.8s cubic-bezier(.2,.7,.3,1) both; }
+.lpc-mini-document { display:flex; align-items:center; gap:12px; padding-top:15px; animation:lpc-mini-field-arrive .7s .7s ease both; }
+.lpc-mini-document>div { flex:1; font-size:10px; }
+.lpc-mini-document>div .lpc-mini-line { margin-top:7px; }
+.lpc-mini-paper { display:flex; flex-direction:column; gap:5px; justify-content:center; width:30px; height:38px; box-sizing:border-box; padding:7px; border:1px solid #bdd0ee; border-radius:3px; }
+.lpc-mini-paper .lpc-mini-line { height:2px; }
+@keyframes lpc-welcome-arrive { from { opacity:0; transform:translate(-50%,calc(-50% + 8px)); } to { opacity:1; transform:translate(-50%,-50%); } }
+@keyframes lpc-welcome-wash { from { opacity:.3; } to { opacity:1; } }
+@keyframes lpc-welcome-object { from { opacity:0; transform:translateY(9px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes lpc-mini-field-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+@keyframes lpc-mini-filter-select { 0%,45% { background:transparent; } 100% { background:#e4ecf9; } }
+@keyframes lpc-mini-select-tab { 0%,20% { transform:translateX(0); } 55% { transform:translateX(100%); } 100% { transform:translateX(200%); } }
+@media(max-width:350px) { :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card { padding:18px; } .lpc-welcome-panel { width:244px; padding-inline:14px; } }
+@media(prefers-reduced-motion:reduce) { :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card::before { animation:none; } }
+:root.theme-dark body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card::before { opacity:.2; animation:none; }
+
+/* Homepage landscape, reserved for the first welcome card. */
+.lpc-welcome-landscape { position:relative; width:100%; height:190px; overflow:hidden; border-radius:16px; background:#f1f5fa; isolation:isolate; }
+.lpc-welcome-mountain { display:block; width:100%; height:100%; object-fit:cover; object-position:50% 35%; opacity:.48; filter:saturate(.25) brightness(1.2); animation:lpc-summit-reveal 4.8s cubic-bezier(.16,.65,.3,1) both; }
+.lpc-welcome-landscape::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(transparent 45%,#edf3fa22 65%,#edf3fa 100%); }
+.lpc-welcome-cloud { position:absolute; z-index:1; width:140%; max-width:none; height:auto; pointer-events:none; opacity:.85; }
+.lpc-welcome-cloud-left { left:-65%; top:4%; animation:lpc-cloud-part-left 4.8s cubic-bezier(.16,.65,.3,1) both; }
+.lpc-welcome-cloud-right { right:-65%; top:25%; animation:lpc-cloud-part-right 4.8s cubic-bezier(.16,.65,.3,1) both; }
+.lpc-welcome-landscape-brand { position:absolute; z-index:2; inset:auto 0 12px; display:flex; justify-content:center; animation:lpc-summit-brand 4.8s ease both; }
+.lpc-welcome-landscape-brand img { display:block; width:196px; max-width:80%; height:auto; }
+@keyframes lpc-summit-reveal { from { transform:scale(1.12) translateY(7px); filter:saturate(.25) brightness(1.35); } to { transform:scale(1); filter:saturate(.25) brightness(1.2); } }
+@keyframes lpc-cloud-part-left { from { transform:translateX(27%) translateY(8px); opacity:.98; } to { transform:translateX(-18%) translateY(-5px); opacity:.48; } }
+@keyframes lpc-cloud-part-right { from { transform:translateX(-27%) translateY(-5px); opacity:.98; } to { transform:translateX(18%) translateY(6px); opacity:.48; } }
+@keyframes lpc-summit-brand { 0%,18% { opacity:0; transform:translateY(5px); } 48%,100% { opacity:1; transform:translateY(0); } }
+@media(max-height:500px) {
+  :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-art { height:100px; padding:4px 0; }
+  .lpc-welcome-landscape { height:100px; }
+  .lpc-welcome-landscape .lpc-welcome-mountain { object-position:50% 0%; }
+  :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-copy { min-height:48px; }
+  .lpc-welcome-landscape-brand { bottom:5px; }
+  .lpc-welcome-landscape-brand img { width:150px; }
+}
+
+/* The opening landscape fills the welcome card, behind its existing content. */
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) { overflow:hidden; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape)::before { display:none; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-art,
+.lpc-welcome-demo-welcome { position:static; }
+.lpc-welcome-demo-welcome .lpc-welcome-landscape { position:absolute; inset:0; z-index:-1; width:100%; height:100%; border-radius:inherit; pointer-events:none; }
+.lpc-welcome-demo-welcome .lpc-welcome-mountain { object-position:50% 30%; }
+.lpc-welcome-demo-welcome .lpc-welcome-landscape::after { background:linear-gradient(#f1f5fa40,#f1f5fa30 28%,#f4f7fbd9 65%,#fff 100%); }
+.lpc-welcome-demo-welcome .lpc-welcome-landscape-brand { top:40%; bottom:auto; }
+@media(max-height:500px) {
+  .lpc-welcome-demo-welcome .lpc-welcome-landscape-brand { top:30%; }
+}
+
+/* Opening-card hierarchy: brand above, greeting centered, count below actions. */
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-meta { position:absolute; inset:auto 24px 18px; }
+.lpc-welcome-demo-welcome .lpc-welcome-landscape-brand { top:24px; bottom:auto; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-art { height:0; padding:0; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-copy { padding-top:32px; box-sizing:border-box; }
+:root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) footer { margin-bottom:24px; }
+@media(max-height:500px) {
+  :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:has(.lpc-welcome-landscape) .lpc-tour-copy { padding-top:24px; }
+}
+@media(max-height:500px) {
+  :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:not(:has(.lpc-welcome-landscape)) .lpc-tour-art { height:90px; padding:0; }
+  :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:not(:has(.lpc-welcome-landscape)) .lpc-welcome-demo { transform:translateY(-12px) scale(.6); }
+  :root body.lpc-v2 [data-tour-kind="welcome"] .lpc-tour-card:not(:has(.lpc-welcome-landscape)) .lpc-tour-copy { flex:none; min-height:0; padding-top:8px; }
+}
+
+/* Cropped recordings of the actual portal, with stills for reduced motion. */
+.lpc-welcome-recording { width:100%; height:100%; overflow:hidden; border-radius:10px; background:#fff; }
+.lpc-welcome-recording > img, .lpc-welcome-recording > video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+.lpc-welcome-recording > video { opacity:0; pointer-events:none; }
+/* Profile review: real LPC profile markup with a deliberate edit timeline. */
+.lpc-profile-snippet { height:100%; position:relative; display:flex; flex-direction:column; overflow:hidden; border-radius:10px; background:var(--v2-white); }
+.lpc-profile-snippet-stage { position:relative; flex:1; min-height:0; overflow:hidden; display:flex; align-items:center; }
+.lpc-profile-snippet-stage > .v2-settings-panel { display:block !important; box-sizing:border-box; width:100%; padding:12px !important; margin:0 !important; }
+.lpc-profile-snippet .v2-profile-group--identity { padding:0; margin:0; }
+.lpc-profile-snippet .v2-profile-identity-summary { margin:0 !important; }
+.lpc-profile-snippet .v2-profile-view-link { display:none !important; }
+.lpc-profile-snippet-hint { position:absolute; border:1px solid #8ca9d1; border-radius:6px; box-shadow:0 0 0 4px #8ca9d119; pointer-events:none; opacity:0; transition:opacity .4s ease; }
+.lpc-profile-snippet-controls { display:flex; align-items:center; justify-content:space-between; gap:5px; padding:0 10px 6px; font:200 10px/1.3 var(--v2-font-sans); color:var(--v2-ink); }
+:root body.lpc-v2 .lpc-tour-card .lpc-profile-snippet-controls button { font:inherit; min-height:28px; padding:3px; border:0; background:transparent; color:var(--v2-blue-hover); }
+.lpc-profile-snippet-controls button[hidden] { display:none; }
+.lpc-profile-snippet-controls span { text-align:center; }
+@media(prefers-reduced-motion:reduce) { .lpc-profile-snippet-hint { transition:none; } }
+:root body.lpc-v2 .lpc-tour-card .lpc-profile-snippet .lpc-profile-value { display:inline; min-height:0; padding:0; margin:0; border:0; border-radius:0; background:transparent; color:inherit; font:inherit; text-align:inherit; }
+:root body.lpc-v2 .lpc-tour-card .lpc-profile-snippet .v2-profile-person-name { font:200 26px/1.2 var(--v2-font-sans); margin:0 0 4px; }
+:root body.lpc-v2 .lpc-tour-card .lpc-profile-snippet .v2-settings-photo { border-radius:50%; padding:0; }
+:root body.lpc-v2 .lpc-profile-snippet .v2-settings-panel { border:0; box-shadow:none; }
+.lpc-profile-snippet-stage > .v2-settings-panel { zoom:.8; width:125%; flex-shrink:0; }
+@media(max-height:500px) { .lpc-profile-snippet-stage > .v2-settings-panel { zoom:.4; width:250%; } }
+/* The welcome continues on actual pages with compact guidance. */
+:root body.lpc-v2 [data-tour-kind="guided"] .lpc-tour-card { width:350px; height:auto; max-height:calc(100dvh - 32px); padding:20px; animation:none; }
+:root body.lpc-v2 [data-tour-kind="guided"] .lpc-tour-art { display:none; }
+:root body.lpc-v2 [data-tour-kind="guided"] .lpc-tour-copy { min-height:0; padding-top:12px; }
+:root body.lpc-v2 [data-tour-kind="guided"] .lpc-tour-card h2 { font-size:24px; }
+:root body.lpc-v2 [data-tour-kind="guided"] .lpc-tour-card [data-v2-onboarding-copy] { font-size:14px; }
+@media(max-width:600px) {
+  :root body.lpc-v2 [data-tour-kind="guided"] .lpc-tour-card { left:16px; right:16px; bottom:16px; width:auto; }
+}

@@ -5,6 +5,8 @@ const argon2 = require("argon2");
 
 const { Schema, Types } = mongoose;
 const { normalizePassword } = require("../utils/passwordPolicy");
+const { normalizeHttpUrl } = require("../utils/httpUrl");
+const { SUPPORTED_ACCOUNT_THEMES, normalizeAccountTheme } = require("../utils/accountPreferences");
 
 const uniqueStrings = (arr = []) =>
   [...new Set((arr || []).map((s) => String(s || "").trim()).filter(Boolean))];
@@ -25,6 +27,15 @@ const auditEntrySchema = new Schema(
     action: { type: String, enum: ["approved", "denied", "rejected"], required: true },
     date: { type: Date, default: Date.now },
     note: { type: String, trim: true, maxlength: 10_000 },
+    qualificationReview: {
+      type: new Schema({
+        qualification: { type: String, enum: ['certificate', 'degree', 'law_firm_experience'], required: true },
+        method: { type: String, enum: ['issuing_institution', 'employer_contact', 'official_communication', 'reliable_documentation'], required: true },
+        evidence: { type: String, trim: true, maxlength: 2000, required: true },
+        reviewedRevision: { type: String, maxlength: 64, required: true },
+      }, { _id: false }),
+      default: undefined,
+    },
   },
   { _id: false }
 );
@@ -74,12 +85,9 @@ const writingSampleSchema = new Schema(
   { _id: false }
 );
 
-const ARGON2_OPTIONS = {
-  type: argon2.argon2id,
-  memoryCost: 19456,
-  timeCost: 2,
-  parallelism: 1,
-};
+const ARGON2_OPTIONS = process.env.NODE_ENV === "test"
+  ? { type: argon2.argon2id, memoryCost: 4096, timeCost: 1, parallelism: 1 }
+  : { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 };
 const BCRYPT_PREFIX = /^\$2[aby]?\$/;
 const ARGON2_PREFIX = /^\$argon2(id|i|d)\$/;
 
@@ -149,6 +157,7 @@ const availabilityDetailsSchema = new Schema(
       lowercase: true,
       trim: true,
     },
+    scheduled: {type:new Schema({from:{type:Date,required:true},nextAvailable:{type:Date,required:true}},{_id:false}),default:undefined},
     nextAvailable: { type: Date, default: null },
     updatedAt: { type: Date, default: null },
   },
@@ -157,7 +166,8 @@ const availabilityDetailsSchema = new Schema(
 
 const onboardingSchema = new Schema(
   {
-    paralegalWelcomeDismissed: { type: Boolean, default: false },
+    paralegalWelcomePending: { type: Boolean, default: false },
+    paralegalTours: { type: Map, of: { type: String, enum: ["completed", "dismissed"] }, default: () => ({}) },
     paralegalTourCompleted: { type: Boolean, default: false },
     paralegalProfileTourCompleted: { type: Boolean, default: false },
     attorneyTourCompleted: { type: Boolean, default: false },
@@ -169,6 +179,7 @@ const onboardingSchema = new Schema(
 const pendingHireSchema = new Schema(
   {
     caseId: { type: Types.ObjectId, ref: "Case", default: null },
+    paralegalId: { type: Types.ObjectId, ref: "User", default: null },
     paralegalName: { type: String, default: "", trim: true, maxlength: 200 },
     fundUrl: { type: String, default: "", trim: true, maxlength: 2000 },
     message: { type: String, default: "", trim: true, maxlength: 2000 },
@@ -177,15 +188,46 @@ const pendingHireSchema = new Schema(
   { _id: false }
 );
 
+const dashboardSavedViewSchema = new Schema(
+  {
+    id: { type: String, required: true, trim: true, maxlength: 80 },
+    scope: {
+      type: String,
+      required: true,
+      enum: ["attorney_matters", "paralegal_applications"],
+      index: false,
+    },
+    name: { type: String, required: true, trim: true, maxlength: 48 },
+    filters: { type: Schema.Types.Mixed, default: () => ({}) },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false, strict: true }
+);
+
+const providerIdentitySchema = new Schema(
+  {
+    provider: {
+      type: String,
+      enum: ["google"],
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+    providerAccountId: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 255,
+    },
+    linkedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main schema
  * -----------------------------------------*/
-const providerIdentitySchema = new Schema({
-  provider: { type: String, enum: ["google"], required: true },
-  providerAccountId: { type: String, required: true, trim: true, maxlength: 255 },
-  linkedAt: { type: Date, default: Date.now },
-}, { _id: false });
-
 const userSchema = new Schema(
   {
     // Core identity
@@ -214,7 +256,6 @@ const userSchema = new Schema(
     resetPasswordExpiresAt: { type: Date, default: null, select: false },
     resetPasswordRequestedAt: { type: Date, default: null, select: false },
     emailVerified: { type: Boolean, default: false },
-    authProviders: { type: [providerIdentitySchema], default: [], select: false },
     phoneNumber: { type: String, default: null },
     phoneVerified: { type: Boolean, default: false },
 
@@ -241,9 +282,13 @@ const userSchema = new Schema(
     },
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
+    profileImageKey: { type: String, default: "", trim: true, select: false },
     profileImageOriginal: { type: String, default: "", trim: true },
+    profileImageOriginalKey: { type: String, default: "", trim: true, select: false },
     pendingProfileImage: { type: String, default: "", trim: true },
+    pendingProfileImageKey: { type: String, default: "", trim: true, select: false },
     pendingProfileImageOriginal: { type: String, default: "", trim: true },
+    pendingProfileImageOriginalKey: { type: String, default: "", trim: true, select: false },
     profilePhotoStatus: {
       type: String,
       enum: ["unsubmitted", "pending_review", "approved", "rejected"],
@@ -251,7 +296,16 @@ const userSchema = new Schema(
       index: true,
     },
     lawFirm: { type: String, default: "", trim: true, maxlength: 300 },
-    firmWebsite: { type: String, default: "", trim: true, maxlength: 500 },
+    firmWebsite: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 500,
+      validate: {
+        validator: (value) => normalizeHttpUrl(value, { fieldLabel: "Firm website" }).ok,
+        message: "Firm website must be a valid HTTP(S) URL without embedded credentials.",
+      },
+    },
     state: { type: String, default: "", trim: true, maxlength: 120 },
     timezone: { type: String, default: "America/New_York", trim: true },
     location: { type: String, default: "", trim: true }, // City, State
@@ -267,7 +321,7 @@ const userSchema = new Schema(
     stateExperience: { type: [String], default: [], set: uniqueStrings },
     skills: { type: [String], default: [], set: uniqueStrings },
     yearsExperience: { type: Number, min: 0, max: 80, default: 0 },
-    paralegalQualification: { type:String, enum:["", "certificate", "degree", "law_firm_experience"], default:"" },
+    paralegalQualification: { type: String, enum: ["", "certificate", "degree", "law_firm_experience"], default: "" },
     languages: { type: [languageEntrySchema], default: [], set: sanitizeLanguageEntries },
     writingSamples: { type: [writingSampleSchema], default: [] },
     experience: { type: [experienceEntrySchema], default: [] },
@@ -307,14 +361,18 @@ const userSchema = new Schema(
       default: "email",
     },
     twoFactorTempCode: { type: String, default: null, select: false },
-    twoFactorExpiresAt: { type: Date, default: null },
+    twoFactorExpiresAt: { type: Date, default: null, select: false },
     twoFactorChallengeHash: { type: String, default: null, select: false, index: true },
     twoFactorChallengeAuthVersion: { type: Number, default: null, select: false },
     twoFactorFailedAttempts: { type: Number, default: 0, select: false },
     twoFactorBackupCodes: { type: [String], default: [], select: false },
     totpSecretEncrypted: { type: String, default: null, select: false },
     totpLastUsedTimeStep: { type: Number, default: null, select: false },
-
+    authProviders: {
+      type: [providerIdentitySchema],
+      default: [],
+      select: false,
+    },
     blockedUsers: {
       type: [{ type: Types.ObjectId, ref: "User" }],
       default: [],
@@ -334,19 +392,20 @@ const userSchema = new Schema(
     preferences: {
       theme: {
         type: String,
-        enum: ["light", "dark", "mountain", "mountain-dark"],
-        default: "mountain",
+        enum: SUPPORTED_ACCOUNT_THEMES,
+        default: "light",
       },
       fontSize: {
         type: String,
         enum: ["xs", "sm", "md", "lg", "xl"],
         default: "md",
       },
+      accentColor: { type: String, enum: ["cornflower", "violet", "teal", "rose"], default: "cornflower" },
       hideProfile: { type: Boolean, default: false },
+      dashboardViews: { type: [dashboardSavedViewSchema], default: [] },
     },
     onboarding: { type: onboardingSchema, default: () => ({}) },
     pendingHire: { type: pendingHireSchema, default: null },
-    pushSubscription: { type: Object, default: null },
     digestFrequency: { type: String, enum: ["off", "daily", "weekly"], default: "daily" },
     emailPref: {
       marketing: { type: Boolean, default: true },
@@ -359,7 +418,24 @@ const userSchema = new Schema(
     // Soft-delete
     deleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
-    linkedInURL: { type: String, default: null },
+    personalDataStatus: {
+      type: String,
+      enum: ["active", "minimized"],
+      default: "active",
+      index: true,
+    },
+    personalDataMinimizedAt: { type: Date, default: null },
+    linkedInURL: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 500,
+      validate: {
+        validator: (value) =>
+          normalizeHttpUrl(value, { fieldLabel: "LinkedIn URL", requiredHost: "linkedin.com" }).ok,
+        message: "LinkedIn URL must be a valid linkedin.com HTTP(S) URL without embedded credentials.",
+      },
+    },
   },
   {
     timestamps: true,
@@ -382,7 +458,6 @@ const userSchema = new Schema(
         delete ret.twoFactorBackupCodes;
         delete ret.totpSecretEncrypted;
         delete ret.totpLastUsedTimeStep;
-
         return ret;
       },
     },
@@ -394,13 +469,19 @@ const userSchema = new Schema(
  * Indexes
  * -----------------------------------------*/
 userSchema.index({ role: 1, status: 1, createdAt: -1 });
-userSchema.index(
-  { "authProviders.provider": 1, "authProviders.providerAccountId": 1 },
-  { unique: true, partialFilterExpression: { "authProviders.providerAccountId": { $type: "string" } } }
-);
 userSchema.index({ specialties: 1 });
 userSchema.index({ jurisdictions: 1 });
 userSchema.index({ skills: 1 });
+userSchema.index(
+  { "authProviders.provider": 1, "authProviders.providerAccountId": 1 },
+  {
+    name: "user_auth_provider_unique",
+    unique: true,
+    partialFilterExpression: {
+      "authProviders.providerAccountId": { $type: "string" },
+    },
+  }
+);
 userSchema.index(
   { firstName: "text", lastName: "text", bio: "text", specialties: "text", skills: "text", jurisdictions: "text" },
   { name: "user_text_idx" }
@@ -434,24 +515,23 @@ userSchema.virtual("name").get(function () {
 /** ----------------------------------------
  * Validation & Hooks
  * -----------------------------------------*/
-userSchema.pre("validate", function (next) {
+userSchema.pre("validate", function () {
   if (this.email) this.email = String(this.email).trim().toLowerCase();
   if (this.firstName) this.firstName = String(this.firstName).trim();
   if (this.lastName) this.lastName = String(this.lastName).trim();
-  next();
+  // A projected user save may not have read appearance preferences. Do not
+  // turn an unrelated profile or Stripe update into a default-theme write.
+  if (this.preferences && (this.isSelected("preferences.theme") || this.isModified("preferences.theme"))) {
+    this.preferences.theme = normalizeAccountTheme(this.preferences.theme);
+  }
 });
 
 // Hash password on create/update
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
   const raw = this.password;
-  if (isArgon2Hash(raw) || isBcryptHash(raw)) return next();
-  try {
-    this.password = await argon2.hash(normalizePassword(raw), ARGON2_OPTIONS);
-    return next();
-  } catch (err) {
-    return next(err);
-  }
+  if (isArgon2Hash(raw) || isBcryptHash(raw)) return;
+  this.password = await argon2.hash(normalizePassword(raw), ARGON2_OPTIONS);
 });
 
 /** ----------------------------------------
@@ -474,6 +554,9 @@ userSchema.methods.comparePassword = async function (plain) {
 };
 
 userSchema.methods.recordLoginSuccess = function () {
+  if (this.role === "paralegal" && this.status === "approved"
+      && (!this.lastLoginAt || (this.approvedAt && this.lastLoginAt < this.approvedAt))
+      && !this.onboarding?.paralegalTourCompleted) this.set("onboarding.paralegalWelcomePending", true);
   this.lastLoginAt = new Date();
   this.failedLogins = 0;
   this.lockedUntil = null;

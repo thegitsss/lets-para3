@@ -35,7 +35,10 @@ const app = (() => {
   return instance;
 })();
 
+const managedCookies = new WeakMap();
+
 function authCookieFor(user) {
+  if (managedCookies.has(user)) return managedCookies.get(user);
   const payload = {
     id: user._id.toString(),
     role: user.role,
@@ -47,7 +50,7 @@ function authCookieFor(user) {
 }
 
 async function createAdmin() {
-  return User.create({
+  const admin = await User.create({
     firstName: "Admin",
     lastName: "Owner",
     email: "approvals-phase4-admin@lets-paraconnect.test",
@@ -56,6 +59,12 @@ async function createAdmin() {
     status: "approved",
     state: "CA",
   });
+  const session = await require("../services/authSessionService").createAuthSession(admin, { headers: {}, ip: "192.0.2.24" });
+  managedCookies.set(admin, `token=${jwt.sign({
+    id: String(admin._id), role: admin.role, email: admin.email, status: admin.status,
+    sid: session.sessionId, av: admin.authVersion || 0,
+  }, process.env.JWT_SECRET, { expiresIn: "2h" })}`);
+  return admin;
 }
 
 async function createPendingKnowledgeReviewTask(admin) {
@@ -143,7 +152,8 @@ async function createFaqCandidate(admin) {
         message: "Please explain why LPC remains approval-based in support-safe language.",
       });
 
-    await request(app)
+    expect(ticketRes.status).toBe(201);
+    const statusRes = await request(app)
       .post(`/api/admin/support/tickets/${ticketRes.body.ticket._id}/status`)
       .set("Cookie", authCookieFor(admin))
       .send({
@@ -151,6 +161,8 @@ async function createFaqCandidate(admin) {
         resolutionSummary: "Stable explanation confirmed.",
         resolutionIsStable: true,
       });
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.body.ticket.status).toBe("resolved");
   }
 
   const faqRes = await request(app)
@@ -158,6 +170,8 @@ async function createFaqCandidate(admin) {
     .set("Cookie", authCookieFor(admin))
     .send({});
 
+  expect(faqRes.status).toBe(200);
+  expect(faqRes.body.candidates).toHaveLength(1);
   return faqRes.body.candidates[0];
 }
 

@@ -1,0 +1,49 @@
+.av2-help { max-width: 1040px; margin-inline: auto; color: var(--av2-ink); overflow-wrap: anywhere; }
+.av2-help .v2-help-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.av2-help h1 { margin: 0; font: 500 2.25rem "Cormorant Garamond", Georgia, serif; }
+.av2-help .v2-help-heading p { margin: 8px 0 0; color: var(--av2-muted); line-height: 1.55; }
+.av2-help .v2-help-assistant-actions { flex: 0 1 260px; }
+.av2-help button { min-height: 44px; max-width: 100%; padding: 10px 14px; font: inherit; border: 1px solid var(--av2-line); border-radius: 6px; background: transparent; color: var(--av2-accent); cursor: pointer; }
+.av2-help button:disabled { cursor: wait; opacity: .65; }
+.av2-help :focus-visible { outline: 2px solid var(--av2-accent); outline-offset: 3px; }
+.av2-help .v2-help-directory { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px; }
+.av2-help .v2-help-directory > p { display: none; }
+.av2-help .v2-help-directory button { color: var(--av2-ink); text-align: left; }
+.av2-help .v2-help-content { max-width: 800px; }
+.av2-help .v2-help-article-section { border-top: 1px solid var(--av2-line); padding: 24px 0; }
+.av2-help h2 { margin: 0 0 12px; font: 500 1.6rem "Cormorant Garamond", Georgia, serif; }
+.av2-help .v2-help-answer { border-bottom: 1px solid var(--av2-line); }
+.av2-help .v2-help-answer:last-child { border: 0; }
+.av2-help summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 48px; padding: 12px 0; cursor: pointer; list-style: none; }
+.av2-help summary::-webkit-details-marker { display: none; }
+.av2-help summary::after { content: "+"; flex: 0 0 auto; color: var(--av2-muted); }
+.av2-help details[open] > summary::after { content: "−"; }
+.av2-help details p { max-width: 70ch; margin: 0 0 18px; line-height: 1.65; color: var(--av2-muted); }
+.av2-help .v2-help-report { margin-top: 20px; border: 1px solid var(--av2-line); border-radius: 8px; padding: clamp(16px, 3vw, 28px); }
+.av2-help .v2-help-report-copy > p { color: var(--av2-muted); line-height: 1.55; margin: 8px 0 20px; }
+.av2-help .v2-help-report-form, .av2-help .v2-help-field { display: grid; min-width: 0; gap: 8px; }
+.av2-help .v2-help-report-form { gap: 18px; }
+.av2-help .av2-help-context { padding-bottom: 16px; border-bottom: 1px solid var(--av2-line); }
+.av2-help .av2-help-context label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.av2-help .av2-help-context input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; accent-color: var(--av2-accent); }
+.av2-help .av2-help-context p { margin: 6px 0; color: var(--av2-muted); line-height: 1.55; }
+.av2-help input, .av2-help textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--av2-line); border-radius: 6px; background: var(--av2-bg); color: var(--av2-ink); font: inherit; }
+.av2-help textarea { min-height: 150px; resize: vertical; line-height: 1.55; }
+.av2-help input::placeholder, .av2-help textarea::placeholder { color: var(--av2-muted); opacity: 1; }
+.av2-help .v2-help-report-warning { margin: 0; font-size: .875rem; color: var(--av2-muted); line-height: 1.55; }
+.av2-help .v2-help-report-actions { display: flex; justify-content: flex-end; }
+.av2-help .v2-help-report-status { display: grid; gap: 6px; padding: 14px; background: var(--av2-soft); border-radius: 6px; color: var(--av2-muted); line-height: 1.55; }
+.av2-help .v2-help-report-status[hidden], .av2-help .v2-help-assistant-status[hidden] { display: none; }
+.av2-help .v2-help-report-status strong { color: var(--av2-ink); font-weight: 500; }
+.av2-help .v2-help-report-status small { font-size: .875rem; }
+.av2-help a { color: var(--av2-accent); text-underline-offset: 3px; }
+.av2-help .v2-help-resources { padding-top: 30px; }
+.av2-help .v2-help-resource-links { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.av2-help .v2-help-resource-links a { display: inline-flex; align-items: center; min-height: 44px; }
+@media (max-width: 700px) {
+  .av2-help .v2-help-heading { flex-direction: column; gap: 16px; }
+  .av2-help .v2-help-assistant-actions { flex: initial; width: 100%; }
+  .av2-help .v2-help-assistant-button { width: 100%; }
+  .av2-help .v2-help-directory { gap: 6px; }
+  .av2-help .v2-help-directory button { flex: 1 1 150px; }
+}

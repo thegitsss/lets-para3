@@ -1,0 +1,11 @@
+const text = (value, max = 2000) => typeof value === "string" && value.length > 0 && value.length <= max;
+export const exportReasons = Object.freeze({ not_archived: "This Matter has not been completed or archived. Its archive is not available for download.", expired: "The archive’s retention period has ended. Its records can no longer be downloaded.", purged: "The Matter’s documents are no longer available through the archive.", retention_unconfirmed: "The archive’s deletion date needs review before its records can be downloaded.", needs_review: "Some Matter records need review before the archive can be prepared.", too_large: "This Matter exceeds the archive preparation limit. Contact support for help obtaining its records." });
+export function readExport(value, caseId, ownerId) {
+  if (value?.ownerId !== ownerId) throw Object.assign(new Error("account_changed"), { kind: "authentication" });
+  if (value.caseId !== caseId || !text(value.caseTitle) || !["available", ...Object.keys(exportReasons)].includes(value.access) || value.retentionEndsAt !== null && (!text(value.retentionEndsAt, 40) || !Number.isFinite(new Date(value.retentionEndsAt).getTime())) || !text(value.filename, 160) || /[\u0000-\u001f\u007f/\\]/.test(value.filename) || !value.filename.endsWith(".zip")) throw new Error("invalid_export");
+  if (value.access !== "available") { if (value.counts !== null || value.revision !== null) throw new Error("invalid_export_availability"); return value; }
+  const counts = value.counts;
+  if (!/^[a-f0-9]{64}$/.test(value.revision || "") || !counts || ["messages", "documents", "priorVersions", "confidentialityDocuments"].some(key => !Number.isSafeInteger(counts[key]) || counts[key] < 0) || (counts.receipts !== undefined && (!Number.isSafeInteger(counts.receipts) || counts.receipts < 0 || counts.receipts > 50)) || (counts.notes !== undefined && ![0, 1].includes(counts.notes)) || counts.messages > 10000 || counts.documents > 4000 || counts.priorVersions + counts.confidentialityDocuments > counts.documents) throw new Error("invalid_export_contents");
+  return value;
+}
+export const exportDate = value => value ? new Date(value).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }) : "No deletion date is scheduled";

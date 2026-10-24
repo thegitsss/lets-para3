@@ -117,7 +117,7 @@ describe("Incident risk engine", () => {
       approvalState: "not_needed",
       verificationStatus: "passed",
       requiredChecksPassed: true,
-      filesTouched: ["frontend/assets/scripts/views/help.js"],
+      filesTouched: ["frontend/assets/scripts/help-incident-intake.js"],
       previewStatus: "passed",
       rollbackTargetDeployId: "render-prev-123",
       freshClusterIncidentCount: 0,

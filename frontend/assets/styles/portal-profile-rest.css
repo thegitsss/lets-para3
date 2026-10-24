@@ -1,0 +1,268 @@
+/* Content-only LPC controls. The header, sidebar and their menus are excluded. */
+:root body.lpc-v2 :is(.lpc-inline-profile,.v2-profile-approved) [hidden] { display:none !important; }
+:root body.lpc-v2 .lpc-profile-value {
+  display:block; width:fit-content; max-width:100%; min-height:24px; margin:0;
+  padding:0; border:0; border-radius:0; background:transparent; box-shadow:none;
+  color:inherit; font:inherit; line-height:inherit; text-align:left;
+  white-space:pre-wrap; overflow-wrap:anywhere; cursor:text;
+}
+:root body.lpc-v2 .lpc-profile-value:hover { text-decoration:underline; text-decoration-color:var(--v2-line,var(--av2-line)); text-underline-offset:4px; }
+:root body.lpc-v2 .lpc-profile-value:focus-visible { outline:0; text-decoration:underline; text-decoration-color:var(--v2-blue-hover,var(--av2-accent)); text-underline-offset:4px; }
+:root body.lpc-v2 .lpc-profile-unit { min-width:0; }
+:root body.lpc-v2 .lpc-profile-unit > .lpc-profile-input { display:grid; gap:4px; min-width:0; width:100%; }
+:root body.lpc-v2 .lpc-profile-single.is-inline-editing { display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); column-gap:10px; row-gap:3px; align-items:baseline; }
+:root body.lpc-v2 .lpc-profile-single.is-inline-editing > label { grid-column:1 / -1; }
+:root body.lpc-v2 .lpc-profile-single.is-inline-editing > .lpc-profile-actions { margin:0; }
+:root body.lpc-v2 .lpc-profile-unit .lpc-profile-input :is(input:not([type="file"]),textarea,select),
+:root body.lpc-v2 .v2-profile-direct-editor :is(input:not([type="file"]),textarea,select).v2-settings-input,
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-personal-card :is(input,select) {
+  box-sizing:border-box; width:100%; max-width:100%; min-width:0; height:auto; min-height:24px;
+  margin:0; padding:0 0 2px; border:0; border-bottom:1px solid var(--v2-line,var(--av2-line));
+  border-radius:0; background:transparent; box-shadow:none; color:inherit;
+  font:inherit; line-height:inherit;
+}
+:root body.lpc-v2 .lpc-profile-input :is(input,textarea,select):focus-visible,
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor :is(input,textarea,select):focus-visible,
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-personal-card :is(input,select):focus-visible {
+  outline:0; box-shadow:none; border-bottom-color:var(--v2-blue-hover,var(--av2-accent));
+}
+:root body.lpc-v2 .lpc-profile-input textarea { min-height:24px; resize:vertical; }
+:root body.lpc-v2 .lpc-profile-input small { font-size:calc(12 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .lpc-inline-profile .av2-account-field { gap:3px; }
+:root body.lpc-v2 .lpc-inline-profile .av2-account-fields { gap:14px 20px; }
+:root body.lpc-v2 .lpc-profile-input .av2-account-entry { padding-left:0; border-left:0; gap:8px; }
+:root body.lpc-v2 .lpc-profile-input .av2-account-collection button { min-height:28px; padding:2px 0; border:0; background:transparent; color:var(--av2-accent); font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .lpc-profile-actions,
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions {
+  position:static; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-start;
+  width:auto; max-width:none; min-height:0; gap:4px 10px; margin:4px 0 0; padding:0;
+  border:0; background:transparent; box-shadow:none;
+}
+:root body.lpc-v2 .lpc-profile-actions > :is(button,.av2-button),
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a) {
+  flex:none; display:inline-flex; align-items:center; width:auto; height:auto;
+  min-width:24px; min-height:26px; margin:0; padding:2px 0; border:0; border-radius:0;
+  background:transparent; box-shadow:none; color:var(--v2-blue-hover,var(--av2-accent));
+  font:inherit; font-size:calc(13 * var(--lpc-reading-unit, 1px)); line-height:calc(20 * var(--lpc-reading-unit, 1px));
+}
+:root body.lpc-v2 .lpc-profile-actions > :is(button,a):not(:first-child),
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-cancel { color:var(--v2-muted,var(--av2-muted)); }
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-form-actions > .v2-profile-form-save { color:var(--v2-blue-hover); }
+:root body.lpc-v2 .lpc-profile-actions > :is(button,a):focus-visible,
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a):focus-visible { outline:1px solid var(--v2-blue-hover,var(--av2-accent)); outline-offset:2px; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a)[aria-busy="true"]::after { content:none; animation:none; }
+:root body.lpc-v2 .lpc-profile-actions .av2-account-feedback { flex-basis:100%; margin:0; padding:0; font-size:calc(12 * var(--lpc-reading-unit, 1px)); line-height:calc(18 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .lpc-profile-actions > :is(button,a):disabled { color:var(--v2-blue-hover,var(--av2-accent)); background:transparent; opacity:.45; }
+:root body.lpc-v2 .v2-profile-approved .v2-profile-scope-toggle { display:none; }
+:root body.lpc-v2 .v2-profile-approved .v2-profile-editor-bank { display:none; }
+:root body.lpc-v2 .v2-profile-approved .v2-profile-edit-label { display:none; }
+:root body.lpc-v2 .v2-profile-direct-editor { min-width:0; margin:0; padding:0; color:inherit; font:inherit; }
+:root body.lpc-v2 .v2-profile-direct-editor > .v2-settings-card {
+  display:block; min-width:0; min-height:0 !important; margin:0; padding:0; border:0;
+  border-radius:0; background:transparent; box-shadow:none; color:inherit; font:inherit;
+}
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-card > .v2-settings-section-heading,
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-row-edit,
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-entry:not(.is-entry-editing),
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-card > .v2-settings-text-action,
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-card-body > .v2-settings-text-action { display:none; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-card-body {
+  display:block; min-width:0; margin:0; padding:0; border:0; background:transparent; font:inherit;
+}
+:root body.lpc-v2 .v2-profile-direct-editor:not(.is-entry-group) .v2-settings-field__label {
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+  clip-path:inset(50%); white-space:nowrap;
+}
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-field-grid { gap:6px 12px; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-entry-editor { display:grid; grid-template-columns:minmax(0,1fr); gap:4px; width:100%; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-entry { margin:0; padding:0; border:0; background:transparent; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-entry-remove,
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-text-action { min-height:26px; padding:2px 0; font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-profile-direct-editor textarea { resize:vertical; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-settings-field-error { margin-top:4px; font-size:calc(12 * var(--lpc-reading-unit, 1px)); line-height:calc(18 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-profile-inline-add { display:block; width:fit-content; text-align:left; margin:8px 0 0; padding:0; border:0; background:transparent; color:var(--v2-muted); font:inherit; font-size:calc(13 * var(--lpc-reading-unit, 1px)); min-height:26px; }
+:root body.lpc-v2 .v2-profile-person-meta .lpc-profile-value { display:inline; }
+:root body.lpc-v2 .v2-profile-practice-tags > .lpc-profile-value { display:flex; flex-wrap:wrap; gap:8px; }
+:root body.lpc-v2 .v2-profile-practice-tags > .lpc-profile-value > span { padding:4px 12px; border-radius:20px; color:var(--v2-blue-hover); background:color-mix(in srgb,var(--v2-blue) 10%,var(--v2-white)); font-size:calc(14 * var(--lpc-reading-unit, 1px)); line-height:calc(20 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-profile-direct-editor:not(.is-entry-group) > .v2-settings-card { display:flex; align-items:baseline; gap:4px 10px; flex-wrap:wrap; }
+:root body.lpc-v2 .v2-profile-direct-editor:not(.is-entry-group) > .v2-settings-card > .v2-settings-card-body { flex:1 1 90px; }
+:root body.lpc-v2 .v2-profile-direct-editor:not(.is-entry-group) .v2-profile-form-actions { flex:none; margin:0; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-personal-card .v2-settings-personal-fields { gap:8px; }
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-personal-card .v2-personal-years { width:auto; max-width:140px; }
+:root body.lpc-v2 .lpc-inline-profile .av2-account-photo-image { padding:0; cursor:pointer; }
+:root body.lpc-v2 .v2-profile-approved .v2-profile-view-link { min-height:30px; padding:4px 10px; font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+
+/* A real field becomes editable, with a single local affordance. */
+:root body.lpc-v2 .lpc-profile-actions > :is(button,a),
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a) {
+  min-height:28px; min-width:28px; padding:3px 7px; border-radius:4px;
+  color:var(--ref-accent); font:400 calc(13 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; font-weight:400 !important;
+}
+:root body.lpc-v2 .lpc-profile-actions > :is(button,a):hover:not(:disabled),
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a):hover:not(:disabled) { background:var(--ref-soft); }
+:root body.lpc-v2 .lpc-profile-actions > :is(button,a):not(:first-child),
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-form-cancel { color:var(--ref-muted); }
+:root body.lpc-v2 .lpc-profile-actions .lpc-profile-save,
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-form-save { color:var(--ref-accent); }
+
+
+@media(max-width:480px) { :root body.lpc-v2 .lpc-profile-input :is(input,textarea,select), :root body.lpc-v2 .v2-profile-direct-editor :is(input,textarea,select) { font-size:calc(16 * var(--lpc-reading-unit, 1px)); } }
+@media(pointer:coarse) { :root body.lpc-v2 .lpc-profile-actions > :is(button,a), :root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a) { min-height:36px; } }
+
+/* Entry editors keep their fields and actions in one column after leaving the bank. */
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-entry-fields {
+  grid-column:1; min-width:0; width:100%;
+}
+:root body.lpc-v2 .v2-profile-direct-editor .v2-profile-entry-editor > .v2-profile-form-actions {
+  grid-column:1; grid-row:auto; margin-top:8px;
+}
+
+/* Autosave status and reversible recent edits stay outside field editors. */
+:root body.lpc-v2 .v2-profile-approved > .v2-profile-save-all {
+  position:static; top:auto; z-index:auto; display:flex; align-items:center; justify-content:flex-end;
+  width:100%; max-width:none; min-height:52px; margin:0 0 16px; padding:8px 12px; gap:8px;
+  border:1px solid var(--v2-line); border-radius:6px; background:var(--v2-white);
+}
+:root body.lpc-v2 .v2-profile-save-all .v2-profile-edit-status { flex:1 1 140px; color:var(--v2-muted); font-size:calc(13 * var(--lpc-reading-unit,1px)); }
+:root body.lpc-v2 .v2-profile-save-all > button { min-height:36px; white-space:nowrap; }
+@media(max-width:480px) {
+  :root body.lpc-v2 .v2-profile-save-all > button { min-height:44px; }
+}
+
+@media(max-width:480px) {
+  :root body.lpc-v2 .v2-profile-autosave { flex-wrap:wrap; }
+  :root body.lpc-v2 .v2-profile-autosave .v2-profile-edit-status { flex:1 1 120px; overflow-wrap:anywhere; }
+}
+
+/* A compact action menu for the Profile photo, separate from its identity card. */
+:root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu {
+  top:calc(100% + 6px); left:0; transform:none; width:172px; max-width:calc(100vw - 48px);
+  padding:4px; border:1px solid var(--v2-line); border-radius:5px;
+  background:var(--v2-white); box-shadow:0 4px 14px #10243f14,0 1px 3px #10243f0a;
+}
+:root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu > .v2-settings-menu-action {
+  min-height:32px; padding:6px 10px; border:0; border-radius:3px;
+  color:var(--v2-ink); background:transparent;
+  font-family:inherit; font-size:calc(14 * var(--lpc-reading-unit,1px)); line-height:20px; font-weight:inherit;
+}
+:root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu > .v2-settings-menu-action:is(:hover,:focus-visible) {
+  color:var(--v2-ink); background:color-mix(in srgb,var(--v2-blue) 9%,var(--v2-white));
+}
+:root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu > .v2-settings-menu-action:focus-visible {
+  outline:1px solid var(--v2-blue); outline-offset:-1px;
+}
+:root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu > .v2-settings-menu-action--danger {
+  margin-top:4px; padding-top:9px; border-top:1px solid var(--v2-line); border-radius:0 0 3px 3px; color:var(--v2-danger);
+}
+:root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu > .v2-settings-menu-action--danger:is(:hover,:focus-visible) {
+  color:var(--v2-danger); background:color-mix(in srgb,var(--v2-danger) 6%,var(--v2-white));
+}
+@media(max-width:760px),(pointer:coarse) {
+  :root body.lpc-v2 .v2-profile-approved .v2-settings-photo-menu > .v2-settings-menu-action { min-height:44px; }
+}
+
+/* Autosave is a quiet status row, not another bordered settings card. */
+:root body.lpc-v2 .v2-profile-approved > .v2-profile-autosave {
+  min-height:32px; margin-bottom:8px; padding:0; gap:12px; border:0; border-radius:0;
+  background:transparent;
+}
+:root body.lpc-v2 .v2-profile-autosave > button {
+  min-height:32px; padding:4px 6px; border:0; background:transparent; color:var(--v2-blue-hover); text-decoration:none;
+}
+:root body.lpc-v2 .v2-profile-autosave > button:focus-visible { outline:2px solid var(--v2-blue-hover); outline-offset:2px; }
+@media(max-width:480px) {
+  :root body.lpc-v2 .v2-profile-approved > .v2-profile-autosave { min-height:44px; }
+  :root body.lpc-v2 .v2-profile-autosave > button { min-width:44px; min-height:44px; }
+}
+
+/* Photo-first crop editor: fixed circle guide over the movable image. */
+:root body.lpc-v2 dialog.v2-photo-crop-dialog {
+  box-sizing:border-box; width:min(480px,calc(100vw - 32px)); height:fit-content; min-height:0; max-width:none; max-height:calc(100dvh - 32px);
+  margin:auto; padding:0; overflow:auto; color:var(--v2-ink,#24344d); background:var(--v2-white,#fff);
+  border:1px solid var(--v2-line,#e2e8f0); border-radius:12px; box-shadow:0 24px 80px #0c203326;
+}
+:root body.lpc-v2 .v2-photo-crop-dialog::backdrop { background:#10243d80; }
+:root body.lpc-v2 .v2-photo-crop-dialog > .v2-photo-crop-header {
+  display:flex; align-items:center; justify-content:center; min-height:40px; gap:0;
+  box-sizing:border-box; width:100%; padding:8px 12px; border-bottom:1px solid var(--v2-line,#e2e8f0);
+}
+:root body.lpc-v2 .v2-photo-crop-header h2 { width:100%; margin:0; text-align:center; font-family:inherit; font-size:18px; line-height:24px; font-weight:200; }
+:root body.lpc-v2 .v2-photo-crop-actions button {
+  min-width:44px; min-height:44px; padding:8px; border:0; border-radius:5px; background:transparent;
+  color:var(--v2-ink,#24344d); font:inherit; font-size:16px; line-height:20px; cursor:pointer;
+}
+:root body.lpc-v2 .v2-photo-crop-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:8px 16px; border-top:1px solid var(--v2-line,#e2e8f0); flex-shrink:0; }
+:root body.lpc-v2 .v2-photo-crop-actions .v2-profile-form-save { justify-self:end; color:var(--v2-blue-hover,#326bc7); }
+:root body.lpc-v2 .v2-photo-crop-actions button:hover:not(:disabled) { background:var(--v2-soft,#f1f5fb); }
+:root body.lpc-v2 .v2-photo-crop-actions button:disabled { opacity:.5; cursor:progress; }
+:root body.lpc-v2 .v2-photo-crop-stage { display:grid; place-items:center; min-height:0; background:var(--v2-navy,#10243d); overflow:hidden; }
+:root body.lpc-v2 .v2-photo-crop-dialog .v2-settings-crop-viewport {
+  position:relative; box-sizing:border-box; width:min(100%,calc(100dvh - 240px)); height:auto; aspect-ratio:1; margin:0; border:0; border-radius:0;
+  background:var(--v2-navy,#10243d); overflow:hidden; touch-action:none; outline-offset:-3px;
+}
+:root body.lpc-v2 .v2-photo-crop-dialog .v2-settings-crop-viewport::after {
+  content:""; position:absolute; z-index:2; top:50%; left:50%; transform:translate(-50%,-50%); width:var(--photo-crop-size,84%); height:var(--photo-crop-size,84%); box-sizing:border-box; border:1px solid #ffffffaa; border-radius:50%;
+  box-shadow:0 0 0 100vmax #07132370; pointer-events:none;
+}
+:root body.lpc-v2 .v2-photo-crop-grid { position:absolute; z-index:1; top:50%; left:50%; transform:translate(-50%,-50%); width:var(--photo-crop-size,84%); height:var(--photo-crop-size,84%); opacity:0; pointer-events:none; clip-path:circle(50%);
+  background:linear-gradient(to right,transparent calc(33.333% - .5px),#ffffff45 33.333%,transparent calc(33.333% + .5px),transparent calc(66.667% - .5px),#ffffff45 66.667%,transparent calc(66.667% + .5px)),linear-gradient(to bottom,transparent calc(33.333% - .5px),#ffffff45 33.333%,transparent calc(33.333% + .5px),transparent calc(66.667% - .5px),#ffffff45 66.667%,transparent calc(66.667% + .5px));
+}
+:root body.lpc-v2 .v2-settings-crop-viewport[data-adjusting] .v2-photo-crop-grid { opacity:1; }
+:root body.lpc-v2 .v2-photo-crop-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 12px; padding:12px 16px; }
+:root body.lpc-v2 .v2-photo-crop-hint { margin:0; font-size:14px; line-height:20px; color:var(--v2-muted,#52627a); }
+:root body.lpc-v2 .v2-photo-hint-touch { display:none; }
+:root body.lpc-v2 .v2-photo-zoom-controls { display:flex; align-items:center; gap:4px; }
+:root body.lpc-v2 .v2-photo-zoom-controls input[hidden] { display:none; }
+:root body.lpc-v2 .v2-photo-zoom-controls button { min-width:44px; min-height:44px; padding:4px 8px; border:0; border-radius:5px; background:transparent; color:var(--v2-ink,#24344d); font:inherit; font-size:16px; cursor:pointer; }
+:root body.lpc-v2 .v2-photo-zoom-controls button:hover:not(:disabled) { background:var(--v2-soft,#f1f5fb); }
+:root body.lpc-v2 .v2-photo-zoom-controls .v2-photo-reset { font-size:14px; }
+:root body.lpc-v2 .v2-photo-crop-dialog > .v2-settings-inline-status { margin:0; padding:12px 16px; font-size:14px; line-height:20px; }
+:root body.lpc-v2 .v2-photo-crop-dialog .v2-settings-inline-status:empty { display:none; }
+:root body.lpc-v2 .v2-photo-crop-dialog > img { margin:0 16px 16px; }
+:root body.lpc-v2 .v2-photo-crop-dialog button:focus-visible,
+:root body.lpc-v2 .v2-photo-crop-dialog .v2-settings-crop-viewport:focus-visible { outline:2px solid var(--v2-blue-hover,#326bc7); outline-offset:-3px; }
+@media(max-width:600px),(pointer:coarse) {
+  :root body.lpc-v2 .v2-photo-hint-desktop { display:none; }
+  :root body.lpc-v2 .v2-photo-hint-touch { display:inline; }
+  /* Keep accessible zoom actions for assistive technology and keyboard users. */
+  :root body.lpc-v2 .v2-photo-zoom-controls:not(:focus-within) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+}
+@media(max-width:600px) {
+  :root body.lpc-v2 dialog.v2-photo-crop-dialog { width:min(100vw,480px); height:fit-content; max-height:calc(100dvh - 24px); margin:auto; border:0; border-radius:10px; }
+  :root body.lpc-v2 dialog.v2-photo-crop-dialog[open] { display:flex; flex-direction:column; }
+  :root body.lpc-v2 .v2-photo-crop-dialog > .v2-photo-crop-header { flex-shrink:0; padding-top:max(8px,env(safe-area-inset-top)); }
+  :root body.lpc-v2 .v2-photo-crop-stage { flex:none; }
+  :root body.lpc-v2 .v2-photo-crop-dialog .v2-settings-crop-viewport { width:min(100vw,calc(100dvh - 214px),480px); flex:none; }
+  :root body.lpc-v2 .v2-photo-crop-footer { flex-shrink:0; justify-content:center; padding-bottom:12px; }
+  :root body.lpc-v2 .v2-photo-crop-actions { padding-bottom:max(8px,env(safe-area-inset-bottom)); }
+}
+
+/* Keep inline editing; size date groups for their content rather than clipping month names. */
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] .v2-education-recovery {
+  display:flex;align-items:flex-start;gap:8px;margin:0 0 12px;padding:0;
+  border:0;border-radius:0;background:transparent;box-shadow:none;
+}
+:root body.lpc-v2 .v2-education-recovery > p {
+  flex:1;min-width:0;margin:0;color:var(--v2-muted);font:inherit;
+  font-size:calc(13 * var(--lpc-reading-unit,1px));line-height:calc(20 * var(--lpc-reading-unit,1px));
+}
+:root body.lpc-v2 .v2-profile-direct-editor .v2-education-recovery > button {
+  flex:none;display:inline-flex;align-items:center;min-height:28px;margin:0;padding:0 4px;
+  color:var(--v2-blue-hover);font:inherit;font-size:calc(13 * var(--lpc-reading-unit,1px));
+}
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] .v2-profile-entry-editor > .v2-settings-text-action {
+  display:block;justify-self:start;width:auto;min-height:28px;margin-top:8px;
+}
+@media(max-width:600px),(pointer:coarse) {
+  :root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] :is(input,select,textarea).v2-settings-input,
+  :root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] .v2-profile-entry-editor > .v2-settings-text-action,
+  :root body.lpc-v2 .v2-profile-direct-editor .v2-education-recovery > button,
+  :root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] .v2-profile-entry-extra > summary { min-height:44px; }
+}
+
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] .v2-profile-entry-dates {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));
+}
+:root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor[data-profile-entry-kind="education"] .v2-profile-entry-date-pair {
+  grid-template-columns:minmax(0,1fr) 64px;max-width:260px;
+}

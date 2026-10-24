@@ -1,0 +1,13 @@
+{
+  "ignore": [
+    "tests/**",
+    "test-results/**",
+    "playwright-report/**",
+    "coverage/**",
+    "output/**",
+    "outputs/**",
+    "../output/**",
+    "../outputs/**",
+    "../.lpc-build/**"
+  ]
+}

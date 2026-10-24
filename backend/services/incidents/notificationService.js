@@ -490,7 +490,7 @@ async function notifyFounderSupportEngineeringIssue({ incident, ticket = null, d
   const notifications = [];
 
   for (const recipientEmail of emailRecipients) {
-    const created = await ensureIncidentNotification({
+    const created = await require('./supportEmailDelivery').deliverSupportEmail({
       incident,
       audience: "founder",
       channel: "email",
@@ -548,6 +548,40 @@ async function syncFounderSupportResolvedEmails({ incident }) {
   return notifications;
 }
 
+// Help's keyed intake commits this initial in-app receipt with its incident.
+// No mail, socket or operator side effect may escape the transaction. Existing
+// milestone synchronization sees the same dedupe key after the commit.
+async function stageHelpReportReceived({ incident, session }) {
+  if (!session?.inTransaction() || incident.source !== "help_form" || !incident.reporter?.userId) {
+    throw new Error("Help receipt requires an authenticated transactional intake.");
+  }
+  const bodyPreview = buildReporterMessage("received", incident);
+  const payload = {
+    dedupeKey: buildDedupeKey({ audience: "reporter", templateKey: "received", incident }),
+    incidentPublicId: incident.publicId,
+    status: incident.userVisibleStatus,
+    state: incident.state,
+  };
+  const [appNotification] = await Notification.create([{
+    userId: incident.reporter.userId,
+    userRole: incident.reporter.role,
+    type: "incident_update",
+    message: bodyPreview,
+    link: reporterHelpLink(incident),
+    payload,
+    read: false,
+    isRead: false,
+  }], { session });
+  const [receipt] = await IncidentNotification.create([{
+    incidentId: incident._id, audience: "reporter", channel: "in_app", templateKey: "received",
+    status: "sent", bodyPreview, recipientUserId: incident.reporter.userId,
+    recipientEmail: incident.reporter.email, subject: "Incident update", payload,
+    externalMessageId: String(appNotification._id), sentAt: new Date(),
+  }], { session });
+  incident.latestNotificationId = receipt._id;
+  return receipt;
+}
+
 async function syncIncidentNotifications({ incident, approval = null, release = null }) {
   if (!incident?._id) return { reporter: [], founder: [] };
 
@@ -562,6 +596,7 @@ async function syncIncidentNotifications({ incident, approval = null, release = 
 module.exports = {
   notifyFounderSupportEngineeringIssue,
   syncIncidentNotifications,
+  stageHelpReportReceived,
   buildReporterMessage,
   buildFounderApprovalMessage,
 };

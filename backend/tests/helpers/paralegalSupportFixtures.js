@@ -8,6 +8,11 @@ const Message = require("../../models/Message");
 const Payout = require("../../models/Payout");
 const Task = require("../../models/Task");
 const User = require("../../models/User");
+const {
+  addCalendarDays,
+  dateOnlyFromZonedInstant,
+  dateOnlyToUtcDate,
+} = require("../../utils/businessDate");
 
 const SYNTHETIC_DOMAIN = "package6.paralegal.invalid";
 const SYNTHETIC_TITLE_PREFIX = "P6 Paralegal Synthetic";
@@ -40,10 +45,9 @@ function syntheticUser({ _id = objectId(), role, label, payoutReady = false }) {
     yearsExperience: role === "paralegal" ? 7 : null,
     bio: "Synthetic Package 6 paralegal assistant fixture. This is not a customer record.",
     resumeURL: role === "paralegal" ? "/synthetic/package6/resume.pdf" : "",
-    preferences: { theme: "mountain", fontSize: "md", hideProfile: false },
+    preferences: { theme: "light", fontSize: "md", hideProfile: false },
     notificationPrefs: { email: true, inApp: true, browser: false },
     onboarding: {
-      paralegalWelcomeDismissed: true,
       paralegalTourCompleted: true,
       paralegalProfileTourCompleted: true,
     },
@@ -107,6 +111,11 @@ function assertSyntheticFixtureData(fixture) {
 
 async function seedParalegalSupportFixtures() {
   const now = new Date("2026-07-23T16:00:00.000Z");
+  const upcomingDeadline = addCalendarDays(
+    dateOnlyFromZonedInstant(new Date(), process.env.BUSINESS_TIME_ZONE || undefined),
+    30
+  );
+  const upcomingTaskDueDate = addCalendarDays(upcomingDeadline, -5);
   const ids = {
     owner: objectId(),
     emptyParalegal: objectId(),
@@ -142,7 +151,8 @@ async function seedParalegalSupportFixtures() {
       status: "in progress",
       paralegalId: ids.owner,
       updatedAt: new Date("2026-07-23T15:00:00.000Z"),
-      deadline: new Date("2026-08-15T21:00:00.000Z"),
+      deadlineDate: upcomingDeadline,
+      deadline: dateOnlyToUtcDate(upcomingDeadline),
       hiredAt: new Date("2026-07-01T12:00:00.000Z"),
       totalAmount: 250000,
       lockedTotalAmount: 250000,
@@ -283,7 +293,16 @@ async function seedParalegalSupportFixtures() {
     }),
   };
 
-  const fixture = { now, ids, caseIds, jobIds, users, cases };
+  const fixture = {
+    now,
+    upcomingDeadline,
+    upcomingTaskDueDate,
+    ids,
+    caseIds,
+    jobIds,
+    users,
+    cases,
+  };
   assertSyntheticFixtureData(fixture);
 
   await User.collection.insertMany(Object.values(users));
@@ -337,7 +356,7 @@ async function seedParalegalSupportFixtures() {
       paralegalId: ids.owner,
       title: "Prepare witness index",
       description: "Synthetic assigned task.",
-      dueDate: new Date("2026-08-10T21:00:00.000Z"),
+      dueDate: dateOnlyToUtcDate(upcomingTaskDueDate),
       status: "in progress",
       createdAt: new Date("2026-07-03T12:00:00.000Z"),
     },

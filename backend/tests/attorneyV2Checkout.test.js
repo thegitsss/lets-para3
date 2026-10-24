@@ -1,0 +1,18 @@
+const {execFileSync}=require('node:child_process'),path=require('node:path');
+const fixture=`const owner='a'.repeat(24),caseId='b'.repeat(24),funding={ownerId:owner,caseId,revision:'c'.repeat(64),hasOriginalCheckout:true,fundingVerified:false,canPrepare:false,closed:false,totalCents:48800,currency:'USD',blockers:['payment_reference_needs_review']},value={ownerId:owner,caseId,fundingRevision:funding.revision,revision:'d'.repeat(64),sessionId:'cs_test_original',state:'available',canResume:true,fundingVerified:false,totalCents:48800,currency:'USD',expiresAt:new Date(Date.now()+1800000).toISOString(),privateNote:'PRIVATE'};`;
+const check=source=>void execFileSync(process.execPath,['--input-type=module','--eval',`import assert from 'node:assert/strict';import {readCheckout,readCheckoutResume} from './frontend/assets/scripts/attorney-v2/checkout-model.mjs';import {createApiClient} from './frontend/assets/scripts/attorney-v2/api-client.mjs';${fixture}${source}`],{cwd:path.resolve(__dirname,'../..'),stdio:'pipe',timeout:15000});
+test('Checkout projection rejects mismatched identities, stale reviews, invalid status, unsafe amounts and expired availability',()=>check(`
+ assert.equal(JSON.stringify(readCheckout(value,funding)).includes('PRIVATE'),false);
+ for(const patch of [{ownerId:'f'.repeat(24)},{caseId:'f'.repeat(24)},{fundingRevision:'f'.repeat(64)},{state:'paid'},{revision:'bad'},{sessionId:'bad'},{fundingVerified:true},{totalCents:null},{currency:'EUR'},{expiresAt:null},{expiresAt:'invalid'},{expiresAt:new Date(0).toISOString()}])assert.throws(()=>readCheckout({...value,...patch},funding));
+ for(const patch of [{hasOriginalCheckout:false},{closed:true},{canPrepare:true},{blockers:['payment_review']}])assert.throws(()=>readCheckout(value,{...funding,...patch}));
+ for(const state of ['expired','processing','paid','needs_review'])assert.equal(readCheckout({...value,state,canResume:false},funding).state,state);
+`));
+test('opening Checkout requires the reviewed Session, current revision and exact trusted hosted path',()=>check(`
+ const read=url=>readCheckoutResume({checkout:value,url},funding,value);assert.equal(read('https://checkout.stripe.com/c/pay/cs_test_original#safe'),'https://checkout.stripe.com/c/pay/cs_test_original#safe');
+ for(const url of ['https://checkout.stripe.com.evil.test/c/pay/cs_test_original','http://checkout.stripe.com/c/pay/cs_test_original','https://user@checkout.stripe.com/c/pay/cs_test_original','https://checkout.stripe.com:444/c/pay/cs_test_original','https://checkout.stripe.com/c/pay/cs_other','javascript:alert(1)'])assert.throws(()=>read(url));
+ assert.throws(()=>readCheckoutResume({checkout:{...value,revision:'f'.repeat(64)},url:'https://checkout.stripe.com/c/pay/cs_test_original'},funding,value));
+`));
+test('the Checkout client sends one CSRF protected resume after current owner verification and never retries it',()=>check(`
+ const calls=[],api=createApiClient({fetchImpl:async(path,options)=>{calls.push({path,...options});return new Response(JSON.stringify(path==='/api/auth/me'?{user:{id:owner,role:'attorney',status:'approved'}}:path==='/api/csrf'?{csrfToken:'synthetic-csrf'}:value));}});
+ await api.readCheckout(caseId,{ownerId:owner});await api.resumeCheckout(caseId,value.revision,{ownerId:owner});const writes=calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].path,'/api/payments/matter/'+caseId+'/checkout/resume');assert.deepEqual(JSON.parse(writes[0].body),{expectedOwnerId:owner,reviewedRevision:value.revision});assert.equal(writes[0].headers['X-CSRF-Token'],'synthetic-csrf');assert.equal(calls.at(-1).path,'/api/auth/me');assert.ok(calls.every(c=>c.cache==='no-store'&&c.credentials==='include'&&c.redirect==='error'));
+`));

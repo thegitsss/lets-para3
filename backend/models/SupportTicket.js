@@ -62,6 +62,29 @@ const internalNoteSchema = new Schema(
 
 const supportTicketSchema = new Schema(
   {
+    requestKind: { type: String, enum: ["support", "contact", "human", "email"], default: "support", index: true },
+    automaticCorrespondence: { type: new Schema({
+      requestId: { type: String, required: true },
+      kind: { type: String, enum: ["routine_reply", "admission_information", "reminder"], required: true },
+      policyAction: { type: String, required: true },
+      status: { type: String, enum: ["pending", "sending", "accepted", "failed", "unknown", "skipped"], default: "pending" },
+      encryptedText: { type: String, required: true },
+      sourceFingerprint: { type: String, required: true },
+      sourceKey: { type: String, default: "" },
+      sourceAnswerFingerprint: { type: String, default: "" },
+      admissionFingerprint: { type: String, default: "" },
+      recipient: { type: String, required: true },
+      attempts: { type: Number, default: 0, min: 0 },
+      claim: { type: String, default: "" },
+      claimedAt: { type: Date, default: null },
+      nextAttemptAt: { type: Date, default: Date.now },
+      nextReminderAt: { type: Date, default: null },
+      failure: { type: String, default: "", maxlength: 500 },
+      createdAt: { type: Date, default: Date.now },
+    }, { _id: false }), default: undefined, select: false },
+    automaticReminders: { type: Number, default: 0, min: 0, max: 2 },
+    emailReplies: { type: [{ requestId: String, messageId: String, text: String, adminId: { type: Schema.Types.ObjectId, ref: "User" }, adminName: String,
+      delivery: { type: String, enum: ["pending", "accepted", "unknown", "disabled", "failed", "skipped"] }, automatedKind: String, createdAt: Date }], default: [] },
     subject: { type: String, required: true, trim: true, maxlength: 300 },
     message: { type: String, required: true, trim: true, maxlength: 20000 },
     status: { type: String, enum: SUPPORT_TICKET_STATUSES, default: "open", index: true },
@@ -73,6 +96,9 @@ const supportTicketSchema = new Schema(
     requesterUserId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     requesterEmail: { type: String, trim: true, lowercase: true, default: "", maxlength: 320 },
     assignedTo: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    followUpAt: { type: Date, default: null, index: true },
+    nextAction: { type: String, trim: true, maxlength: 600, default: "" },
+    administrativeRequestKey: { type: String, trim: true },
     conversationId: { type: Schema.Types.ObjectId, ref: "SupportConversation", default: null, index: true },
     routePath: { type: String, trim: true, default: "", maxlength: 500 },
     caseId: { type: Schema.Types.ObjectId, ref: "Case", default: null, index: true },
@@ -86,6 +112,7 @@ const supportTicketSchema = new Schema(
       type: Schema.Types.Mixed,
       default: {},
     },
+    lastInboundMailAt: { type: Date, default: null },
     latestUserMessage: { type: String, trim: true, default: "", maxlength: 12000 },
     assistantSummary: { type: String, trim: true, default: "", maxlength: 12000 },
     supportFactsSnapshot: {
@@ -122,7 +149,10 @@ const supportTicketSchema = new Schema(
   }
 );
 
+supportTicketSchema.index({ "automaticCorrespondence.status": 1, "automaticCorrespondence.nextAttemptAt": 1 });
 supportTicketSchema.index({ status: 1, updatedAt: -1 });
+supportTicketSchema.index({ administrativeRequestKey: 1 }, { unique: true, sparse: true });
+supportTicketSchema.index({ status: 1, followUpAt: 1 });
 supportTicketSchema.index({ urgency: 1, status: 1, updatedAt: -1 });
 supportTicketSchema.index({ "classification.patternKey": 1, status: 1, updatedAt: -1 });
 supportTicketSchema.index({ "routingSuggestion.ownerKey": 1, status: 1, updatedAt: -1 });

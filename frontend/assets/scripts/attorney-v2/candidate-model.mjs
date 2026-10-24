@@ -4,7 +4,7 @@ const text = (value) => typeof value === "string" ? value : "";
 const list = (value) => Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 
 export function directoryQuery(query) {
-  const result = new URLSearchParams({ page: String(Math.min(10000, Math.max(1, Number.parseInt(query.get("page"), 10) || 1))), limit: "10", sort: ["recent", "alpha", "experience"].includes(query.get("sort")) ? query.get("sort") : "recent" });
+  const result = new URLSearchParams({ page: String(Math.min(10000, Math.max(1, Number.parseInt(query.get("page"), 10) || 1))), limit: "10", sort: ["alpha", "experience"].includes(query.get("sort")) ? query.get("sort") : "alpha" });
   for (const key of ["q", "location", "practice"]) { const value = query.get(key)?.trim().slice(0, 2000); if (value) result.set(key, value); }
   const years = Number(query.get("minYears"));
   if (Number.isInteger(years) && years > 0 && years <= 80) result.set("minYears", String(years));
@@ -112,7 +112,7 @@ export function projectCandidate(payload, candidateId, tier) {
   if (tier === "authenticated") {
     result.nextAvailable = text(payload.availabilityDetails?.nextAvailable);
     for (const key of ["skills", "stateExperience", "jurisdictions"]) result[key] = list(payload[key]);
-    result.languages = Array.isArray(payload.languages) ? payload.languages.map((item) => typeof item === "string" ? item : [text(item?.name || item?.language), text(item?.proficiency)].filter(Boolean).join(" · ")) : [];
+    result.languages = Array.isArray(payload.languages) ? payload.languages.map((item) => text(typeof item === "string" ? item : item?.name || item?.language).trim()).filter(Boolean) : [];
     result.experience = Array.isArray(payload.experience) ? payload.experience.map((item) => Object.fromEntries(["title", "company", "firm", "years", "startDate", "endDate", "description"].map((key) => [key, text(item?.[key])]))) : [];
     result.documents = [["Résumé", payload.resumeURL || payload.resumeKey], ["Certificate", payload.certificateKey || payload.certificateURL], ["Writing sample", payload.writingSampleURL || payload.writingSampleKey]].map(([label, value]) => ({ label, key: safeDocumentKey(value, candidateId) })).filter((doc) => doc.key);
   }

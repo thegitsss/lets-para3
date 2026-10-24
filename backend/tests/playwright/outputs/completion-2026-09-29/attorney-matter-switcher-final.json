@@ -1,0 +1,475 @@
+{
+  "config": {
+    "argv": [
+      "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/samanthasider/Desktop/lets-para3/backend/node_modules/playwright/cli.js",
+      "test",
+      "-c",
+      "tests/playwright/attorney-v2/playwright.config.js",
+      "workspace.spec.js",
+      "--grep",
+      "Matter switcher|Matter text renders",
+      "--output",
+      "../outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts",
+      "--reporter=line,json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/playwright.config.js",
+    "rootDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+    "failOnFlakyTests": true,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/support/global.setup.js",
+    "globalTeardown": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/global.teardown.js",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node \"/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/control-room/webServer.js\"",
+      "cwd": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T",
+      "port": 5051,
+      "reuseExistingServer": false,
+      "timeout": 240000,
+      "env": {
+        "APPLICATION_INSIGHTS_NO_STATSBEAT": "true",
+        "CODEX_CI": "1",
+        "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
+        "CODEX_PERMISSION_PROFILE": ":workspace",
+        "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+        "CODEX_SESSION_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_THREAD_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_VERSION": "0.155.0-alpha.16.3",
+        "COLORTERM": "",
+        "COMMAND_MODE": "unix2003",
+        "DEBUG": "release",
+        "ELECTRON_RUN_AS_NODE": "1",
+        "GH_PAGER": "cat",
+        "GIT_PAGER": "cat",
+        "HOME": "/Users/samanthasider",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.UTF-8",
+        "LOGNAME": "samanthasider",
+        "MACH_PORT_RENDEZVOUS_PEER_VALDATION": "1",
+        "MallocNanoZone": "0",
+        "NVM_CD_FLAGS": "-q",
+        "NVM_DIR": "/Users/samanthasider/.nvm",
+        "OLDPWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "PAGER": "cat",
+        "PATH": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Users/samanthasider/.codex/tmp/arg0/codex-arg0x2rsES:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/Users/samanthasider/.vscode/extensions/openai.chatgpt-26.5917.62051-darwin-x64/bin/macos-x86_64",
+        "PWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "RUST_LOG": "warn",
+        "SHELL": "/bin/zsh",
+        "SHLVL": "0",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.bG4A0cldCu/Listeners",
+        "TERM": "dumb",
+        "TMPDIR": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T/",
+        "USER": "samanthasider",
+        "VSCODE_CODE_CACHE_PATH": "/Users/samanthasider/Library/Application Support/Code/CachedData/2242ebbb54efeeb0129e08e919e7e8d43033cd83",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE": "extensionHost",
+        "VSCODE_CWD": "/",
+        "VSCODE_ESM_ENTRYPOINT": "vs/workbench/api/node/extensionHostProcess",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS": "true",
+        "VSCODE_IPC_HOOK": "/Users/samanthasider/Library/Application Support/Code/1.13-main.sock",
+        "VSCODE_NLS_CONFIG": "{\"userLocale\":\"en-us\",\"osLocale\":\"en-us\",\"resolvedLanguage\":\"en\",\"defaultMessagesFile\":\"/Applications/Visual Studio Code.app/Contents/Resources/app/out/nls.messages.json\",\"locale\":\"en-us\",\"availableLanguages\":{}}",
+        "VSCODE_PID": "21447",
+        "XPC_FLAGS": "0x0",
+        "XPC_SERVICE_NAME": "application.com.microsoft.VSCode.177186350.177186356",
+        "__CFBundleIdentifier": "com.microsoft.VSCode",
+        "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+        "PLAYWRIGHT_JSON_OUTPUT_NAME": "../outputs/completion-2026-09-29/attorney-matter-switcher-final.json",
+        "_": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+        "PLAYWRIGHT_BASE_URL": "http://127.0.0.1:5051",
+        "EMAIL_DISABLE": "true",
+        "OPENAI_API_KEY": "",
+        "DATA_ENCRYPTION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "PLAYWRIGHT_MONGO_REPLICA_SET": "true",
+        "PLAYWRIGHT_INITIALIZE_ATTORNEY_MODELS": "true",
+        "PLAYWRIGHT_MONGO_PORT": "5889",
+        "PORT": "5051",
+        "NODE_ENV": "test"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "workspace.spec.js",
+      "file": "workspace.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Matter switcher preserves the inventory return and recovers failed searches",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1836,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:40:14.449Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-037d64f8c7913d6b6467",
+          "file": "workspace.spec.js",
+          "line": 18,
+          "column": 1
+        },
+        {
+          "title": "Matter text renders as text and long titles remain readable with accessible section navigation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4108,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:40:16.508Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-b8c9552b69df392891c0",
+          "file": "workspace.spec.js",
+          "line": 45,
+          "column": 1
+        },
+        {
+          "title": "Matter switcher preserves the inventory return and recovers failed searches",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 15552,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-matter-workspace]')\nExpected: \u001b[32m\"6abbe9\u001b[7mfc\u001b[27mcb5c2b6895e269\u001b[7m8\u001b[27mb\"\u001b[39m\nReceived: \u001b[31m\"6abbe9\u001b[7mee\u001b[27mcb5c2b6895e269\u001b[7m6\u001b[27mb\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-matter-workspace]')\u001b[22m\n\u001b[2m    2 × locator resolved to <section data-tab=\"overview\" data-state=\"loading\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m      - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\u001b[2m    21 × locator resolved to <section data-state=\"ready\" data-tab=\"overview\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-matter-workspace]')\nExpected: \u001b[32m\"6abbe9\u001b[7mfc\u001b[27mcb5c2b6895e269\u001b[7m8\u001b[27mb\"\u001b[39m\nReceived: \u001b[31m\"6abbe9\u001b[7mee\u001b[27mcb5c2b6895e269\u001b[7m6\u001b[27mb\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-matter-workspace]')\u001b[22m\n\u001b[2m    2 × locator resolved to <section data-tab=\"overview\" data-state=\"loading\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m      - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\u001b[2m    21 × locator resolved to <section data-state=\"ready\" data-tab=\"overview\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js:31:33",
+                    "location": {
+                      "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js",
+                      "column": 33,
+                      "line": 31
+                    },
+                    "snippet": "  29 |   await expect(dialog.locator('[aria-current=\"true\"]')).toBeDisabled();\n  30 |   await dialog.locator('.av2-matter-choice:not([disabled])').first().click();\n> 31 |   await expect(workspace(page)).toHaveAttribute('data-matter-workspace', second.id);\n     |                                 ^\n  32 |   await expect(workspace(page)).toHaveAttribute('data-state', 'ready');\n  33 |   await expect(page.getByRole('link', { name: 'Back to Matters', exact: true })).toHaveAttribute('href', '#/matters?view=active');\n  34 |   await expect(dialog).toHaveCount(0);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js",
+                        "column": 33,
+                        "line": 31
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-matter-workspace]')\nExpected: \u001b[32m\"6abbe9\u001b[7mfc\u001b[27mcb5c2b6895e269\u001b[7m8\u001b[27mb\"\u001b[39m\nReceived: \u001b[31m\"6abbe9\u001b[7mee\u001b[27mcb5c2b6895e269\u001b[7m6\u001b[27mb\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-matter-workspace]')\u001b[22m\n\u001b[2m    2 × locator resolved to <section data-tab=\"overview\" data-state=\"loading\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m      - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\u001b[2m    21 × locator resolved to <section data-state=\"ready\" data-tab=\"overview\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\n\n  29 |   await expect(dialog.locator('[aria-current=\"true\"]')).toBeDisabled();\n  30 |   await dialog.locator('.av2-matter-choice:not([disabled])').first().click();\n> 31 |   await expect(workspace(page)).toHaveAttribute('data-matter-workspace', second.id);\n     |                                 ^\n  32 |   await expect(workspace(page)).toHaveAttribute('data-state', 'ready');\n  33 |   await expect(page.getByRole('link', { name: 'Back to Matters', exact: true })).toHaveAttribute('href', '#/matters?view=active');\n  34 |   await expect(dialog).toHaveCount(0);\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js:31:33"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:40:22.942Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts/workspace-Matter-switcher--209f4-nd-recovers-failed-searches-firefox/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts/workspace-Matter-switcher--209f4-nd-recovers-failed-searches-firefox/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts/workspace-Matter-switcher--209f4-nd-recovers-failed-searches-firefox/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js",
+                    "column": 33,
+                    "line": 31
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-39ed0729e9486212c66e",
+          "file": "workspace.spec.js",
+          "line": 18,
+          "column": 1
+        },
+        {
+          "title": "Matter text renders as text and long titles remain readable with accessible section navigation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7682,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:40:40.868Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-432eeb4db8e2cc87b99c",
+          "file": "workspace.spec.js",
+          "line": 45,
+          "column": 1
+        },
+        {
+          "title": "Matter switcher preserves the inventory return and recovers failed searches",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 13263,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-matter-workspace]')\nExpected: \u001b[32m\"6abbe\u001b[7ma14\u001b[27mcb5c2b6895e269\u001b[7ma3\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"6abbe\u001b[7m9ee\u001b[27mcb5c2b6895e269\u001b[7m6b\u001b[27m\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-matter-workspace]')\u001b[22m\n\u001b[2m    2 × locator resolved to <section data-tab=\"overview\" data-state=\"loading\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m      - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\u001b[2m    21 × locator resolved to <section data-state=\"ready\" data-tab=\"overview\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-matter-workspace]')\nExpected: \u001b[32m\"6abbe\u001b[7ma14\u001b[27mcb5c2b6895e269\u001b[7ma3\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"6abbe\u001b[7m9ee\u001b[27mcb5c2b6895e269\u001b[7m6b\u001b[27m\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-matter-workspace]')\u001b[22m\n\u001b[2m    2 × locator resolved to <section data-tab=\"overview\" data-state=\"loading\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m      - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\u001b[2m    21 × locator resolved to <section data-state=\"ready\" data-tab=\"overview\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js:31:33",
+                    "location": {
+                      "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js",
+                      "column": 33,
+                      "line": 31
+                    },
+                    "snippet": "  29 |   await expect(dialog).toHaveAttribute('data-state', 'ready');\n  30 |   await expect(dialog.locator('[aria-current=\"true\"]')).toBeDisabled();\n> 31 |   await dialog.getByLabel('Search Matters', { exact: true }).fill(secondTitle);\n     |                                 ^\n  32 |   await expect(dialog).toHaveAttribute('data-state', 'ready');\n  33 |   await dialog.locator('.av2-matter-choice').filter({ hasText: secondTitle }).click();\n  34 |   await expect(workspace(page)).toHaveAttribute('data-matter-workspace', second.id);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js",
+                        "column": 33,
+                        "line": 31
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-matter-workspace]')\nExpected: \u001b[32m\"6abbe\u001b[7ma14\u001b[27mcb5c2b6895e269\u001b[7ma3\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"6abbe\u001b[7m9ee\u001b[27mcb5c2b6895e269\u001b[7m6b\u001b[27m\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-matter-workspace]')\u001b[22m\n\u001b[2m    2 × locator resolved to <section data-tab=\"overview\" data-state=\"loading\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m      - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\u001b[2m    21 × locator resolved to <section data-state=\"ready\" data-tab=\"overview\" aria-labelledby=\"av2-page-title\" class=\"av2-view av2-matter-workspace\" data-matter-workspace=\"6abbe9eecb5c2b6895e2696b\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"6abbe9eecb5c2b6895e2696b\"\u001b[22m\n\n\n  29 |   await expect(dialog).toHaveAttribute('data-state', 'ready');\n  30 |   await expect(dialog.locator('[aria-current=\"true\"]')).toBeDisabled();\n> 31 |   await dialog.getByLabel('Search Matters', { exact: true }).fill(secondTitle);\n     |                                 ^\n  32 |   await expect(dialog).toHaveAttribute('data-state', 'ready');\n  33 |   await dialog.locator('.av2-matter-choice').filter({ hasText: secondTitle }).click();\n  34 |   await expect(workspace(page)).toHaveAttribute('data-matter-workspace', second.id);\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js:31:33"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:40:50.566Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts/workspace-Matter-switcher--209f4-nd-recovers-failed-searches-webkit/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts/workspace-Matter-switcher--209f4-nd-recovers-failed-searches-webkit/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/attorney-matter-switcher-final-artifacts/workspace-Matter-switcher--209f4-nd-recovers-failed-searches-webkit/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/workspace.spec.js",
+                    "column": 33,
+                    "line": 31
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-5304e87a4b62efab5ae2",
+          "file": "workspace.spec.js",
+          "line": 18,
+          "column": 1
+        },
+        {
+          "title": "Matter text renders as text and long titles remain readable with accessible section navigation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7795,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:41:04.870Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "469843e17c99c5f3017e-4e750601f4b82d386451",
+          "file": "workspace.spec.js",
+          "line": 45,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T16:39:16.555Z",
+    "duration": 116550.777,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "6ef16ef35e01f3907605a0501c2140b1ebb7c434",
+  "observedLog": "outputs/lpc-final-backend-20261014/run-1792023939525-98490/jest.log",
+  "capturedUtc": "2026-10-15T01:27:28.184352+00:00",
+  "boundary": "Scheduling hints from completed original local suites under shared-machine contention, not hosted timing or acceptance. Include failed suite elapsed time without granting pass credit. Unknown/drifted files receive estimated weights and are still mandatory.",
+  "observations": [
+    {
+      "file": "tests/supportAssistant.test.js",
+      "durationMs": 157857,
+      "sourceSHA256": "8aca74e2b6e3043ff36ee652349b26ab1c59dcd426763d6f8bf1e3daeb88eef2",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/phase2Lifecycle.test.js",
+      "durationMs": 106559,
+      "sourceSHA256": "deece9cf9eadcbb25cdf73ae7a758f1e18e258133681d2d4d348cf4a554080bc",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/incidentRelease.test.js",
+      "durationMs": 98426,
+      "sourceSHA256": "7bb5732e24edd98e37109a66d37eda1420f0af81daebc8715aa0c4aabb14cbbf",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/caseFlowNotifications.test.js",
+      "durationMs": 16177,
+      "sourceSHA256": "0698235065418622c37e63538a4cfe5670fb8591959c3fbc2bc6fd929c24418d",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/uploadsDownloads.test.js",
+      "durationMs": 34974,
+      "sourceSHA256": "7c21d54e7045367782d91597033215608320d16077b2d80a6a7c92b02d0f6655",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/marketingPublishingPhase2.test.js",
+      "durationMs": 71937,
+      "sourceSHA256": "3eaa934dfaa0859e181bd20667715bbc63fc7d18a832fecaaa190194d464a857",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/adminWorkflows.test.js",
+      "durationMs": 6954,
+      "sourceSHA256": "2023d27d971a099d21bed5294e9deae16152469a4d1d2df3d97e8fbf23993e06",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterFileNotificationWorker.test.js",
+      "durationMs": 288202,
+      "sourceSHA256": "39b2efe5816455876e694f046c150e0a87446fb00e05240cbcd277318b249fd5",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/paymentsPayouts.test.js",
+      "durationMs": 15311,
+      "sourceSHA256": "4ad1951b11294ad1f9aa11dd9c3df6bd0a6d86ef68f81fa394e9c75b6eb43e6a",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/aiControlRoomRoutes.test.js",
+      "durationMs": 9186,
+      "sourceSHA256": "b7fae57d6a3d00021fb5e8bd6681b4f9fb242ff8f4d88a87e2074bb10a0b79a6",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/adminFlow.test.js",
+      "durationMs": 29836,
+      "sourceSHA256": "645e606e56a14de003718d709630a2770718bdeee5cffafd19dc9deca7e03d70",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/privateNoteWriteAuthorityBoundary.test.js",
+      "durationMs": 56541,
+      "sourceSHA256": "89d0b404600b38da0e1dc5ee0feb4119af195c78b5fee1d5e76614ca48fbcae9",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/engagementAgreement.test.js",
+      "durationMs": 33197,
+      "sourceSHA256": "8bc8f415b45e4fc0d280c536c83fb400ae4838db1834620a0e92ef7a46474ab7",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyWithdrawal.test.js",
+      "durationMs": 37817,
+      "sourceSHA256": "9159a69fb126b621e7afc6c0ea733bef23c71bfd8c292ed93065bff3f7957455",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/messagingNotifications.test.js",
+      "durationMs": 7174,
+      "sourceSHA256": "feda3474c4004e7738b08d2a5a688e472d0e0c0d4f7992d0c951d27c56149ef4",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/disputesRefunds.test.js",
+      "durationMs": 7187,
+      "sourceSHA256": "c0a10d7033bed0db2b3cf99ce1b5fc5cbfaba7176e5da3ef24f88f6dab3708ce",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/directorPortal.test.js",
+      "durationMs": 8395,
+      "sourceSHA256": "98a517dbd70d3edf1d90ecb2801d12d5c0b028b59c1b343e6592778b1f9ed561",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/calendarManagedAuthorityBoundary.test.js",
+      "durationMs": 94928,
+      "sourceSHA256": "44afa00cf872aaf3580715e1636971a24da10644cb87493cae475ce1187aa703",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/accountDeactivationAtomicity.test.js",
+      "durationMs": 74891,
+      "sourceSHA256": "d8bb06e40ec6e2fa3d0704165e673fc574e9c8e4bb3a2c61007389c6fc1b44d1",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/adminFinancialAgreement.test.js",
+      "durationMs": 89757,
+      "sourceSHA256": "043c302d045e1533e89509c7d9f783f97bf955ad12d83e4e857a293210921488",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyCompletion.test.js",
+      "durationMs": 62389,
+      "sourceSHA256": "9191328e5e6db982f0993a9b4f95ade5c88445e6d5fe916cf46c6e95f0f673c7",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyFinancialHistory.test.js",
+      "durationMs": 61722,
+      "sourceSHA256": "500a51cb645be4a761868eda221914bfd5e809076f56eef573f4b969c8943c78",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterPostings.test.js",
+      "durationMs": 48958,
+      "sourceSHA256": "e23718c2e2765149a61910459f4a35e6213850b8c838a32dd52a5bdd552ed1f8",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/incidentAdminRoutes.test.js",
+      "durationMs": 23080,
+      "sourceSHA256": "712039d82444194163d67b66b9918dfddad169f04155746e01b660d0595854c6",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterFileWrites.test.js",
+      "durationMs": 49728,
+      "sourceSHA256": "7cd1f7890bfc10f60351f0899ca7a38697e67ab404483886d2d33acbe5bee7ea",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterHiringReview.test.js",
+      "durationMs": 51797,
+      "sourceSHA256": "ccd6bf601062e422df4dc24e6b2a45a49c3987972f4e969feedccb23edb423c8",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyFunding.test.js",
+      "durationMs": 68473,
+      "sourceSHA256": "9f49a99715a4044bd729fd3d59bd99f34dfb34cf454dd9390a7fe4a06e250cce",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/autonomyUpgradeSystem.test.js",
+      "durationMs": 21372,
+      "sourceSHA256": "e699131d68e0ab551724ba0a3fd543106a06e9075816e4057dc651e6b60fe5fc",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/marketingPublishingPhase1.test.js",
+      "durationMs": 64114,
+      "sourceSHA256": "e955e0d532e002729f1a236577ea761e5b34ac651185ac238cd9a0ee2471d1ba",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/jobEscrow.test.js",
+      "durationMs": 19088,
+      "sourceSHA256": "077dc300826170cbbd5291f093151a2d443cf76662923a6c26262988cb492858",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/adminCommunications.test.js",
+      "durationMs": 110550,
+      "sourceSHA256": "5e37bbc1ef58686c9df6c72b97c68253d1576a630461117aaa3a7e01900cf67a",
+      "observedStatus": "FAIL"
+    },
+    {
+      "file": "tests/attorneyReceipts.test.js",
+      "durationMs": 54083,
+      "sourceSHA256": "4b3bf7fdb6333bbef06fca9d55bf38ce95f3ff1f46c810e257cf1b535f49edd5",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/chargebackLifecycle.test.js",
+      "durationMs": 15474,
+      "sourceSHA256": "676d8a32f4b24e5c4ec401d3f48e5df9e44f36bc9a06fad26b1ed699a5ea36b2",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/auth.test.js",
+      "durationMs": 10436,
+      "sourceSHA256": "7714a19748ee60e1ebb1f99999a71af792df7f59885530d12cd34c07aba139c2",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/paralegalHomeModel.test.js",
+      "durationMs": 6133,
+      "sourceSHA256": "88f8c5f495c59318875b14140d4ae5e80c04ae96e2c14a6418cc6a75b54d1644",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/historicalRecommendationMatrix.test.js",
+      "durationMs": 15057,
+      "sourceSHA256": "e6b891ede8cbabe0cf3eb4ce1c22263f33ec56d45404e16ab9e662e1477dd5ac",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/webhookHandling.test.js",
+      "durationMs": 5916,
+      "sourceSHA256": "7c176eeb219c59022a643e874f9a646e67af33f397b0b2e1184022c0ca54c0b9",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneySupportDatabaseIntegration.test.js",
+      "durationMs": 7386,
+      "sourceSHA256": "78307222a73407f6307f9a1197cb94371325f1eb700b45d6695c1db083d19856",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyMatterWorkAuthorityBoundary.test.js",
+      "durationMs": 20086,
+      "sourceSHA256": "c2af519b74018de1f8118ec71349b95b7effeffe82f027bec6f1eea7e9d8dc95",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyMatterInventory.test.js",
+      "durationMs": 129907,
+      "sourceSHA256": "12b08b1e1c188feae7464bde63c33ea92fc63cdf398a90c730f916b8f9027986",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/applicationDecisions.test.js",
+      "durationMs": 30857,
+      "sourceSHA256": "082662cf3cb8bc5755680531c55720f32122b10baec8e0c44bbd9db7072dcb4b",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyFundingEvents.test.js",
+      "durationMs": 25234,
+      "sourceSHA256": "c2ae0592215e62d2e1cdbe5857bb6dac58fe448c6bcf9a9ab45977e1a8ed2333",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/directorCommissionEvidence.test.js",
+      "durationMs": 39106,
+      "sourceSHA256": "98ca1217227b310feabe35b46f236b4f45024e78cc90625a478f41e4125426a6",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/privateTaskWriteAuthorityBoundary.test.js",
+      "durationMs": 21967,
+      "sourceSHA256": "ab5ccc1ffdebcf5053ff481995ed8906a852ab7f1adf071d05becd0297c33d2a",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/lpcPhase2.test.js",
+      "durationMs": 25067,
+      "sourceSHA256": "c52a7f8cbe2387f7c9acefec5a97f1c1520d4a61dfd19be5cbb9fa45aef79451",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterDeletionConsistency.test.js",
+      "durationMs": 40569,
+      "sourceSHA256": "72c0f08ae3a3dd75281acfbe23312e621c6d27c472a5f8ea8d207514c89dde91",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/directorCommissionPayments.test.js",
+      "durationMs": 75690,
+      "sourceSHA256": "7f73192bc01771ceb971929a083eeb873da451b26bdb2ca9652eb39c05d61d29",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/notificationPagination.test.js",
+      "durationMs": 29803,
+      "sourceSHA256": "ad38508c8e25ffd5853dbf9a9bce2ffd72ab0076d87749f4f6bc09554cbc69bc",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/authenticatedSearch.test.js",
+      "durationMs": 6278,
+      "sourceSHA256": "632cf5240921eb3551e77a6d1d2ebb798ea196f2a69823956f4ef48449d4a8e6",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/accountWriteConcurrency.test.js",
+      "durationMs": 8543,
+      "sourceSHA256": "774ffca89ea8fe33287e4a2aa4a7af4ee9978f9d8f3dd0d96c847dbfb9e3354a",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/genericEventManagedAuthority.test.js",
+      "durationMs": 34463,
+      "sourceSHA256": "f3451d671b12a7e176d593ba583490b47e05c1871f39a588e61824c8753eba19",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/phase3AccessLoss.test.js",
+      "durationMs": 10394,
+      "sourceSHA256": "f4bae7ea94c85b10510e4f7424b85c84940cdb410eadbf09ff109a9ec780ae2f",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyApplicationRaces.test.js",
+      "durationMs": 15327,
+      "sourceSHA256": "7758245140eba2e648a3bd87908320fbd81afc480d5fa575104e71913d695fb6",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterDownloads.test.js",
+      "durationMs": 18845,
+      "sourceSHA256": "7f7119be7d3c26741e3f553381ed984319f76cb82af5566f100a6402693dafe0",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyPaymentSummaryAgreement.test.js",
+      "durationMs": 17442,
+      "sourceSHA256": "4c0f3c70824be3c4f1b5a12a30ed22709c448739a442286dda643a1910eb9350",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/accountSecurityGuards.test.js",
+      "durationMs": 16743,
+      "sourceSHA256": "75f701790f3ec3778612b3d7b23a707aff4e5c881bbcc36fd19852dc6d61b590",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/archiveAuthorityBoundary.test.js",
+      "durationMs": 22569,
+      "sourceSHA256": "4c11087164b7f8c568a4544dc599524f17444c399becfb8ffc35d5453325b243",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/authFactorConcurrency.test.js",
+      "durationMs": 43831,
+      "sourceSHA256": "bce5555a1c328d45f88a26be8ad3fbb0edbbecb9bd9abe0550fcdb2dc7bc6a51",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/postingNotifications.test.js",
+      "durationMs": 25251,
+      "sourceSHA256": "c2d6e03ecc419e67b0c490c1f4e22da4f04ad19eefb9cce7a8aba56f5e555093",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyDisputes.test.js",
+      "durationMs": 40668,
+      "sourceSHA256": "92acb08b1d47ca40b2cdbefddc388aee8eb59c6eabc7c8661623350b925c1b12",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/accountDeactivation.test.js",
+      "durationMs": 26159,
+      "sourceSHA256": "661766a8c081cf6dd103c7944c4200a8a833c08bbc2ef9d3e93bee79bd694264",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/preEngagementNotifications.test.js",
+      "durationMs": 44903,
+      "sourceSHA256": "a389bcb71f1986ee54d2c14aa5bebb687a34de8114349ce98ce9c0bc7954573c",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/applicationIdentityConvergence.test.js",
+      "durationMs": 86209,
+      "sourceSHA256": "025b3af40130565d506f7dd7a214801e9917e394745aacf03385d0cfb5b9653e",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyCompletionRevisionSummary.test.js",
+      "durationMs": 18641,
+      "sourceSHA256": "93229a31ceff3ddf891262cbe5e20697aa4ff5fae3e447d6edb926443f90895d",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/paralegalFinancialViews.test.js",
+      "durationMs": 39606,
+      "sourceSHA256": "dc4c22b60698ba790c5866691fee9e8289597bbab750e8886aaaeb968e6aa377",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/frontendHygienePolicy.test.js",
+      "durationMs": 45408,
+      "sourceSHA256": "729e96c948e594ebfcf43f1b962d4e327b07180e893c191f098a9935caf45922",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/applicationWithdrawalNotifications.test.js",
+      "durationMs": 44740,
+      "sourceSHA256": "0e4fdc502630d1f36362a645c98b492f1b2205f26554c2817a8b261b17f69450",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyRefundRetention.test.js",
+      "durationMs": 18021,
+      "sourceSHA256": "38be69d2409eb15e4ef2983e9abee94c01aa89be45472f5b9a25d2cf7f4823aa",
+      "observedStatus": "FAIL"
+    },
+    {
+      "file": "tests/applicationResumes.test.js",
+      "durationMs": 37303,
+      "sourceSHA256": "89829fefbd6eb09f249710f2b8ed5752889bf43efff16937c070e9b19742bf52",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/earlierApplicationWithdrawal.test.js",
+      "durationMs": 36598,
+      "sourceSHA256": "914f9a94050d2e2a8ac56cf8978eae5ac1cced4fbd921e4199551cdd64470cb8",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/ccoAutonomyPhase2.test.js",
+      "durationMs": 18586,
+      "sourceSHA256": "4021b3761a122c7f03f9a8454c44cd4c424979df441b2adf1ce191496e9a3027",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyReceiptHistory.test.js",
+      "durationMs": 19381,
+      "sourceSHA256": "f920d9e0b4cccad9434877cb4ef6482bc6586759788450eefdee50c11c41c570",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/terminationReviewNotificationAtomicity.test.js",
+      "durationMs": 29677,
+      "sourceSHA256": "9269e2de2d6e242df5fcf791890f67da9c92b265931c6823305b16e5ae65a822",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyMatterUploads.test.js",
+      "durationMs": 74257,
+      "sourceSHA256": "e7ffd20bf1027327fad26521df55cf4aa0800ce7c1fc5c32c64a5318d3c3cac0",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/adminInbox.test.js",
+      "durationMs": 64268,
+      "sourceSHA256": "40dd48d9b26e976a488c8d7b6fad31fe27ad2e0e8f9ed4526b3bd715a62b0b35",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterExportContents.test.js",
+      "durationMs": 52651,
+      "sourceSHA256": "705ecc22bb3f14a3bbf3fda7705bc746c7aba540f81a78cb4e2d69b36b0771a0",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyTransferEvents.test.js",
+      "durationMs": 32398,
+      "sourceSHA256": "b89484759da5b9c487a0c13f05884f9a3b3e4f92b6efdf83fc45d69175b7a13a",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/paralegalV2SubmissionLifecycle.test.js",
+      "durationMs": 37090,
+      "sourceSHA256": "f17c709c8bbc5293712b033b7fe0f0ebbed7fd29f9ff88d66c5f5cd6912afd2d",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/authenticatedSearchCompletion.test.js",
+      "durationMs": 30679,
+      "sourceSHA256": "255750e146b813a6c0aa73609d2b7d7b68449761f0017b8d199ccbb6355d8786",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyRefundEvents.test.js",
+      "durationMs": 25501,
+      "sourceSHA256": "4c39a21d0c82658ed4da57cc7bbe33593dd5326635812e31c79108a9e7eddca1",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/openMatterDiscovery.test.js",
+      "durationMs": 31679,
+      "sourceSHA256": "a519aa79d6fb70737b6bf9417df2613e7b3a1da3160f1be17e56cedeaa84fc28",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/attorneyMatterFileRemoval.test.js",
+      "durationMs": 22174,
+      "sourceSHA256": "f3465139009a5ed5a40157f09d1eab86af4e8124aa2665a0541d0a8ecf016fa1",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/disputeResolutionNotificationAtomicity.test.js",
+      "durationMs": 48036,
+      "sourceSHA256": "fa03d9c58808b6839998c214a20ee386fbb350f43954ebb4c32c98db0a1dd7cd",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterArchive.test.js",
+      "durationMs": 14963,
+      "sourceSHA256": "13d19335fdb013a357432fccb77d6e7997f0ff6edfab3172b9be54f41d657269",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/matterInvitationActions.test.js",
+      "durationMs": 8573,
+      "sourceSHA256": "f3ba65aef6d9a7060c283e12a350d0ee8f761047d9d32802d3d8443efdeb3e41",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/preEngagementReview.test.js",
+      "durationMs": 8395,
+      "sourceSHA256": "c2eb7c33949d1487cae85d14057144466d286bd43c03b5349ad59807b5a5ce47",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/legacyApplicationAgreement.test.js",
+      "durationMs": 21537,
+      "sourceSHA256": "3f51a285d4a9986473e63ab933779c2524fbfc0a28a2dedb7f5432ed27e2c855",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/financialRoleAgreement.test.js",
+      "durationMs": 11230,
+      "sourceSHA256": "d40793509a60baa54df0ec79804bfb175d0390fb5b069c2401eb9c20b304daf6",
+      "observedStatus": "PASS"
+    },
+    {
+      "file": "tests/supportAdmin.test.js",
+      "durationMs": 7427,
+      "sourceSHA256": "25bc197c1157fd11d8f2168713a84d41472e6e047401ceda33f42d5e70815acc",
+      "observedStatus": "PASS"
+    }
+  ]
+}

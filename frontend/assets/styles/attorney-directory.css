@@ -1,0 +1,87 @@
+/* One directory composition for Browse and Saved. */
+body.av2 .av2-directory > form.av2-directory-controls { display:grid; grid-template-columns:minmax(0,1fr) auto 44px 44px; align-items:end; gap:8px; }
+body.av2 .av2-directory-controls > label { min-width:0; margin:0; }
+body.av2 .av2-directory-controls .lpc-directory-sort-control,
+body.av2 .av2-directory-controls > .lpc-directory-icon { flex:0 0 44px; }
+body.av2 .av2-directory > .lpc-directory-filter-chips { margin-top:12px; }
+body.av2 .av2-directory { max-width:1200px; container-type:inline-size; }
+body.av2 .av2-directory > .av2-view-header { margin:0 0 18px; padding:0; }
+body.av2 .av2-main .av2-directory > .av2-view-header h1 { margin:0; font:var(--av2-page-title); letter-spacing:-.025em; }
+body.av2 .av2-directory .av2-directory-tabs { display:flex; flex-wrap:wrap; gap:24px; width:100%; padding:0; border:0; border-bottom:1px solid var(--av2-line); border-radius:0; background:transparent; }
+body.av2 .av2-directory .av2-directory-tabs a { flex:0 1 auto; padding:8px 0 12px; min-height:40px; border:0; border-bottom:2px solid transparent; border-radius:0; margin-bottom:-1px; background:transparent; font-size:.8125rem; font-weight:400; color:var(--av2-muted); box-shadow:none; }
+body.av2 .av2-directory .av2-directory-tabs a[aria-current=page] { border-bottom-color:var(--av2-accent); color:var(--av2-accent); font-weight:500; }
+body.av2 .av2-directory > .av2-card { margin-top:20px; }
+body.av2 .av2-directory .av2-candidate-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr)); gap:18px; margin:0; }
+body.av2 .av2-directory .lpc-saved-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:0; margin:0; }
+body.av2 .av2-directory .lpc-saved-paralegals { max-width:480px; margin:12px 0 0; color:var(--av2-ink); }
+body.av2 .av2-directory .av2-saved-count { display:inline-block; margin-left:6px; font-size:.75rem; font-weight:400; color:var(--av2-muted); }
+body.av2 .av2-directory .lpc-saved-paralegals > [role=status] { margin:0 0 8px; color:var(--av2-muted); font-size:.75rem; }
+body.av2 .av2-directory .lpc-saved-card { border:0; border-bottom:1px solid var(--av2-line); border-radius:0; padding:12px 0; background:transparent; box-shadow:none; }
+/* Match the public Browse directory's compact centered cards. */
+body.av2 .av2-directory .av2-candidate-card { display:flex; flex-direction:column; align-items:center; min-width:0; padding:20px 18px 18px; border:1px solid var(--av2-line); border-radius:14px; background:var(--av2-bg); box-shadow:none; text-align:center; }
+body.av2 .av2-directory .av2-candidate-identity { display:flex; flex-direction:column; gap:12px; width:100%; min-width:0; }
+body.av2 .av2-directory .av2-candidate-heading { width:100%; min-width:0; }
+body.av2 .av2-directory .av2-candidate-photo { display:block; width:64px; height:64px; flex:none; }
+body.av2 .av2-directory .av2-candidate-identity img { position:static; display:block; width:64px; height:64px; object-fit:cover; border-radius:50%; }
+body.av2 .av2-directory .av2-candidate-card h2 { display:flex; align-items:baseline; justify-content:center; gap:4px; margin:0; font:400 1.5rem/1.15 "Cormorant Garamond",serif; overflow-wrap:anywhere; }
+body.av2 .av2-directory .av2-candidate-card h2 a { min-width:0; }
+body.av2 .av2-directory .lpc-saved-card h2 { margin:0 0 3px; font-size:.9375rem; line-height:1.5; font-weight:500; }
+body.av2 .av2-directory .lpc-saved-card h2 a { min-height:24px; padding:0; }
+body.av2 .av2-directory .av2-candidate-card h2 a,body.av2 .av2-directory .lpc-saved-card h2 a { font:inherit; color:var(--av2-ink); text-decoration:none; }
+body.av2 .av2-directory h2 a:hover { color:var(--av2-accent); text-decoration:underline; text-underline-offset:3px; }
+body.av2 .av2-directory .av2-candidate-card p { font-size:.875rem; line-height:1.6; color:var(--av2-muted); margin:0; overflow-wrap:anywhere; }
+body.av2 .av2-directory .av2-candidate-card p:empty { display:none; }
+body.av2 .av2-directory .av2-candidate-card .av2-candidate-location { margin:5px 0 0; font-size:.75rem; line-height:1.4; }
+body.av2 .av2-directory .av2-candidate-card .av2-candidate-practice { margin:12px 0 8px; }
+body.av2 .av2-directory .av2-candidate-card .av2-candidate-bio { margin-bottom:12px; font-weight:300; white-space:normal; }
+body.av2 .av2-directory .av2-candidate-card .av2-candidate-experience { margin-top:auto; font-size:.75rem; }
+body.av2 .av2-directory .lpc-saved-card p { font-size:.8125rem; line-height:1.5; color:var(--av2-muted); margin:3px 0; }
+body.av2 .av2-directory .lpc-saved-card { display:grid; grid-template-columns:32px minmax(0,1fr) 40px; gap:0 12px; align-items:center; }
+body.av2 .av2-directory .lpc-saved-avatar { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--av2-soft); color:var(--av2-accent); font-size:.8125rem; }
+body.av2 .av2-directory .lpc-saved-info { min-width:0; }
+body.av2 .av2-directory .lpc-saved-remove-icon { display:grid; place-items:center; width:40px; height:40px; padding:8px; border:0; background:transparent; color:var(--av2-accent); border-radius:6px; }
+body.av2 .av2-directory .lpc-saved-remove-icon svg { width:22px; height:22px; flex:none; fill:currentColor; stroke:currentColor; }
+body.av2 .av2-directory .lpc-saved-remove-icon:hover { background:var(--av2-soft); }
+body.av2 .av2-directory .lpc-saved-card > [role=status] { grid-column:2 / -1; }
+body.av2 .av2-directory .lpc-saved-card > [role=status]:empty { display:none; }
+@media(max-width:480px) {
+ body.av2 .av2-directory .lpc-saved-card { gap:0 12px; }
+ body.av2 .av2-directory .av2-directory-tabs { gap:20px; }
+}
+body.av2 .av2-directory .av2-filter-disclosure > summary { white-space:nowrap; }
+body.av2 .av2-directory .av2-filter-disclosure { flex-shrink:0; }
+body.av2 .av2-directory > form.av2-card { padding:0; }
+body.av2 .av2-directory form.av2-compact-filters { gap:10px; margin-top:20px; }
+body.av2 .av2-directory .av2-search-field { margin-right:auto; }
+body.av2 .av2-directory .av2-directory-sort,body.av2 .av2-directory .av2-filter-disclosure > summary { display:flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; min-width:44px; height:44px; min-height:44px; margin:0; padding:0; border:0; border-radius:50%; background:transparent; color:var(--av2-ink); cursor:pointer; }
+body.av2 .av2-directory .av2-directory-sort { position:relative; }
+body.av2 .av2-directory .av2-directory-sort > span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+body.av2 .av2-directory .av2-directory-sort select { position:absolute; inset:0; width:100%; height:100%; min-height:44px; margin:0; opacity:0; cursor:pointer; }
+body.av2 .av2-directory :is(.av2-directory-sort,.av2-filter-disclosure > summary) svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+body.av2 .av2-directory .av2-filter-disclosure > summary::after { display:none; }
+body.av2 .av2-directory :is(.av2-directory-sort,.av2-filter-disclosure > summary):hover,body.av2 .av2-directory .av2-filter-disclosure[open] > summary { background:var(--av2-soft); }
+body.av2 .av2-directory .av2-directory-sort:focus-within { outline:2px solid var(--av2-accent); outline-offset:3px; }
+body.av2 .av2-directory .av2-filter-panel { max-height:min(480px,calc(100dvh - 240px)); overflow-y:auto; overscroll-behavior:contain; }
+/* Blue is availability, without the old green glow or pulse. */
+body.av2 :is(.av2-directory,.av2-profile-resume) .lpc-availability-dot.is-available::before { background:var(--av2-accent); box-shadow:none; }
+body.av2 :is(.av2-directory,.av2-profile-resume) .lpc-availability-dot.is-available::after { display:none; }
+body.av2 .av2-directory .av2-candidate-card .lpc-availability-dot { width:14px; height:18px; margin-left:4px; }
+
+body.av2 .av2-directory .lpc-saved-avatar img { display:block; width:32px; height:32px; object-fit:cover; border-radius:50%; }
+@media(max-width:760px) {
+ body.av2 .av2-directory .lpc-saved-grid { grid-template-columns:minmax(0,1fr); }
+}
+@container(min-width:601px) {
+ body.av2 .av2-directory .av2-candidate-practice,body.av2 .av2-directory .av2-candidate-bio { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+}
+@container(max-width:600px) {
+ body.av2 .av2-directory .av2-candidate-grid { grid-template-columns:minmax(0,1fr); gap:0; }
+ body.av2 .av2-directory .av2-candidate-card { align-items:stretch; padding:24px 0; border:0; border-bottom:1px solid var(--av2-line); border-radius:0; text-align:left; }
+ body.av2 .av2-directory .av2-candidate-identity { display:grid; grid-template-columns:60px minmax(0,1fr); align-items:center; gap:16px; margin-bottom:14px; }
+ body.av2 .av2-directory .av2-candidate-photo,body.av2 .av2-directory .av2-candidate-identity img { width:60px; height:60px; }
+ body.av2 .av2-directory .av2-candidate-card h2 { justify-content:flex-start; font-size:1.625rem; line-height:1.12; }
+ body.av2 .av2-directory .av2-candidate-card .av2-candidate-location { margin-top:6px; font-size:.8125rem; }
+ body.av2 .av2-directory .av2-candidate-card .av2-candidate-practice { margin:2px 0 14px; }
+ body.av2 .av2-directory .av2-candidate-card .av2-candidate-bio { margin:0 0 14px; }
+ body.av2 .av2-directory .av2-search-field { flex:1; min-width:0; width:auto; }
+}

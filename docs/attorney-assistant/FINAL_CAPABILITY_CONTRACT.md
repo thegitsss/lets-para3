@@ -30,7 +30,7 @@ All 32 families remain in routing, state, failure, adversarial, multi-turn, data
 | A08 Invitations | Implemented | Invitation state and shared readiness blockers |
 | A09 Pre-engagement | Implemented | Selected requirements, state, and next actor from owned matter data/policy |
 | A10 Hiring | Implemented | Shared-policy eligibility and all represented blockers |
-| A11 Posting | Implemented | Draft/publish requirements and payment prerequisite from executable policy |
+| A11 Posting | Implemented | Draft/publish requirements and the no-payment-method publication rule from executable policy |
 | A12 Funding | Implemented | Funding timing, state, and failures without conflating absence and outage |
 | A13 Payment method | Implemented | Saved/absent/unavailable processor state without credential exposure |
 | A14 Billing summary | Implemented | Complete authorized billing aggregates and history readiness |

@@ -20,16 +20,18 @@ export function button(text, action, className = "av2-secondary") {
 }
 
 export function recoveryButton(label, action, className = "av2-secondary") {
-  const control = button(label.replace(/^Refresh\b/, "Retry"), action, className);
+  const control = button(label.replace(/^Refresh\b/, "Retry"), function (event) {
+    this.restoreRecoveryFocus = true;
+    return action.call(this, event);
+  }, className);
   control.dataset.retryLabel = control.textContent;
   control.hidden = true;
-  control.addEventListener("click", () => { control.restoreRecoveryFocus = true; });
   return control;
 }
 
 // Recovery is contextual: successful reads do not leave a manual reload task
 // behind. Keep an explicit readback for uncertain actions, without replaying them.
-export function setRecovery(control, boundary, { pending = false, label = "Check status" } = {}) {
+export function setRecovery(control, boundary, { pending = false, label = "Check status", recoveryFocusTarget } = {}) {
   const failed = boundary.dataset.state === "error";
   const needed = failed || pending;
   const hadFocus = document.activeElement === control || control.restoreRecoveryFocus && [document.body, document.documentElement].includes(document.activeElement);
@@ -41,7 +43,14 @@ export function setRecovery(control, boundary, { pending = false, label = "Check
   control.hidden = !needed;
   if (!control.disabled || !needed) control.restoreRecoveryFocus = false;
   if (hadFocus && !needed) {
-    const target = boundary.querySelector("h1, h2, h3, [role='status']") || boundary;
+    let contextualTarget;
+    if (typeof recoveryFocusTarget === "function") {
+      try {
+        const candidate = recoveryFocusTarget();
+        if (candidate?.isConnected && candidate.getClientRects().length) contextualTarget = candidate;
+      } catch { /* Optional presentation targets cannot interrupt recovery. */ }
+    }
+    const target = contextualTarget || boundary.querySelector("h1, h2, h3, [role='status']") || boundary;
     target.setAttribute("tabindex", "-1");
     target.focus({ preventScroll: true });
   } else if (hadFocus && needed && !control.disabled) {
@@ -60,7 +69,7 @@ export function page(title, description) {
 
 // Each source has its own loading/failure boundary. A failed refresh removes old
 // values; neither failed requests nor malformed payloads become fabricated zeroes.
-export function region(title, { signal, load, render, key = title, showHeading = true } = {}) {
+export function region(title, { signal, load, render, key = title, showHeading = true, recoveryFocusTarget } = {}) {
   const body = node("div", { className: "av2-region-body" });
   const status = node("p", { className: "av2-muted", role: "status" });
   const refresh = recoveryButton("Retry", () => void update(), "av2-refresh");
@@ -109,7 +118,7 @@ export function region(title, { signal, load, render, key = title, showHeading =
       if (!signal.aborted && ticket === generation) {
         refresh.disabled = false;
         body.setAttribute("aria-busy", "false");
-        setRecovery(refresh, section);
+        setRecovery(refresh, section, { recoveryFocusTarget });
         if (focusAfterRefresh && !focusAfterRefresh.matches('a, button, input, select, textarea')) focusAfterRefresh.tabIndex = -1;
         focusAfterRefresh?.focus({ preventScroll: true });
       }

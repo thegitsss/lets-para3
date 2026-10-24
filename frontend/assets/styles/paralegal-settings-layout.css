@@ -1,0 +1,128 @@
+/* Original top-level Settings layout; grouped controls stay scoped below it. */
+:root body.lpc-v2 .v2-settings { display: block; width: 100%; max-width: 1120px; margin: 0; }
+:root body.lpc-v2 .v2-settings > .v2-settings-header { display: block; position: static; min-width: 0; margin: 0 0 28px; padding: 0; border: 0; border-bottom: 1px solid var(--v2-line); background: transparent; }
+:root body.lpc-v2 .v2-settings > .v2-settings-header h1 { color: var(--v2-ink); font: 400 calc(28 * var(--lpc-reading-unit, 1px))/calc(36 * var(--lpc-reading-unit, 1px)) var(--v2-font-sans); font-weight: 400 !important; margin: 0 0 14px; }
+:root body.lpc-v2 .v2-settings .v2-settings-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; }
+:root body.lpc-v2 .v2-settings .v2-settings-tabs { display: flex; flex-direction: row; align-items: stretch; gap: 12px; margin: 0; padding: 0; border: 0; }
+:root body.lpc-v2 .v2-settings .v2-settings-tab { display: flex; align-items: center; min-height: 44px; padding: 10px; margin: 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font: 400 calc(14 * var(--lpc-reading-unit, 1px))/calc(22 * var(--lpc-reading-unit, 1px)) var(--v2-font-sans); font-weight: 400 !important; color: var(--v2-ink); background: transparent; text-decoration: none; white-space: nowrap; }
+:root body.lpc-v2 .v2-settings .v2-settings-tab::after { display: none; }
+:root body.lpc-v2 .v2-settings .v2-settings-tab:hover { color: var(--v2-blue); background: transparent; }
+:root body.lpc-v2 .v2-settings .v2-settings-tab[aria-selected=true] { color: var(--v2-blue); border-bottom-color: var(--v2-blue); background: transparent; }
+:root body.lpc-v2 .v2-settings .v2-settings-tab:focus-visible { outline: 2px solid var(--v2-blue); outline-offset: -2px; border-radius: 2px; }
+:root body.lpc-v2 .v2-settings .v2-settings-header-feedback { margin: 0; flex: 0 0 auto; }
+:root body.lpc-v2 .v2-settings .v2-settings-panel { width: 100%; min-width: 0; max-width: 720px; margin: 0; padding: 0 0 48px; }
+:root body.lpc-v2 .v2-settings > .v2-profile-approved { max-width: none; }
+
+/* Clear section headings and related rows in one restrained group. */
+:root body.lpc-v2 .v2-settings #v2-settings-preferences:not([hidden]) { display: block; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences > .v2-settings-card { display: block; border: 0; border-radius: 0; background: transparent; box-shadow: none; margin: 0 0 30px; padding: 0; }
+:root body.lpc-v2 .v2-settings :is(#v2-settings-preferences,#v2-settings-security) .v2-settings-section-heading { display: block; margin: 0 0 12px; padding: 0; }
+:root body.lpc-v2 .v2-settings :is(#v2-settings-preferences,#v2-settings-security) .v2-settings-section-heading h2,
+:root body.lpc-v2 .v2-settings .pv2-security-section > h2,
+:root body.lpc-v2 .v2-settings :is(.pv2-blocked-header,.pv2-closure-header) > h2 { color: var(--v2-ink); font-size: calc(15 * var(--lpc-reading-unit, 1px)); line-height: calc(22 * var(--lpc-reading-unit, 1px)); font-weight: 500; margin: 0; }
+:root body.lpc-v2 .v2-settings :is(#v2-settings-preferences,#v2-settings-security) .v2-settings-section-heading p { font-size: calc(13 * var(--lpc-reading-unit, 1px)); line-height: calc(20 * var(--lpc-reading-unit, 1px)); color: var(--v2-muted); margin: 6px 0 0; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences > .v2-settings-card > .v2-settings-card-body { display: block; min-width: 0; margin: 0; padding: 0; }
+:root body.lpc-v2 .v2-settings .lpc-appearance-settings,
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channels,
+:root body.lpc-v2 .v2-settings :is(.v2-settings-card--visibility,.lpc-settings-help) > .v2-settings-card-body { border: 1px solid var(--v2-line); border-radius: 7px; background: var(--v2-white); }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-preference-row { display: flex; align-items: center; justify-content: space-between; min-width: 0; min-height: 48px; max-width: none; gap: 20px; padding: 12px 16px; margin: 0; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-preference-row strong { font-size: calc(14 * var(--lpc-reading-unit, 1px)); line-height: calc(22 * var(--lpc-reading-unit, 1px)); font-weight: 400; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-preference-row p { font-size: calc(12 * var(--lpc-reading-unit, 1px)); line-height: calc(19 * var(--lpc-reading-unit, 1px)); margin: 4px 0 0; }
+
+/* Compact appearance rows retain the approved Auto mode and text-size slider. */
+:root body.lpc-v2 .v2-settings .lpc-appearance-settings { display: block; }
+/* Appearance thumbnails follow the user's Light / Dark / Auto reference. */
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-preference-block { display: block; margin: 0; padding: 18px 16px 16px; border: 0; border-bottom: 1px solid var(--v2-line); }
+:root body.lpc-v2 .v2-settings .lpc-reading-size-heading { font-size: calc(14 * var(--lpc-reading-unit, 1px)); line-height: calc(22 * var(--lpc-reading-unit, 1px)); font-weight: 400; margin: 0; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; margin: 0; width: 100%; max-width: 372px; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme { display: flex; flex-direction: column; align-items: stretch; justify-content: start; min-width: 0; min-height: 0; gap: 8px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--v2-muted); box-shadow: none; text-align: center; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme-swatch { display: block; width: 100%; height: auto; aspect-ratio: 1.6; flex: none; border: 1px solid var(--v2-line); border-radius: 6px; background: transparent; overflow: hidden; }
+:root body.lpc-v2 .v2-settings .v2-settings-theme-swatch img { display: block; width: 100%; height: 100%; object-fit: cover; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme[aria-checked=true] { color: var(--v2-ink); background: transparent; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme[aria-checked=true] .v2-settings-theme-swatch { outline: 3px solid var(--v2-blue); outline-offset: 2px; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme:focus-visible { outline: none; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme:focus-visible .v2-settings-theme-swatch { outline: 2px solid var(--v2-blue); outline-offset: 5px; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme:hover { color: var(--v2-ink); background: transparent; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme strong { font-size: calc(13 * var(--lpc-reading-unit, 1px)); line-height: calc(20 * var(--lpc-reading-unit, 1px)); font-weight: 400; }
+:root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-theme[aria-checked=true] strong { font-weight: 600; }
+:root body.lpc-v2 .v2-settings .lpc-reading-size { display: grid; grid-template-columns: minmax(0,1fr) minmax(180px,260px); align-items: center; gap: 24px; max-width: none; padding: 12px 16px 8px; margin: 0; }
+:root body.lpc-v2 .v2-settings .lpc-reading-size-track { gap: 12px; min-width: 0; }
+:root body.lpc-v2 .v2-settings .lpc-reading-size-large { font-size: calc(23 * var(--lpc-reading-unit, 1px)); }
+
+/* Native disclosures match Linear's notification-channel pattern. */
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel { margin: 0; padding: 0; }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel + .lpc-settings-notification-channel { border-top: 1px solid var(--v2-line); }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel > summary { display: grid; grid-template-columns: 28px minmax(0,1fr) auto 16px; align-items: center; gap: 12px; padding: 12px 16px; min-height: 56px; cursor: pointer; list-style: none; }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel > summary::-webkit-details-marker { display: none; }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel > summary:hover { background: var(--v2-soft); }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel > summary:focus-visible { outline: 2px solid var(--v2-blue); outline-offset: -3px; border-radius: 5px; }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel > summary > strong { font-size: calc(14 * var(--lpc-reading-unit, 1px)); font-weight: 400; }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-icon { display: grid; place-items: center; color: var(--v2-muted); }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-status { display: inline-flex; align-items: center; gap: 8px; color: var(--v2-muted); font-size: calc(12 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-status::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--v2-muted); }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-status[data-enabled=true]::after { background: #23835e; }
+:root.theme-dark body.lpc-v2 .v2-settings .lpc-settings-channel-status[data-enabled=true]::after { background: #6dcc9d; }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-chevron { color: var(--v2-muted); }
+:root body.lpc-v2 .v2-settings .lpc-settings-notification-channel[open] .lpc-settings-channel-chevron { transform: rotate(90deg); }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-controls { margin: 0 16px 10px 56px; border-top: 1px solid var(--v2-line); }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .lpc-settings-channel-controls .v2-settings-preference-row { padding: 10px 0; min-height: 44px; }
+:root body.lpc-v2 .v2-settings .lpc-settings-channel-controls .v2-settings-preference-row + .v2-settings-preference-row { border-top: 1px solid var(--v2-line); }
+:root body.lpc-v2 .v2-settings .lpc-notification-details { margin: 10px 0 0; font-size: calc(12 * var(--lpc-reading-unit, 1px)); line-height: calc(20 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-settings .lpc-notification-details summary { width: fit-content; cursor: pointer; padding: 4px 0; color: var(--v2-muted); }
+:root body.lpc-v2 .v2-settings .lpc-notification-details summary:focus-visible { outline: 2px solid var(--v2-blue); outline-offset: 3px; border-radius: 2px; }
+:root body.lpc-v2 .v2-settings .lpc-notification-details p { margin: 8px 0 0; }
+:root body.lpc-v2 .v2-settings .lpc-tour-replay-row { display: flex; margin: 0; padding: 12px 16px; border: 0; }
+
+/* Smaller visible switches retain a larger native label hit area. */
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-switch { width: 36px; height: 28px; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-switch > span { inset: 4px 0; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-switch > span::after { width: 16px; height: 16px; top: 2px; left: 2px; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-switch input:checked + span::after { transform: translateX(16px); }
+
+/* Security groups use the same restrained rows; existing actions and dialogs remain. */
+:root body.lpc-v2 .v2-settings .v2-settings-security-grid { display: block; }
+:root body.lpc-v2 .v2-settings .v2-settings-security-card,
+:root body.lpc-v2 .v2-settings :is(.pv2-blocked,.pv2-closure) { display: block; padding: 16px; margin: 0 0 28px; border: 1px solid var(--v2-line); border-radius: 7px; background: var(--v2-white); box-shadow: none; }
+:root body.lpc-v2 .v2-settings .pv2-security-section { padding: 0; margin: 0 0 28px; border: 0; }
+:root body.lpc-v2 .v2-settings .pv2-security-section > h2 { margin-bottom: 12px; }
+:root body.lpc-v2 .v2-settings .pv2-security-section .lpc-settings-section-body { min-width: 0; border: 1px solid var(--v2-line); border-radius: 7px; padding: 14px 16px; background: var(--v2-white); }
+:root body.lpc-v2 .v2-settings .pv2-security-password-section { display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid var(--v2-line); border-radius: 7px; padding: 14px 16px; background: var(--v2-white); }
+:root body.lpc-v2 .v2-settings .pv2-security-password-section > h2 { margin: 0; }
+:root body.lpc-v2 .v2-settings .pv2-security-password-section .lpc-settings-section-body { border: 0; padding: 0; background: transparent; }
+:root body.lpc-v2 .v2-settings .pv2-security-section .pv2-security-row { gap: 18px; padding: 12px 0; }
+:root body.lpc-v2 .v2-settings .pv2-security-section .pv2-security-row:first-child { padding-top: 0; }
+:root body.lpc-v2 .v2-settings .pv2-security-section .pv2-security-row:last-child { padding-bottom: 0; }
+:root body.lpc-v2 .v2-settings :is(.pv2-security-section,.pv2-blocked-row,.pv2-closure-effects) :is(p,small) { font-size: calc(13 * var(--lpc-reading-unit, 1px)); line-height: calc(20 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-settings :is(.pv2-security-row,.pv2-blocked-row) h3 { font-size: calc(14 * var(--lpc-reading-unit, 1px)); line-height: calc(22 * var(--lpc-reading-unit, 1px)); font-weight: 500; margin: 0; }
+:root body.lpc-v2 .v2-settings .pv2-security-row p { margin-top: 3px; }
+:root body.lpc-v2 .v2-settings .pv2-security-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 12px; padding-top: 0; }
+:root body.lpc-v2 .v2-settings .pv2-security-footer > p { flex-basis: 100%; margin: 0; }
+:root body.lpc-v2 .v2-settings :is(.pv2-blocked-header,.pv2-closure-header) { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 14px; }
+:root body.lpc-v2 .v2-settings .pv2-closure-effects p { margin: 0 0 8px; }
+@media(max-width:600px) {
+ :root body.lpc-v2 .v2-settings .v2-settings-navigation { flex-wrap: wrap; gap: 4px 10px; }
+ :root body.lpc-v2 .v2-settings .v2-settings-tabs { gap: 6px; }
+ :root body.lpc-v2 .v2-settings .v2-settings-header-feedback { margin-left: auto; }
+ :root body.lpc-v2 .v2-settings .lpc-reading-size { grid-template-columns: minmax(0,1fr); gap: 10px; }
+ :root body.lpc-v2 .v2-settings .lpc-reading-size-track { max-width: 100%; }
+ :root body.lpc-v2 .v2-settings .lpc-settings-notification-channel > summary { padding-inline: 12px; gap: 8px; }
+ :root body.lpc-v2 .v2-settings .lpc-settings-channel-controls { margin-left: 48px; margin-right: 12px; }
+ :root body.lpc-v2 .v2-settings .pv2-security-row { flex-wrap: wrap; }
+ :root body.lpc-v2 .v2-settings .pv2-security-row > div { flex: 1 1 100%; }
+ :root body.lpc-v2 .v2-settings :is(.pv2-blocked-header,.pv2-closure-header) { align-items: start; }
+}
+
+/* Quiet utility rows: keep visibility and tour access without oversized cards. */
+:root body.lpc-v2 .v2-settings #v2-settings-preferences > .v2-settings-card--notifications { margin-bottom: 16px; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences > .v2-settings-card--visibility,
+:root body.lpc-v2 .v2-settings #v2-settings-preferences > .lpc-settings-help { margin: 0; padding: 0; border-top: 1px solid var(--v2-line); }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-card--visibility > .v2-settings-preference-row { padding: 10px 0; min-height: 48px; }
+:root body.lpc-v2 .v2-settings #v2-settings-preferences .lpc-tour-replay-row { padding: 6px 0; min-height: 48px; align-items: center; }
+:root body.lpc-v2 .v2-settings .lpc-tour-replay { padding: 6px 0; min-height: 36px; font-size: calc(13 * var(--lpc-reading-unit, 1px)); line-height: calc(20 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2 .v2-settings .lpc-notification-details { max-width: 62ch; }
+
+/* Center the content column; preserve the original heading and tab alignment. */
+:root body.lpc-v2 .v2-settings .v2-settings-panel { margin-inline: auto; }
+
+/* Approved option A: editorial Preferences rows; protected shell stays unchanged. */
+:root body.lpc-v2 .v2-settings #v2-settings-preferences{max-width:880px} :root body.lpc-v2 .v2-settings .lpc-settings-notification-channels{border:0;background:transparent;border-radius:0} :root body.lpc-v2 .v2-settings .lpc-appearance-settings{border:0;background:transparent;border-radius:0} :root body.lpc-v2 .v2-settings .v2-settings-card--workspace .v2-settings-preference-block{padding:8px 0 20px} :root body.lpc-v2 .v2-settings .lpc-reading-size{padding:18px 0 8px} :root body.lpc-v2 .v2-settings .lpc-settings-notification-channel>summary{padding-inline:0} :root body.lpc-v2 .v2-settings .lpc-settings-channel-controls{margin-left:40px}:root body.lpc-v2 .v2-settings #v2-settings-preferences>:is(.v2-settings-card--workspace,.v2-settings-card--notifications){display:grid;grid-template-columns:180px minmax(0,1fr);gap:32px;border-bottom:1px solid var(--v2-line);padding:24px 0;margin:0} :root body.lpc-v2 .v2-settings #v2-settings-preferences>.v2-settings-card--workspace{padding-top:0} :root body.lpc-v2 .v2-settings #v2-settings-preferences .v2-settings-section-heading h2{font-size:calc(17 * var(--lpc-reading-unit, 1px));font-weight:500} :root body.lpc-v2 .v2-settings #v2-settings-preferences>.v2-settings-card--visibility{border-top:0;margin-left:212px} :root body.lpc-v2 .v2-settings #v2-settings-preferences>.lpc-settings-help{margin-left:212px} @media(max-width:700px){:root body.lpc-v2 .v2-settings #v2-settings-preferences>:is(.v2-settings-card--workspace,.v2-settings-card--notifications){grid-template-columns:1fr;gap:10px} :root body.lpc-v2 .v2-settings #v2-settings-preferences>:is(.v2-settings-card--visibility,.lpc-settings-help){margin-left:0}}

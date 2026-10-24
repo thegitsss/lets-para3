@@ -8,10 +8,23 @@ function stripHtml(value = "") {
     .trim();
 }
 
+function normalizeTextControls(value) {
+  return value.replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+}
+
+// Plain-text fields retain literal angle brackets; their renderers own escaping.
+function cleanPlainText(value, { max = 10000 } = {}) {
+  if (typeof value !== "string") return "";
+  return normalizeTextControls(value).replace(/\t/g, " ").trim().slice(0, max);
+}
+
 function cleanText(str, { max = 10000, allowNewlines = true } = {}) {
   if (typeof str !== "string") return "";
   const normalized = allowNewlines
-    ? String(str).replace(/<[^>]*>/g, "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, (m) => (m.includes("\n") ? "\n" : " "))
+    ? normalizeTextControls(str.replace(/<[^>]*>/g, ""))
+      .replace(/[^\S\n]+/g, " ")
+      .replace(/ *\n */g, "\n")
     : stripHtml(str);
   return normalized.trim().slice(0, max);
 }
@@ -54,6 +67,7 @@ function cleanBudget(value, { min = 0.01, max = 30000 } = {}) {
 }
 
 module.exports = {
+  cleanPlainText,
   cleanText,
   cleanTitle,
   cleanMessage,

@@ -18,8 +18,8 @@ const resolveDashboardTarget = (userOrRole) => {
   const normalizedRole = String(user?.role || userOrRole || "").toLowerCase();
   if (normalizedRole === "admin") return "admin-dashboard.html";
   if (normalizedRole === "director") return "director-portal.html";
-  if (normalizedRole === "paralegal") return "dashboard-paralegal.html";
-  return "dashboard-attorney.html";
+  if (normalizedRole === "paralegal") return "paralegal-v2.html#/home";
+  return "attorney-v2.html#/home";
 };
 
 const resolveRequestedMemberTarget = (userOrRole) => {
