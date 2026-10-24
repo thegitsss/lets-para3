@@ -66,6 +66,7 @@ function sanitizeSubject(s) {
 }
 
 function wrapHtml(html) {
+  if (String(html).includes('data-lpc-email="letter"')) return html;
   // keep your brandy wrapper (backwards compatible)
   return `<div style="font-family: Georgia, serif; font-size:16px; color:#5c4e3a;">${html}</div>`;
 }
@@ -171,10 +172,10 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
     cc: opts.cc,
     bcc: opts.bcc,
     attachments: Array.isArray(opts.attachments) ? opts.attachments : undefined,
-    messageId:
+    messageId: opts.messageId || (
       opts.messageIdPrefix && typeof opts.messageIdPrefix === "string"
         ? `<${opts.messageIdPrefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@paraconnect>`
-        : undefined,
+        : undefined),
   };
 
   try {

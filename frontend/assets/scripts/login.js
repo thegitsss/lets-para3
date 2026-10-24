@@ -1,6 +1,8 @@
-import { persistSession } from "./auth.js";
+import { fetchCSRF, persistSession } from "./auth.js";
 import "./utils/login-return-target.js";
 import { showAlert } from "./utils/dialogs.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { runPasskeyCeremony } from "./utils/passkey-ceremony.js";
 
 const API_BASE = "/api";
 
@@ -77,29 +79,77 @@ const maybeRedirectFromStoredUser = async () => {
   return false;
 };
 
-async function fetchCsrfToken() {
+async function fetchCsrfToken(force = false) {
   try {
-    const res = await fetch(`${API_BASE}/csrf`, { credentials: "include" });
-    if (!res.ok) return "";
-    const data = await res.json().catch(() => ({}));
-    return data?.csrfToken || "";
+    return await fetchCSRF(force);
   } catch {
     return "";
   }
 }
 
-function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+// The deadline covers CSRF, the credential request and its response body.
+// A late CSRF response must never start a credential request after timeout.
+async function postSignIn(endpoint, body, { suppressToast = endpoint === "/auth/login" } = {}) {
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  const signal = options.signal || controller.signal;
-  return fetch(url, { ...options, signal }).finally(() => clearTimeout(id));
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new DOMException("Sign-in timed out.", "AbortError"));
+    }, 12000);
+  });
+  try {
+    return await Promise.race([(async () => {
+      const csrfToken = await fetchCsrfToken(true);
+      controller.signal.throwIfAborted();
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: "POST",
+        suppressToast,
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(error => {
+        if (controller.signal.aborted) throw error;
+        return {};
+      });
+      controller.signal.throwIfAborted();
+      return { res, data };
+    })(), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
+const consumeSessionNotice = (key) => {
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value) sessionStorage.removeItem(key);
+    return value;
+  } catch {
+    return null;
+  }
+};
+
 const initLogin = () => {
+  if (new URLSearchParams(window.location.search).get("reason") === "session-expired") {
+    const title = document.querySelector(".login-title");
+    if (title) {
+      title.textContent = "Please sign in again";
+      const notice = document.createElement("p");
+      notice.className = "login-session-notice";
+      notice.textContent = "Your session has expired.";
+      notice.setAttribute("role", "status");
+      title.after(notice);
+    }
+  }
   const toastHelper = window.toastUtils;
-  const stagedSignupToast = sessionStorage.getItem("signupToast");
+  const stagedSignupToast = consumeSessionNotice("signupToast");
   if (stagedSignupToast) {
-    sessionStorage.removeItem("signupToast");
     if (toastHelper) {
       toastHelper.show(stagedSignupToast, { targetId: "toastBanner", type: "info" });
     } else {
@@ -107,9 +157,8 @@ const initLogin = () => {
     }
   }
 
-  const disabledMsg = sessionStorage.getItem("disabledAccountMsg");
+  const disabledMsg = consumeSessionNotice("disabledAccountMsg");
   if (disabledMsg) {
-    sessionStorage.removeItem("disabledAccountMsg");
     if (toastHelper) {
       toastHelper.show(disabledMsg, { targetId: "toastBanner", type: "err" });
     } else {
@@ -135,6 +184,29 @@ const initLogin = () => {
   const passkeysSupported = Boolean(webAuthnBrowser?.browserSupportsWebAuthn?.());
   let pendingTwoFactorChallenge = "";
   let useBackupCode = false;
+  let loginPending = false;
+  let factorPending = false;
+
+  const verificationDialog = document.getElementById("loginVerificationDialog");
+  const verificationEmail = document.getElementById("loginVerificationEmail");
+  const verificationDescription = document.getElementById("loginVerificationDescription");
+  const showVerificationRecovery = (email = "", message = "") => {
+    if (!verificationDialog) return;
+    document.getElementById("toastBanner")?.classList.remove("show");
+    if (email && verificationEmail) verificationEmail.value = email;
+    if (verificationDescription) verificationDescription.textContent = message || "Please verify your email address before signing in.";
+    if (verificationDialog.open) return;
+    verificationDialog.showModal();
+    activateDialogFocus(verificationDialog, {
+      initialFocus: verificationEmail?.value
+        ? verificationDialog.querySelector('button[type="submit"]:not([disabled])') || verificationEmail
+        : verificationEmail,
+      returnFocus: loginButton,
+      onEscape: () => verificationDialog.close(),
+    });
+  };
+  verificationDialog?.querySelector("[data-verification-close]")?.addEventListener("click", () => verificationDialog.close());
+  verificationDialog?.addEventListener("close", () => deactivateDialogFocus(verificationDialog));
 
   const notify = (message, type = "err") => {
     if (toastHelper) {
@@ -157,78 +229,69 @@ const initLogin = () => {
 
   if (!passkeysSupported && passkeyLoginBtn) passkeyLoginBtn.hidden = true;
 
-  const performPasskeyAuthentication = async (challengeToken = "", { useBrowserAutofill = false } = {}) => {
+  const passkeyPreparations = new Map();
+  function preparePasskeySignIn(challengeToken = "") {
+    const cached = passkeyPreparations.get(challengeToken);
+    if (cached && Date.now() - cached.createdAt < 240000) return cached.promise;
+    const record = { createdAt: Date.now(), data: null, promise: null };
+    record.promise = (async () => {
+      const { res, data } = await postSignIn("/auth/passkeys/authentication-options", challengeToken ? { challengeToken } : {}, { suppressToast: true });
+      if (!res.ok) throw new Error(res.status >= 500
+        ? "Passkey sign-in is temporarily unavailable. Please sign in with your password and try again."
+        : data?.error || data?.msg || "Unable to start passkey sign-in. Please try again.");
+      if (!data?.challengeId || !data?.options?.challenge) throw new Error("Unable to prepare passkey sign-in. Please try again.");
+      record.data = data;
+      return data;
+    })().catch(error => { if (passkeyPreparations.get(challengeToken) === record) passkeyPreparations.delete(challengeToken); throw error; });
+    passkeyPreparations.set(challengeToken, record);
+    return record.promise;
+  }
+  const performPasskeyAuthentication = async (challengeToken = "") => {
     if (!passkeysSupported) throw new Error("Passkeys are not supported by this browser or device.");
-    const csrfToken = await fetchCsrfToken();
-    const headers = {
-      "Content-Type": "application/json",
-      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-    };
-    const optionsRes = await fetchWithTimeout(`${API_BASE}/auth/passkeys/authentication-options`, {
-      method: "POST",
-      credentials: "include",
-      suppressToast: useBrowserAutofill,
-      headers,
-      body: JSON.stringify(challengeToken ? { challengeToken } : {}),
+    const cached = passkeyPreparations.get(challengeToken);
+    if (!cached?.data || Date.now() - cached.createdAt >= 240000) {
+      await preparePasskeySignIn(challengeToken);
+      notify("Passkey sign-in is ready. Select the passkey button again to continue.", "ok");
+      return;
+    }
+    passkeyPreparations.delete(challengeToken);
+    const optionsData = cached.data;
+    // Options are ready before the click: the browser call starts immediately.
+    const response = await runPasskeyCeremony(() => webAuthnBrowser.startAuthentication({ optionsJSON: optionsData.options }), {
+      action: "sign-in", cancel: () => webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(),
     });
-    const optionsData = await optionsRes.json().catch(() => ({}));
-    if (!optionsRes.ok) throw new Error(optionsData?.error || "No passkey is available for this sign-in.");
-    const response = await webAuthnBrowser.startAuthentication({
-      optionsJSON: optionsData.options,
-      useBrowserAutofill,
-    });
-    const verifyRes = await fetchWithTimeout(`${API_BASE}/auth/passkeys/authenticate`, {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: JSON.stringify({
-        challengeId: optionsData.challengeId,
-        response,
-        ...(challengeToken ? { challengeToken } : {}),
-      }),
-    });
-    const data = await verifyRes.json().catch(() => ({}));
-    if (!verifyRes.ok) throw new Error(data?.error || "Passkey sign-in failed.");
+    const { res, data } = await postSignIn("/auth/passkeys/authenticate", {
+      challengeId: optionsData.challengeId, response, ...(challengeToken ? { challengeToken } : {}),
+    }, { suppressToast: true });
+    if (!res.ok) throw new Error(data?.error || data?.msg || "Passkey sign-in failed.");
     persistSession({ user: data.user || null });
     window.location.href = await resolvePostLoginTarget(data.user);
   };
-
   passkeyLoginBtn?.addEventListener("click", async () => {
     passkeyLoginBtn.disabled = true;
-    try {
-      await performPasskeyAuthentication();
-    } catch (err) {
-      if (err?.name !== "NotAllowedError") notify(err?.message || "Passkey sign-in was cancelled or failed.");
-    } finally {
-      passkeyLoginBtn.disabled = false;
-    }
+    try { await performPasskeyAuthentication(); }
+    catch (error) {
+      notify(error?.name === "NotAllowedError" || error?.name === "AbortError" ? "Passkey sign-in was canceled. You can try again or use your password." : error?.message || "Passkey sign-in failed.");
+      void preparePasskeySignIn().catch(() => {});
+    } finally { passkeyLoginBtn.disabled = false; }
   });
-
-  const startPasskeyAutofill = async () => {
-    if (!passkeysSupported || !window.PublicKeyCredential?.isConditionalMediationAvailable) return;
-    try {
-      const available = await window.PublicKeyCredential.isConditionalMediationAvailable();
-      if (!available) return;
-      await performPasskeyAuthentication("", { useBrowserAutofill: true });
-    } catch (err) {
-      // Conditional UI stays silent unless the user deliberately selects a passkey.
-      // Explicit passkey-button errors continue to use the visible notification above.
-      if (err?.name !== "AbortError" && err?.name !== "NotAllowedError") {
-        console.warn("[login] passkey autofill unavailable", err);
-      }
-    }
-  };
-
-  void startPasskeyAutofill();
-
+  if (passkeysSupported && passkeyLoginBtn) {
+    passkeyLoginBtn.disabled = true;
+    void preparePasskeySignIn().catch(() => {}).finally(() => { passkeyLoginBtn.disabled = false; });
+  }
   twoFactorPasskeyBtn?.addEventListener("click", async () => {
-    twoFactorPasskeyBtn.disabled = true;
-    try {
-      await performPasskeyAuthentication(pendingTwoFactorChallenge);
-    } catch (err) {
-      if (err?.name !== "NotAllowedError") notify(err?.message || "Passkey verification was cancelled or failed.");
+    if (factorPending || !pendingTwoFactorChallenge) return;
+    factorPending = true;
+    const controls = [document.getElementById("twoFactorVerifyBtn"), twoFactorBackupToggle, twoFactorBackBtn, twoFactorPasskeyBtn].filter(Boolean);
+    const disabledBefore = controls.map(control => control.disabled);
+    controls.forEach(control => { control.disabled = true; });
+    try { await performPasskeyAuthentication(pendingTwoFactorChallenge); }
+    catch (error) {
+      notify(error?.name === "NotAllowedError" || error?.name === "AbortError" ? "Passkey verification was canceled. You can try again." : error?.message || "Passkey verification failed.");
+      void preparePasskeySignIn(pendingTwoFactorChallenge).catch(() => {});
     } finally {
-      twoFactorPasskeyBtn.disabled = false;
+      factorPending = false;
+      controls.forEach((control, index) => { control.disabled = disabledBefore[index]; });
     }
   });
 
@@ -242,6 +305,10 @@ const initLogin = () => {
           : "Enter the verification code we just sent you.";
     }
     if (twoFactorPasskeyAction) twoFactorPasskeyAction.hidden = !(passkeysSupported && passkeyAvailable);
+    if (passkeysSupported && passkeyAvailable && twoFactorPasskeyBtn) {
+      twoFactorPasskeyBtn.disabled = true;
+      void preparePasskeySignIn(challengeToken).catch(() => {}).finally(() => { twoFactorPasskeyBtn.disabled = false; });
+    }
     if (loginPanel) loginPanel.classList.add("hidden");
     if (twoFactorPanel) twoFactorPanel.classList.remove("hidden");
     if (twoFactorCode) twoFactorCode.focus();
@@ -279,16 +346,19 @@ const initLogin = () => {
         identity_invalid: "Google did not return a verified identity.",
         matching_email_unlinked:
           "An LPC account already uses that email. Sign in with your email and password to link Google sign-in.",
-        pending: "Your account is still under review. We’ll email you when the review is complete.",
+        pending: "We’re reviewing your application. We’ll email you when your account is ready.",
         not_approved: "Your application was not approved. Contact support if you have questions.",
         disabled: "This account has been deactivated.",
         maintenance: "The platform is in maintenance mode. Please try again soon.",
         email_unverified: "Please verify your email before signing in.",
         two_factor_unavailable: "Unable to send a verification code. Please try again.",
-        two_factor_password: "For this account, please sign in with your email and password to complete two-step verification.",
         unavailable: "Google sign-in is temporarily unavailable.",
       };
-      notify(messages[errorCode] || "Google sign-in could not be completed.");
+      if (errorCode === "email_unverified") {
+        showVerificationRecovery("", messages[errorCode]);
+      } else {
+        notify(messages[errorCode] || "Google sign-in could not be completed.");
+      }
     }
 
     if (params.get("google_2fa") !== "1") return;
@@ -310,6 +380,8 @@ const initLogin = () => {
   handleGoogleReturn();
 
   const submitLogin = async ({ email, password, originalLabel }) => {
+    if (loginPending) return;
+    loginPending = true;
     let shouldRestoreButton = true;
 
     try {
@@ -317,28 +389,16 @@ const initLogin = () => {
         loginButton.disabled = true;
         loginButton.textContent = "Signing in…";
       }
-      const csrfToken = await fetchCsrfToken();
-      const res = await fetchWithTimeout(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-
-      let data = {};
-      try {
-        data = await res.json();
-      } catch (error) {
-        console.warn("[login] response was not valid JSON", error);
-      }
+      const { res, data } = await postSignIn("/auth/login", { email, password });
 
       if (!res.ok) {
         clearLocalSession();
         const msg = data?.error || data?.msg || data?.message || "Sign-in failed";
-        notify(msg);
+        if (data?.emailVerificationRequired === true) {
+          showVerificationRecovery(email, msg);
+        } else {
+          notify(msg);
+        }
         return;
       }
 
@@ -348,10 +408,10 @@ const initLogin = () => {
         return;
       }
 
-      shouldRestoreButton = false;
       persistSession({ user: data.user || null });
-
-      window.location.href = await resolvePostLoginTarget(data.user);
+      const target = await resolvePostLoginTarget(data.user);
+      shouldRestoreButton = false;
+      window.location.href = target;
     } catch (err) {
       console.error(err);
       clearLocalSession();
@@ -362,6 +422,7 @@ const initLogin = () => {
       }
     } finally {
       if (shouldRestoreButton) {
+        loginPending = false;
         restoreLoginButton(originalLabel);
       }
     }
@@ -379,6 +440,7 @@ const initLogin = () => {
 
   if (twoFactorBackupToggle) {
     twoFactorBackupToggle.addEventListener("click", () => {
+      if (factorPending) return;
       useBackupCode = !useBackupCode;
       if (twoFactorBackupToggle) {
         twoFactorBackupToggle.textContent = useBackupCode ? "Use a verification code" : "Use a backup code";
@@ -393,6 +455,7 @@ const initLogin = () => {
 
   if (twoFactorBackBtn) {
     twoFactorBackBtn.addEventListener("click", () => {
+      if (factorPending) return;
       resetTwoFactorPanel();
     });
   }
@@ -400,6 +463,7 @@ const initLogin = () => {
   if (twoFactorForm) {
     twoFactorForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (factorPending) return;
       const code = String(twoFactorCode?.value || "").trim();
       if (!code) {
         if (toastHelper) {
@@ -409,19 +473,14 @@ const initLogin = () => {
         }
         return;
       }
+      factorPending = true;
+      const controls = [document.getElementById("twoFactorVerifyBtn"), twoFactorBackupToggle, twoFactorBackBtn, twoFactorPasskeyBtn].filter(Boolean);
+      const disabledBefore = controls.map(control => control.disabled);
+      controls.forEach(control => { control.disabled = true; });
+      let completed = false;
       try {
-        const csrfToken = await fetchCsrfToken();
         const endpoint = useBackupCode ? "/auth/2fa-backup" : "/auth/2fa-verify";
-        const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify({ challengeToken: pendingTwoFactorChallenge, code }),
-        });
-        const payload = await res.json().catch(() => ({}));
+        const { res, data: payload } = await postSignIn(endpoint, { challengeToken: pendingTwoFactorChallenge, code });
         if (!res.ok) {
           const msg = payload?.error || payload?.msg || payload?.message || "Verification failed.";
           if (toastHelper) {
@@ -432,7 +491,9 @@ const initLogin = () => {
           return;
         }
         persistSession({ user: payload.user || null });
-        window.location.href = await resolvePostLoginTarget(payload.user);
+        const target = await resolvePostLoginTarget(payload.user);
+        completed = true;
+        window.location.href = target;
       } catch (err) {
         if (err?.name === "AbortError") {
           if (toastHelper) {
@@ -446,6 +507,11 @@ const initLogin = () => {
           toastHelper.show("Verification error. Try again.", { targetId: "toastBanner", type: "err" });
         } else {
           void showAlert("Verification error. Try again.", { title: "Verification unsuccessful" });
+        }
+      } finally {
+        if (!completed) {
+          factorPending = false;
+          controls.forEach((control, index) => { control.disabled = disabledBefore[index]; });
         }
       }
     });

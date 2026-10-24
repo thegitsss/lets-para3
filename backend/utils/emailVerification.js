@@ -1,4 +1,7 @@
+const accountEmails = require("../email/accountTemplates");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const EmailVerificationToken = require("../models/EmailVerificationToken");
 
 const sendEmail = require("./email");
 
@@ -6,19 +9,24 @@ function normalizeEmail(value = "") {
   return String(value || "").trim().toLowerCase();
 }
 
-function buildEmailVerificationToken({ userId, email, expiresIn = "60m" }) {
+function buildEmailVerificationToken({ userId, email, expiresIn }) {
   return jwt.sign(
     {
       purpose: "verify-email",
       uid: String(userId),
       email: normalizeEmail(email),
+      jti: crypto.randomBytes(32).toString("hex"),
     },
     process.env.JWT_SECRET,
-    { expiresIn }
+    expiresIn === undefined ? {} : { expiresIn }
   );
 }
 
-async function sendVerificationEmail({ user, email }) {
+function verificationTokenHash(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+async function createEmailVerificationLink({ user, email }) {
   const targetEmail = normalizeEmail(email || user?.pendingEmail || user?.email);
   if (!user?._id || !targetEmail) return;
 
@@ -26,8 +34,22 @@ async function sendVerificationEmail({ user, email }) {
     userId: user._id.toString(),
     email: targetEmail,
   });
-  const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email?token=${verifyToken}`;
-  await sendEmail(targetEmail, "Verify your email", `Click to verify: ${verifyUrl}`);
+  const payload = jwt.decode(verifyToken);
+  await EmailVerificationToken.create({
+    tokenHash: verificationTokenHash(verifyToken), userId: user._id,
+    expiresAt: Number.isFinite(payload.exp) ? new Date(payload.exp * 1000) : null,
+  });
+  return `${process.env.APP_BASE_URL || ""}/verify-email.html?token=${verifyToken}`;
+}
+
+async function sendVerificationEmail({ user, email }) {
+  const targetEmail = normalizeEmail(email || user?.pendingEmail || user?.email);
+  const verifyUrl = await createEmailVerificationLink({ user, email: targetEmail });
+  if (!verifyUrl) return;
+  const message = accountEmails.emailVerification(user, verifyUrl);
+  const result = await sendEmail(targetEmail, message.subject, message.html, { text: message.text, throwOnError: true });
+  if (result?.error) throw new Error(result.message || "Verification email delivery failed");
+  return result;
 }
 
 function applyVerifiedEmail(user, verifiedEmail) {
@@ -54,5 +76,7 @@ module.exports = {
   normalizeEmail,
   buildEmailVerificationToken,
   sendVerificationEmail,
+  createEmailVerificationLink,
   applyVerifiedEmail,
+  verificationTokenHash,
 };

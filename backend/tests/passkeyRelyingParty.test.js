@@ -1,0 +1,10 @@
+const { relyingParty } = require('../services/passkeyService');
+const keys = ['NODE_ENV','APP_ENV','APP_BASE_URL','WEBAUTHN_ORIGIN','WEBAUTHN_RP_ID'];
+let previous;
+const request = (host='www.lets-paraconnect.com',protocol='https') => ({protocol,headers:{host},get:()=>host});
+beforeEach(()=>{previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));process.env.NODE_ENV='production';delete process.env.APP_ENV;process.env.APP_BASE_URL='lets-paraconnect.com';delete process.env.WEBAUTHN_ORIGIN;delete process.env.WEBAUTHN_RP_ID;});
+afterEach(()=>{for(const key of keys){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}});
+test('the hosted bare site address generates the actual HTTPS credential origin',()=>{expect(relyingParty(request())).toMatchObject({origin:'https://www.lets-paraconnect.com',rpID:'www.lets-paraconnect.com'});});
+test('an unrelated Host cannot replace the configured credential origin',()=>{expect(relyingParty(request('untrusted.example'))).toMatchObject({origin:'https://lets-paraconnect.com',rpID:'lets-paraconnect.com'});});
+test('an explicit WebAuthn origin and relying-party ID remain authoritative',()=>{process.env.WEBAUTHN_ORIGIN='https://accounts.example.com';process.env.WEBAUTHN_RP_ID='example.com';expect(relyingParty(request())).toMatchObject({origin:'https://accounts.example.com',rpID:'example.com'});});
+test('localhost credentials remain local in development',()=>{process.env.NODE_ENV='development';expect(relyingParty(request('localhost:5050','http'))).toMatchObject({origin:'http://localhost:5050',rpID:'localhost'});});

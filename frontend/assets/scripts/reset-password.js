@@ -22,7 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (panel) panel.dataset.state = state;
     if (eyebrow) eyebrow.textContent = eyebrowText;
     if (title) title.textContent = titleText;
-    if (lead) lead.textContent = leadText;
+    if (lead) {
+      lead.textContent = leadText;
+      lead.hidden = !leadText;
+    }
     if (form) form.hidden = true;
     setMessage(messageText, state);
     if (backLink) {
@@ -37,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
       eyebrowText: "Reset link unavailable",
       titleText: "This reset link can’t be used.",
       leadText: "It may be incomplete, expired, or already used. Request a new link and try again.",
-      messageText: "Your password has not been changed.",
+      messageText: "",
       actionText: "Request another reset link",
       actionHref: "forgot-password.html",
     });

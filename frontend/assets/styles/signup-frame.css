@@ -1,0 +1,68 @@
+/* Preserve the shared action slot while letting validation messages take space. */
+.signup-stage { display: contents; }
+.signup-page.auth-entry.signup-application-step .signup-form-scroll {
+ height: calc(var(--signup-action-top) - var(--signup-column-top) - 16px + var(--signup-action-offset, 0px) + var(--signup-error-space, 0px));
+ overflow: visible;
+}
+.signup-page.auth-entry.signup-application-step .signup-submit-actions {
+ top: calc(var(--signup-action-top) + var(--signup-action-offset, 0px) + var(--signup-error-space, 0px));
+}
+.signup-page.auth-entry.signup-application-step #editSignupBasics {
+ top: calc(var(--signup-action-top) + var(--signup-action-offset, 0px) + var(--signup-error-space, 0px) + var(--signup-action-height) + 8px);
+}
+.signup-page.auth-entry.signup-received .signup-form-scroll { height: auto; }
+
+/* Phones scroll the card above the agreement; the agreement cannot cover controls. */
+@media (max-width: 768px), (max-width: 1024px) and (max-height: 500px) {
+ body.signup-page.auth-entry { padding: 0; }
+ .signup-page .signup-stage {
+  display: grid;
+  position: fixed;
+  inset: 0 0 var(--signup-mobile-policy-height, 64px);
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-items: safe center;
+  justify-items: center;
+  scroll-padding-block: 16px;
+ }
+ .signup-page.auth-entry .overlay { flex-shrink: 0; }
+ .signup-page.auth-entry.signup-application-step #signupPolicyReview {
+  position: fixed;
+  inset: auto 0 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 8px 24px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: #edf0f3;
+  z-index: 2000;
+ }
+ .signup-page.signup-application-step #signupPolicyReview p { max-width: 350px; margin-inline: auto; }
+ .signup-page.auth-entry.signup-application-step #editSignupBasics {
+  top: calc(var(--signup-action-top) + var(--signup-action-offset, 0px) + var(--signup-error-space, 0px) + var(--signup-action-height) + 4px);
+ }
+ .signup-page.signup-received .signup-stage { bottom: 0; }
+}
+
+/* Use the bundled Regular face directly; WebKit synthesizes a wider 500 weight. */
+.signup-page.auth-entry #signupHeading,
+.signup-page.auth-entry .signup-step-two-title { font-weight: 400; }
+
+/* Keep the decorative conversation card shadow-free across signup roles. */
+.signup-page.auth-entry .lpc-closeup--conversation { box-shadow: none; }
+
+/* Keep state names readable in the opened native picker. */
+.signup-page.auth-entry #signupState option { font-size: 16px; }
+.signup-page.auth-entry #signupState:open { font-size: 16px; }
+
+/* Landscape validation needs real scroll space below the fixed brand. */
+@media (max-width: 1024px) and (max-height: 500px) and (orientation: landscape) {
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .overlay { height: auto; min-height: var(--signup-common-height); }
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .left-panel { height: auto; padding-bottom: var(--signup-panel-padding-bottom); }
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .form-container { height: auto; margin-top: 0; }
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .signup-form-scroll { height: auto; }
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .signup-submit-actions { position: static; width: 100%; margin-top: 16px; }
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) #attorneyPricingText { position: static; margin: 0 0 12px; }
+ .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) #editSignupBasics { position: static; transform: none; margin-top: 8px; }
+}

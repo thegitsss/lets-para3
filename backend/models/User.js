@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const argon2 = require("argon2");
 
 const { Schema, Types } = mongoose;
+const { normalizePassword } = require("../utils/passwordPolicy");
 
 const uniqueStrings = (arr = []) =>
   [...new Set((arr || []).map((s) => String(s || "").trim()).filter(Boolean))];
@@ -208,6 +209,10 @@ const userSchema = new Schema(
     },
     pendingEmailRequestedAt: { type: Date, default: null },
     password: { type: String, required: true, select: false }, // never returned by default
+    authVersion: { type: Number, default: 0, min: 0, select: false },
+    resetPasswordTokenHash: { type: String, default: null, select: false, index: true },
+    resetPasswordExpiresAt: { type: Date, default: null, select: false },
+    resetPasswordRequestedAt: { type: Date, default: null, select: false },
     emailVerified: { type: Boolean, default: false },
     authProviders: { type: [providerIdentitySchema], default: [], select: false },
     phoneNumber: { type: String, default: null },
@@ -262,6 +267,7 @@ const userSchema = new Schema(
     stateExperience: { type: [String], default: [], set: uniqueStrings },
     skills: { type: [String], default: [], set: uniqueStrings },
     yearsExperience: { type: Number, min: 0, max: 80, default: 0 },
+    paralegalQualification: { type:String, enum:["", "certificate", "degree", "law_firm_experience"], default:"" },
     languages: { type: [languageEntrySchema], default: [], set: sanitizeLanguageEntries },
     writingSamples: { type: [writingSampleSchema], default: [] },
     experience: { type: [experienceEntrySchema], default: [] },
@@ -270,6 +276,19 @@ const userSchema = new Schema(
 
     // Security / housekeeping
     termsAccepted: { type: Boolean, default: false },
+    termsVersion: { type: String, default: "", trim: true, maxlength: 32 },
+    termsAcceptedAt: { type: Date, default: null },
+    termsDocumentHash: { type: String, default: "", maxlength: 64 },
+    privacyDocumentHash: { type: String, default: "", maxlength: 64 },
+    policyAcknowledgements: { type: [new mongoose.Schema({
+      termsVersion: String, privacyVersion: String,
+      termsHash: String, privacyHash: String, acceptedAt: Date,
+      privacyAcknowledgedAt: Date,
+      source: { type: String, enum: ["signup", "policy-review", "legacy"] },
+      sessionId: String,
+    }, { _id: false })], default: [], select: false },
+    privacyVersion: { type: String, default: "", trim: true, maxlength: 32 },
+    privacyAcknowledgedAt: { type: Date, default: null },
     attorneyPricingAccepted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
@@ -289,7 +308,13 @@ const userSchema = new Schema(
     },
     twoFactorTempCode: { type: String, default: null, select: false },
     twoFactorExpiresAt: { type: Date, default: null },
-    twoFactorBackupCodes: { type: [String], default: [] },
+    twoFactorChallengeHash: { type: String, default: null, select: false, index: true },
+    twoFactorChallengeAuthVersion: { type: Number, default: null, select: false },
+    twoFactorFailedAttempts: { type: Number, default: 0, select: false },
+    twoFactorBackupCodes: { type: [String], default: [], select: false },
+    totpSecretEncrypted: { type: String, default: null, select: false },
+    totpLastUsedTimeStep: { type: Number, default: null, select: false },
+
     blockedUsers: {
       type: [{ type: Types.ObjectId, ref: "User" }],
       default: [],
@@ -346,6 +371,18 @@ const userSchema = new Schema(
         ret.id = ret._id;
         delete ret._id;
         delete ret.password; // double-safety
+        delete ret.authVersion;
+        delete ret.resetPasswordTokenHash;
+        delete ret.resetPasswordExpiresAt;
+        delete ret.resetPasswordRequestedAt;
+        delete ret.twoFactorTempCode;
+        delete ret.twoFactorChallengeHash;
+        delete ret.twoFactorChallengeAuthVersion;
+        delete ret.twoFactorFailedAttempts;
+        delete ret.twoFactorBackupCodes;
+        delete ret.totpSecretEncrypted;
+        delete ret.totpLastUsedTimeStep;
+
         return ret;
       },
     },
@@ -410,7 +447,7 @@ userSchema.pre("save", async function (next) {
   const raw = this.password;
   if (isArgon2Hash(raw) || isBcryptHash(raw)) return next();
   try {
-    this.password = await argon2.hash(String(raw || ""), ARGON2_OPTIONS);
+    this.password = await argon2.hash(normalizePassword(raw), ARGON2_OPTIONS);
     return next();
   } catch (err) {
     return next(err);
@@ -424,7 +461,7 @@ userSchema.methods.comparePassword = async function (plain) {
   // password field is select:false by default; ensure it's loaded when calling this
   const hash = this.password;
   if (!hash || !plain) return false;
-  const candidate = String(plain);
+  const candidate = normalizePassword(plain);
   if (isArgon2Hash(hash)) {
     return argon2.verify(hash, candidate);
   }

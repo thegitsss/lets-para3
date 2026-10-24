@@ -1,0 +1,28 @@
+const express=require('express'),cookieParser=require('cookie-parser'),request=require('supertest');
+const {webcrypto}=require('crypto');
+const User=require('../models/User'),AuthChallenge=require('../models/AuthChallenge'),PasskeyCredential=require('../models/PasskeyCredential');
+const {connect,clearDatabase,closeDatabase}=require('./helpers/db');
+jest.mock('../utils/email',()=>jest.fn(async()=>({ok:true})));
+const app=express();app.use(cookieParser(),express.json());app.use('/api/auth',require('../routes/auth'));app.use('/api/account',require('../routes/account'));
+app.use((error,req,res,next)=>res.status(error.status||500).json({error:error.message}));
+const password='An isolated passkey account passphrase';
+beforeAll(async()=>{if(!globalThis.crypto)globalThis.crypto=webcrypto;await connect();},60000);
+afterAll(closeDatabase);beforeEach(clearDatabase);
+for(const role of ['attorney','paralegal'])test(`${role} Settings requires password proof and persists a session-bound setup challenge`,async()=>{
+ const user=await User.create({firstName:'Morgan',lastName:'Member',email:`${role}@example.test`,password,role,status:'approved',emailVerified:true});
+ const agent=request.agent(app);expect((await agent.post('/api/auth/login').send({email:user.email,password})).status).toBe(200);
+ expect((await agent.post('/api/account/passkeys/registration-options').send({currentPassword:'incorrect'})).status).toBe(400);
+ const begun=await agent.post('/api/account/passkeys/registration-options').send({currentPassword:password});expect(begun.status).toBe(200);expect(begun.body.options.authenticatorSelection.userVerification).toBe('required');
+ const challenge=await AuthChallenge.findOne({challengeId:begun.body.challengeId}).select('+metadata');expect(String(challenge.userId)).toBe(String(user._id));expect(challenge.metadata.securityContext.sessionId).toBeTruthy();
+ const invalid=await agent.post('/api/account/passkeys/register').send({challengeId:begun.body.challengeId,response:{}});expect(invalid.status).toBe(400);expect(await PasskeyCredential.countDocuments({userId:user._id})).toBe(0);
+ const other=await User.create({firstName:'Other',lastName:'Member',email:`other-${role}@example.test`,password,role,status:'approved',emailVerified:true});
+ const owned=await PasskeyCredential.create({userId:user._id,credentialId:`${role}-owned`,publicKey:Buffer.from('synthetic-public-key'),name:'Owned key'});
+ const foreign=await PasskeyCredential.create({userId:other._id,credentialId:`${role}-foreign`,publicKey:Buffer.from('synthetic-public-key'),name:'Other key'});
+ const listed=await agent.get('/api/account/passkeys');expect(listed.status).toBe(200);expect(listed.body.passkeys.map(x=>x.name)).toEqual(['Owned key']);expect(listed.body.passkeys[0]).not.toHaveProperty('publicKey');
+ await User.updateOne({_id:user._id},{$set:{twoFactorEnabled:true,twoFactorMethod:'email'}});
+ const factor=await agent.post('/api/auth/login').send({email:user.email,password});expect(factor.body.twoFactorRequired).toBe(true);
+ const factorOptions=await agent.post('/api/auth/passkeys/authentication-options').send({challengeToken:factor.body.challengeToken});expect(factorOptions.status).toBe(200);expect(factorOptions.body.available).toBe(true);
+ expect((await agent.delete(`/api/account/passkeys/${foreign._id}`).send({currentPassword:password})).status).toBe(404);expect(await PasskeyCredential.findById(foreign._id)).not.toBeNull();
+ expect((await agent.delete(`/api/account/passkeys/${owned._id}`).send({currentPassword:'incorrect'})).status).toBe(400);
+ expect((await agent.delete(`/api/account/passkeys/${owned._id}`).send({currentPassword:password})).status).toBe(200);expect(await PasskeyCredential.findById(owned._id)).toBeNull();
+});

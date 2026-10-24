@@ -10,10 +10,12 @@
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="assets/styles/auth-secondary.css?v=20260925-background-card">
+  <link rel="stylesheet" href="/assets/styles/brand-lockup.css?v=20261016-mountain" />
+  <link rel="stylesheet" href="assets/styles/verification-resend.css" />
 </head>
-<body class="auth-secondary verify-email-page">
+<body class="auth-secondary verify-email-page" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="auth-secondary__header"><a class="auth-secondary__brand" href="index.html">Let<span class="auth-secondary__brand-mark">’</span>s-ParaConnect</a></header>
+  <header class="auth-secondary__header"><a class="auth-secondary__brand lpc-brand-lockup" href="index.html" aria-label="Let’s-ParaConnect home"><svg class="home-brand__mountain" viewBox="7 20 50 22" fill="none" stroke="currentColor" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9.25 39.63C13 39 16.8 34.1 20.1 31.5S23.9 30.4 25.2 30.2C27 29.9 30.4 25.2 32.63 22.38C35 24.3 37.8 29.3 39.2 30.6S42.9 31.5 44.7 33.4S47.7 34.8 49.9 36.7S52.9 38.9 54.8 39.4" /></svg><span class="home-brand__name">Let<span class="auth-secondary__brand-mark">’</span>s-ParaConnect</span></a></header>
   <main class="verify-email-layout" id="main" tabindex="-1" aria-labelledby="verificationTitle">
     <div class="verification-art overlay" aria-hidden="true">
       <canvas class="auth-matter-field" data-auth-matter-field></canvas>
@@ -21,14 +23,27 @@
     <section class="verification-panel" id="verificationPanel" data-state="loading">
       <div class="verification-panel__inner">
         <p class="verification-eyebrow" id="verificationEyebrow">Account security</p>
-        <h1 id="verificationTitle">Verifying your email.</h1>
-        <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">Please wait while we verify this link.</p>
+        <h1 id="verificationTitle" tabindex="-1">Confirm your email.</h1>
+        <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">Select the button below to verify your email address.</p>
+        <form id="verificationConfirmForm" hidden>
+          <button type="submit">Verify email</button>
+        </form>
+        <div id="verificationRecovery" class="verification-resend" hidden>
+          <p>Enter your email to request a new verification link.</p>
+          <form data-verification-resend>
+              <label for="verificationRecoveryEmail">Email address</label>
+              <input id="verificationRecoveryEmail" type="email" autocomplete="email" required />
+              <button type="submit">Resend verification email</button>
+              <p role="status" aria-live="polite"></p>
+            </form>
+        </div>
         <p class="verification-action-row"><a id="verificationAction" href="index.html" data-public-action="text" hidden>Return home</a></p>
       </div>
     </section>
   </main>
   <script src="assets/scripts/auth-matter-field.js" defer></script>
-  <script src="assets/scripts/verify-email.js"></script>
+  <script type="module" src="assets/scripts/verify-email.js"></script>
+  <script type="module" src="assets/scripts/verification-resend.js"></script>
   <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
 </body>
 </html>

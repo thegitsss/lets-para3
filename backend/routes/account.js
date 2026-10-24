@@ -141,121 +141,14 @@ router.post(
   })
 );
 
-router.post(
-  "/update-password",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const { currentPassword, newPassword } = req.body || {};
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: "Current and new password are required." });
-    }
-    if (String(newPassword).length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters." });
-    }
+router.use(require('./accountAuthentication'));
 
-    const user = await User.findById(req.user.id).select("+password");
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    const ok = await user.comparePassword(String(currentPassword));
-    if (!ok) {
-      return res.status(400).json({ error: "Current password is incorrect." });
-    }
-
-    user.password = String(newPassword);
-    await user.save();
-
-    try {
-      await AuditLog.logFromReq(req, "account.password.update", {
-        targetType: "user",
-        targetId: user._id,
-      });
-    } catch {}
-
-    res.json({ ok: true });
-  })
-);
-
-router.get(
-  "/2fa",
-  asyncHandler(async (req, res) => {
-    if (!TWO_FACTOR_ENABLED) {
-      return res.json({ enabled: false, method: "email", hasBackupCodes: false, disabled: true });
-    }
-    const user = await User.findById(req.user.id).select("twoFactorEnabled twoFactorBackupCodes twoFactorMethod");
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({
-      enabled: !!user.twoFactorEnabled,
-      method: user.twoFactorMethod || "email",
-      hasBackupCodes: Array.isArray(user.twoFactorBackupCodes) && user.twoFactorBackupCodes.length > 0,
-    });
-  })
-);
-
-router.get(
-  "/sessions",
-  asyncHandler(async (req, res) => {
-    const actor = req.user?.id || req.user?._id;
-    if (!actor) return res.json({ sessions: [] });
-    const sessions = await AuditLog.find({
-      actor,
-      action: "auth.login.success",
-    })
-      .sort({ createdAt: -1 })
-      .limit(12)
-      .select("createdAt ua ip");
-
-    res.json({
-      sessions: sessions.map((item) => ({
-        id: item.id,
-        createdAt: item.createdAt,
-        ua: item.ua || "",
-        ip: item.ip || "",
-      })),
-    });
-  })
-);
-
-router.post(
-  "/2fa-toggle",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    if (!TWO_FACTOR_ENABLED) {
-      return res.status(400).json({ error: "Two-step verification is currently disabled." });
-    }
-    const user = await User.findById(req.user.id).select("twoFactorEnabled twoFactorMethod");
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    const enabled = !!req.body?.enabled;
-    const method = String(req.body?.method || user.twoFactorMethod || "email").toLowerCase();
-    const allowed = new Set(["authenticator", "sms", "email"]);
-
-    user.twoFactorEnabled = enabled;
-    if (allowed.has(method)) {
-      user.twoFactorMethod = method;
-    }
-    await user.save();
-
-    res.json({ enabled: user.twoFactorEnabled, method: user.twoFactorMethod || "email" });
-  })
-);
-
-router.post(
-  "/2fa-backup-codes",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    if (!TWO_FACTOR_ENABLED) {
-      return res.status(400).json({ error: "Two-step verification is currently disabled." });
-    }
-    const user = await User.findById(req.user.id).select("twoFactorEnabled twoFactorBackupCodes");
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    const codes = generateBackupCodes();
-    user.twoFactorBackupCodes = codes.map((code) => hashCode(code));
-    await user.save();
-
-    res.json({ codes });
-  })
-);
+router.get('/2fa', asyncHandler(async (req,res)=>{
+  const user=await User.findById(req.user.id).select('twoFactorEnabled twoFactorMethod +twoFactorBackupCodes');
+  if(!user)return res.status(404).json({error:'User not found'});
+  const enabled=String(process.env.ENABLE_TWO_FACTOR||'true').toLowerCase()!=='false';
+  res.json({enabled:enabled&&!!user.twoFactorEnabled,method:user.twoFactorMethod||'email',hasBackupCodes:enabled&&!!user.twoFactorBackupCodes?.length,...(!enabled?{disabled:true}:{})});
+}));
 
 async function handleDeactivateAccount(req, res) {
   const generalBlockerCopy =

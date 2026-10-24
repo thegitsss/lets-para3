@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, codex/signup-signin-approved-20261023]
 
 permissions:
   contents: read
@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22.17.0
@@ -34,6 +36,12 @@ jobs:
           JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
           EMAIL_DISABLE: "true"
         run: npm test -- --runTestsByPath tests/auth.test.js tests/googlePublicAuth.test.js tests/publicParalegalStateCounts.test.js tests/supportAdmin.test.js tests/webNotFound.test.js tests/mobileHomepageImages.test.js
+      - name: Run account verification, recovery and admission delivery contracts
+        working-directory: backend
+        env:
+          JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
+          EMAIL_DISABLE: "true"
+        run: npm test -- --runTestsByPath tests/emailVerificationFlow.test.js tests/admissionDecisionNotifications.test.js tests/accountEmailTemplates.test.js tests/emailLayout.test.js tests/passwordPolicy.test.js tests/authPasswordResetConcurrency.test.js tests/authPasswordLoginLockConcurrency.test.js tests/authLoginRehashConcurrency.test.js tests/authFactorConcurrency.test.js tests/authFactorGoogleLinkAtomicity.test.js tests/passkeyRelyingParty.test.js tests/passkeyAccountRoutes.test.js tests/passkeyCeremony.test.js
       - name: Install browser for public journeys
         working-directory: backend
         run: |
@@ -66,6 +74,8 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
