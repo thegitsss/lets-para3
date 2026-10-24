@@ -1,4 +1,5 @@
-const { test, expect, start } = require('./financial-strict-observation.cjs');
+const { test, expect } = require('../workspace-paired-observation.cjs');
+const start = require('../../helpers/financialLifecycleBrowserServer');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const inspectBrowserDiagnostics = require('./browser-diagnostics');
@@ -59,7 +60,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await page.evaluate(() => { const input = document.createElement('input'); input.name = 'cf-turnstile-response'; input.type = 'hidden'; input.value = 'synthetic-admission-challenge'; document.querySelector('#signupForm').append(input); });
     await page.getByRole('button', { name: 'Submit application', exact: true }).click();
     await expect(page.locator('#signupConfirmation')).toBeVisible();
-    await expect(page.locator('#signupConfirmation')).toContainText('review your application');
+    await expect(page.locator('#signupConfirmation')).toContainText('Your application is saved. Check your email to verify your address.');
     const User = require('../../../models/User');
     const applicant = await User.findOne({ email }).select('+policyAcknowledgements').lean();
     expect(applicant).toMatchObject({ role: 'paralegal', status: 'pending', emailVerified: false, yearsExperience: 6 });
@@ -70,6 +71,9 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     const verification = server.evidence().external.mail.find(call => call[0] === email && call[1] === 'Verify your email'); expect(verification).toBeTruthy();
     const token = decodeURIComponent(verification[2].match(/token=([^&\s"'<>]+)/i)[1]);
     await page.goto(`${server.origin}/verify-email.html?token=${encodeURIComponent(token)}`);
+    await expect(page.locator('#verificationPanel')).toHaveAttribute('data-state', 'ready');
+    expect((await User.findById(id).lean()).emailVerified).toBe(false);
+    await page.getByRole('button', { name: 'Verify email', exact: true }).click();
     await expect(page.locator('#verificationPanel')).toHaveAttribute('data-state', 'success');
     expect((await User.findById(id).lean()).emailVerified).toBe(true);
     await login(page, email, password); await expect(page.locator('body')).toContainText('We’re reviewing your application.');
@@ -137,26 +141,59 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await adminPage.close();
     expect(await User.findById(id).lean()).toMatchObject({ status: 'approved', preferences: { hideProfile: true } });
     await login(page, email, password); await expect(page.locator('body')).toHaveAttribute('data-v2-session', 'ready');
-    const workspaceTour = page.locator('[data-v2-onboarding-dialog="workspace"]'); await expect(workspaceTour).toBeVisible();
+    const welcome = page.locator('[data-v2-onboarding-dialog="welcome-v1"]');
+    await expect(welcome).toBeVisible();
+    await expect(welcome.getByRole('button', { name: 'Explore first', exact: true })).toBeVisible();
+    await expect(welcome.getByRole('button', { name: 'Set up my account', exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('welcome-desktop.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(welcome.getByRole('button', { name: 'Set up my account', exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: info.outputPath('welcome-mobile.png') });
     let failedWrites = 0;
     await page.route('**/api/users/me/onboarding', route => {
-      if (route.request().method() === 'PATCH' && failedWrites++ === 0) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Tour progress could not be saved.' }) });
+      if (route.request().method() === 'PATCH') {
+        expect(route.request().postDataJSON().expectedOwnerId).toBe(id);
+        if (failedWrites++ === 0) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Tour progress could not be saved.' }) });
+      }
       return route.continue();
     });
-    async function completeCurrentTour() { for (let step = 1; step <= 5; step++) { await expect(workspaceTour.locator('.v2-onboarding-progress')).toHaveText(`${step} of 5`); await workspaceTour.locator('[data-tour-next]').click(); } }
-    await completeCurrentTour(); await expect(workspaceTour.getByRole('alert')).toHaveText('Couldn’t save tour completion. Try again.');
-    expect((await User.findById(id).lean()).onboarding).toMatchObject({paralegalTourCompleted:false,paralegalProfileTourCompleted:false});
-    await page.keyboard.press('Escape'); await expect(workspaceTour).toHaveCount(0); expect(failedWrites).toBe(1);
-    await page.reload(); await expect(workspaceTour).toBeVisible(); await completeCurrentTour();
-    await expect.poll(async () => (await User.findById(id).lean()).onboarding).toMatchObject({paralegalTourCompleted:true,paralegalProfileTourCompleted:true});
-    expect(failedWrites).toBe(2); await page.unroute('**/api/users/me/onboarding');
-    await page.goto(server.origin+'/paralegal-v2.html#/settings?tab=profile');await expect(page.locator('#v2-settings-profile')).toBeVisible();const resumeIntro=page.locator('dialog.ri-dialog[open]');if(!await resumeIntro.isVisible())await page.getByRole('button',{name:'Fill from résumé',exact:true}).click();await expect(resumeIntro).toBeVisible();await resumeIntro.getByRole('button',{name:'I’ll enter it myself',exact:true}).click();await expect(resumeIntro).toHaveCount(0);
+    await welcome.getByRole('button', { name: 'Explore first', exact: true }).click();
+    await expect(welcome).toHaveCount(0);
+    await expect(page.locator('[data-v2-toast-region]')).toContainText('Progress couldn’t sync');
+    expect((await User.findById(id).lean()).onboarding.paralegalTourCompleted).toBe(false);
+    const outboxKey = `lpc_portal_tour_pending_v1:${id}`;
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), outboxKey)).toEqual({ 'welcome-v1': 'dismissed' });
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-v2-session', 'ready');
+    await expect.poll(async () => (await User.findById(id).lean()).onboarding.paralegalTours['welcome-v1']).toBe('dismissed');
+    expect((await User.findById(id).lean()).onboarding.paralegalTourCompleted).toBe(true);
+    expect(failedWrites).toBe(2);
+    await expect.poll(() => page.evaluate(key => localStorage.getItem(key), outboxKey)).toBeNull();
+    await expect(welcome).toHaveCount(0);
+    for (const route of ['browse', 'work', 'home']) {
+      await page.goto(`${server.origin}/paralegal-v2.html#/${route}`);
+      await expect(page.locator('html')).toHaveAttribute('data-lpc-v2-committed-route', route);
+      await expect(page.locator('[data-v2-route-outlet]')).toBeVisible();
+    }
+    await page.getByRole('button', { name: 'Replay tour', exact: true }).click();
+    await expect(welcome).toBeVisible();
+    await welcome.getByRole('button', { name: 'Set up my account', exact: true }).click();
+    const resumeIntro = page.locator('dialog.ri-dialog[open]');
+    await expect(resumeIntro).toBeVisible();
+    await expect(resumeIntro).toContainText('Your résumé has a head start.');
+    await page.screenshot({ path: info.outputPath('setup-resume-mobile.png') });
+    await resumeIntro.getByRole('button', { name: 'I’ll enter it myself', exact: true }).click();
+    await expect(resumeIntro).toHaveCount(0);
+    await expect(page.locator('#v2-settings-profile')).toBeVisible();
+    await expect.poll(async () => (await User.findById(id).lean()).onboarding.paralegalTours['welcome-v1']).toBe('dismissed');
+    await page.unroute('**/api/users/me/onboarding');
     await page.reload(); await expect(page.locator('body')).toHaveAttribute('data-v2-session', 'ready');
     await expect(page.locator('html')).toHaveAttribute('data-lpc-v2-committed-route', 'settings');
     await expect(page.getByRole('button', { name: 'Edit personal details name', exact: true })).toContainText('Morgan Admission');
     await expect(page.locator('[data-v2-onboarding-dialog][open]')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('approved-first-workspace.png') });
-    checkpoints.push('approved and signed into V2; current combined five-step tour persisted both completion flags; failed save required deliberate retry');
+    checkpoints.push('approved and signed into V2; current welcome and setup flow persisted owner-bound progress; failed sync recovered on reload; normal routes remained available');
     await api(adminContext, 'post', `/api/admin/disable/${id}`, { reason: 'Synthetic access restriction check.' });
     try { await page.reload(); } catch (error) {
       // Suspension can start the sign-in redirect before this explicit reload.

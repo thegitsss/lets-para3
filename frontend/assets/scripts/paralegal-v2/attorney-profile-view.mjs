@@ -17,10 +17,12 @@ function list(value) {
   return Array.isArray(value) ? [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))] : [];
 }
 
-function safeHttpUrl(value) {
+function safeHttpUrl(value, requiredHost = '') {
   try {
     const url = new URL(String(value || "").trim());
-    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    if (url.username || url.password || !["http:", "https:"].includes(url.protocol)) return '';
+    if (requiredHost && url.hostname !== requiredHost && !url.hostname.endsWith(`.${requiredHost}`)) return '';
+    return url.href;
   } catch {
     return "";
   }
@@ -73,7 +75,7 @@ function languageText(values) {
 function profileView(profile) {
   const name = profileName(profile);
   const photo = profilePhoto(profile.profileImage || profile.avatarURL);
-  const linkedIn = safeHttpUrl(profile.linkedInURL);
+  const linkedIn = safeHttpUrl(profile.linkedInURL, 'linkedin.com');
   const website = safeHttpUrl(profile.firmWebsite || profile.website);
   const practiceAreas = [...list(profile.practiceAreas), ...list(profile.specialties)];
   const subtitle = [

@@ -1,6 +1,7 @@
 (() => {
 
   "use strict";
+  import('/assets/scripts/utils/row-actions-bootstrap.mjs').catch(() => {});
 
   const headerMarkup = `
     <header class="home-header" data-home-header data-public-header>

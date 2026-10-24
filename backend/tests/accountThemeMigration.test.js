@@ -21,9 +21,13 @@ describe("current account appearance transition", () => {
     expect(user.$getChanges()).toEqual({ $set: { "preferences.theme": "dark" } });
   });
 
-  test("Light, Dark and System are valid account appearances", () => {
-    const themePath = User.schema.path("preferences.theme");
-    expect(themePath.enumValues).toEqual(["light", "dark", "system"]);
+  test.each(["light", "dark", "system"])("%s remains a valid account appearance", async theme => {
+    const user = new User({
+      firstName: "Preserved", lastName: "Member", email: "appearance@example.test",
+      password: "Password123!", role: "paralegal", preferences: { theme },
+    });
+    await user.validate();
+    expect(user.preferences.theme).toBe(theme);
   });
 
   test("retired appearance values normalize without changing other user information", async () => {

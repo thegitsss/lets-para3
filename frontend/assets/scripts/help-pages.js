@@ -5,6 +5,8 @@
   const assistantModuleUrl = new URL("utils/support-drawer.js", scriptUrl).href;
 
   async function initializeAuthenticatedHelp() {
+    const { isSupportPageAllowed } = await import(new URL("utils/support-page-boundary.mjs", scriptUrl).href);
+    if (!isSupportPageAllowed(window.location.pathname)) return;
     if (typeof window.checkSession !== "function") return;
     try {
       const session = await window.checkSession(undefined, { redirectOnFail: false });

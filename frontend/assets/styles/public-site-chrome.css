@@ -258,3 +258,8 @@ body.public-site-chrome.nav-open { overflow: hidden; }
 @media (max-width: 767px) {
   .public-site-chrome .home-footer { margin-bottom: 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
 }
+
+/* Use one typeface for public-page titles; retain each page's existing type scale. */
+body.public-site-chrome:not(.lpc-home):not(.authenticated-browse) h1 {
+  font-family: "Sarabun", sans-serif;
+}

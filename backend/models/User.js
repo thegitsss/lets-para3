@@ -8,6 +8,13 @@ const { normalizePassword } = require("../utils/passwordPolicy");
 const { normalizeHttpUrl } = require("../utils/httpUrl");
 const { SUPPORTED_ACCOUNT_THEMES, normalizeAccountTheme } = require("../utils/accountPreferences");
 
+const retainedProfileValues = new WeakMap();
+function isUnchangedStoredProfileValue(user, field, value) {
+  if (user?.isNew !== false) return false;
+  const stored = retainedProfileValues.get(user);
+  return Boolean(stored && Object.hasOwn(stored, field) && stored[field] === value);
+}
+
 const uniqueStrings = (arr = []) =>
   [...new Set((arr || []).map((s) => String(s || "").trim()).filter(Boolean))];
 
@@ -302,7 +309,10 @@ const userSchema = new Schema(
       trim: true,
       maxlength: 500,
       validate: {
-        validator: (value) => normalizeHttpUrl(value, { fieldLabel: "Firm website" }).ok,
+        validator: function (value) {
+          return isUnchangedStoredProfileValue(this, "firmWebsite", value)
+            || normalizeHttpUrl(value, { fieldLabel: "Firm website" }).ok;
+        },
         message: "Firm website must be a valid HTTP(S) URL without embedded credentials.",
       },
     },
@@ -392,8 +402,14 @@ const userSchema = new Schema(
     preferences: {
       theme: {
         type: String,
-        enum: SUPPORTED_ACCOUNT_THEMES,
         default: "light",
+        validate: {
+          validator: function (value) {
+            return isUnchangedStoredProfileValue(this, "preferences.theme", value)
+              || SUPPORTED_ACCOUNT_THEMES.includes(value);
+          },
+          message: "Choose a supported account theme.",
+        },
       },
       fontSize: {
         type: String,
@@ -431,8 +447,10 @@ const userSchema = new Schema(
       trim: true,
       maxlength: 500,
       validate: {
-        validator: (value) =>
-          normalizeHttpUrl(value, { fieldLabel: "LinkedIn URL", requiredHost: "linkedin.com" }).ok,
+        validator: function (value) {
+          return isUnchangedStoredProfileValue(this, "linkedInURL", value)
+            || normalizeHttpUrl(value, { fieldLabel: "LinkedIn URL", requiredHost: "linkedin.com" }).ok;
+        },
         message: "LinkedIn URL must be a valid linkedin.com HTTP(S) URL without embedded credentials.",
       },
     },
@@ -515,13 +533,24 @@ userSchema.virtual("name").get(function () {
 /** ----------------------------------------
  * Validation & Hooks
  * -----------------------------------------*/
+// Keep historical values on unrelated saves. This snapshot is private to the
+// hydrated document and is never stored in MongoDB or included in API output.
+userSchema.post("init", function (user) {
+  retainedProfileValues.set(user, Object.freeze({
+    "preferences.theme": user.get("preferences.theme"),
+    linkedInURL: user.linkedInURL,
+    firmWebsite: user.firmWebsite,
+  }));
+});
+
 userSchema.pre("validate", function () {
   if (this.email) this.email = String(this.email).trim().toLowerCase();
   if (this.firstName) this.firstName = String(this.firstName).trim();
   if (this.lastName) this.lastName = String(this.lastName).trim();
   // A projected user save may not have read appearance preferences. Do not
   // turn an unrelated profile or Stripe update into a default-theme write.
-  if (this.preferences && (this.isSelected("preferences.theme") || this.isModified("preferences.theme"))) {
+  if (this.preferences && (this.isSelected("preferences.theme") || this.isModified("preferences.theme"))
+      && !isUnchangedStoredProfileValue(this, "preferences.theme", this.preferences.theme)) {
     this.preferences.theme = normalizeAccountTheme(this.preferences.theme);
   }
 });

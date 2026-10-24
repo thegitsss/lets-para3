@@ -1,22 +1,50 @@
 (function initializeUniversalAuthenticatedHeader() {
+  import('/assets/scripts/utils/row-actions-bootstrap.mjs').catch(() => {
+    // Existing controls remain usable if the optional larger hit areas cannot load.
+  });
   // These destinations can reveal without accepting an outgoing snapshot.
   // Keep their navigation ordinary: Chromium can otherwise reject the native
   // transition while the new settings, shell or Matter document is opening.
   let transitionBoundaryStyle = null;
+  let pendingBoundaryRestore = null;
+  let documentSwapping = false;
   const restoreTransitionBoundary = () => {
+    pendingBoundaryRestore = null;
     transitionBoundaryStyle?.remove();
     transitionBoundaryStyle = null;
   };
   window.navigation?.addEventListener("navigate", (event) => {
+    if (documentSwapping) return;
+    // History/hash normalization cannot replace a pending document departure.
+    if (event.destination.sameDocument) {
+      pendingBoundaryRestore = null;
+      return;
+    }
     restoreTransitionBoundary();
     const destination = new URL(event.destination.url);
-    if (destination.origin !== window.location.origin || !["/attorney-v2.html", "/paralegal-v2.html", "/profile-settings.html", "/case-detail.html"].includes(destination.pathname)) return;
+    if (destination.origin !== window.location.origin || !["/dashboard-attorney.html", "/create-case.html", "/attorney-v2.html", "/paralegal-v2.html", "/dashboard-paralegal.html", "/browse-jobs.html", "/profile-settings.html", "/case-detail.html", "/login.html", "/paralegal-admission.html"].includes(destination.pathname)) return;
     transitionBoundaryStyle = document.createElement("style");
     transitionBoundaryStyle.textContent = "@view-transition { navigation: none; }";
     document.head.append(transitionBoundaryStyle);
   });
-  window.navigation?.addEventListener("navigateerror", restoreTransitionBoundary);
-  window.addEventListener("pageshow", restoreTransitionBoundary);
+  window.navigation?.addEventListener("navigateerror", () => {
+    if (documentSwapping) return;
+    const pending = { style: transitionBoundaryStyle };
+    pendingBoundaryRestore = pending;
+    // replaceState can report the document departure aborted before dispatching
+    // its own synchronous navigation, although that departure still completes.
+    queueMicrotask(() => {
+      if (!documentSwapping && pendingBoundaryRestore === pending && transitionBoundaryStyle === pending.style) restoreTransitionBoundary();
+    });
+  });
+  window.addEventListener("pageswap", () => {
+    documentSwapping = true;
+    pendingBoundaryRestore = null;
+  });
+  window.addEventListener("pageshow", () => {
+    documentSwapping = false;
+    restoreTransitionBoundary();
+  });
   const scriptUrl = document.currentScript?.src || window.location.href;
   const assetUrl = (relative) => new URL(relative, scriptUrl).href;
   let controls = null;
