@@ -143,13 +143,14 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await login(page, email, password); await expect(page.locator('body')).toHaveAttribute('data-v2-session', 'ready');
     const welcome = page.locator('[data-v2-onboarding-dialog="welcome-v1"]');
     await expect(welcome).toBeVisible();
+    await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
     await expect(welcome.getByRole('button', { name: 'Explore first', exact: true })).toBeVisible();
     await expect(welcome.getByRole('button', { name: 'Set up my account', exact: true })).toBeVisible();
-    await page.screenshot({ path: info.outputPath('welcome-desktop.png') });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('welcome-desktop.png') });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(welcome.getByRole('button', { name: 'Set up my account', exact: true })).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-    await page.screenshot({ path: info.outputPath('welcome-mobile.png') });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('welcome-mobile.png') });
     let failedWrites = 0;
     await page.route('**/api/users/me/onboarding', route => {
       if (route.request().method() === 'PATCH') {
@@ -182,7 +183,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     const resumeIntro = page.locator('dialog.ri-dialog[open]');
     await expect(resumeIntro).toBeVisible();
     await expect(resumeIntro).toContainText('Your résumé has a head start.');
-    await page.screenshot({ path: info.outputPath('setup-resume-mobile.png') });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('setup-resume-mobile.png') });
     await resumeIntro.getByRole('button', { name: 'I’ll enter it myself', exact: true }).click();
     await expect(resumeIntro).toHaveCount(0);
     await expect(page.locator('#v2-settings-profile')).toBeVisible();
@@ -192,7 +193,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await expect(page.locator('html')).toHaveAttribute('data-lpc-v2-committed-route', 'settings');
     await expect(page.getByRole('button', { name: 'Edit personal details name', exact: true })).toContainText('Morgan Admission');
     await expect(page.locator('[data-v2-onboarding-dialog][open]')).toHaveCount(0);
-    await page.screenshot({ path: info.outputPath('approved-first-workspace.png') });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('approved-first-workspace.png') });
     checkpoints.push('approved and signed into V2; current welcome and setup flow persisted owner-bound progress; failed sync recovered on reload; normal routes remained available');
     await api(adminContext, 'post', `/api/admin/disable/${id}`, { reason: 'Synthetic access restriction check.' });
     try { await page.reload(); } catch (error) {
@@ -218,7 +219,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await expect(page.locator('html')).toHaveAttribute('data-lpc-v2-committed-route', 'home');
     await expect(page.locator('[data-v2-home]')).not.toHaveAttribute('data-home-loading', 'true');
     await expect(page.locator('[data-v2-onboarding-dialog][open]')).toHaveCount(0);
-    await page.screenshot({ path: info.outputPath('reinstated-workspace.png') });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('reinstated-workspace.png') });
     checkpoints.push('suspension revoked session and blocked sign-in; reinstatement required fresh sign-in and retained completed tours');
     expect(diagnostics().documentFailures).toEqual([]);
     expect(diagnostics().unexplainedPageErrors).toEqual([]);

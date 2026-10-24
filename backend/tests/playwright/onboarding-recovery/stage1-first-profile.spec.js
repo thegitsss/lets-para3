@@ -21,6 +21,7 @@ for (const width of [1440, 390]) test(`new paralegal can create and retain the f
   const page = await context.newPage();
   try {
     await page.goto(`${server.origin}/paralegal-v2.html#/home`);
+    await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
     const welcome = page.locator('[data-v2-onboarding-dialog="welcome-v1"]');
     await expect(welcome).toBeVisible();
     await welcome.getByRole('button', { name: 'Set up my account', exact: true }).click();
@@ -41,6 +42,7 @@ for (const width of [1440, 390]) test(`new paralegal can create and retain the f
       await panel.getByRole('heading', { name: 'About', exact: true }).click();
       await expect.poll(async () => (await read())[entry.key]).toEqual([expect.objectContaining(entry.expected)]);
       await page.reload();
+      await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
       await expect(panel).toBeVisible();
       expect((await read())[entry.key]).toEqual([expect.objectContaining(entry.expected)]);
     }
@@ -59,23 +61,24 @@ for (const width of [1440, 390]) test(`new paralegal can create and retain the f
     expect((await read()).profileImage).toBe(beforePhoto.profileImage);
     await choosePhoto();
     await expect(crop.getByRole('button', { name: 'Submit photo for approval', exact: true })).toBeInViewport();
-    await page.screenshot({ path: info.outputPath('first-photo-crop.png') });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('first-photo-crop.png') });
     await crop.getByRole('button', { name: 'Submit photo for approval', exact: true }).click();
     await expect(crop).toHaveCount(0);
     await expect.poll(async () => (await read()).profilePhotoStatus).toBe('pending_review');
     expect((await read()).pendingProfileImageKey).toMatch(new RegExp(`^profile-photos/${actor.id}/`));
     await page.reload();
+    await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
     await expect(panel).toBeVisible();
     expect((await read()).profilePhotoStatus).toBe('pending_review');
     expect((await read()).profileImage).toBe('');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-    await page.screenshot({ path: info.outputPath('first-profile-settings.png'), fullPage: true });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('first-profile-settings.png'), fullPage: true });
     await panel.getByRole('link', { name: 'View profile', exact: true }).click();
     const preview = page.locator('[data-v2-profile-preview]');
     await expect(preview).toBeVisible();
     for (const value of ['Litigation paralegal', 'Synthetic City College', 'Spanish']) await expect(preview).toContainText(value);
     await expect(preview).not.toContainText((await read()).email);
-    await page.screenshot({ path: info.outputPath('first-profile-preview.png'), fullPage: true });
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('first-profile-preview.png'), fullPage: true });
     await fs.writeFile(info.outputPath('first-profile-evidence.json'), JSON.stringify({ width, persistedEntries: Object.fromEntries(entries.map(entry => [entry.key, entry.expected])), syntheticProviders: true }, null, 2));
   } finally { await context.close(); }
 });
