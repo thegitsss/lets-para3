@@ -1622,7 +1622,7 @@ router.post(
     const challengeToken = String(req.body?.challengeToken || "");
     if (challengeToken) {
       const challengeUser = await User.findOne({ twoFactorChallengeHash: hashOpaqueToken(challengeToken) })
-        .select("_id twoFactorEnabled +twoFactorExpiresAt");
+        .select("_id twoFactorEnabled twoFactorExpiresAt");
       if (!challengeUser?.twoFactorEnabled || !challengeUser.twoFactorExpiresAt || challengeUser.twoFactorExpiresAt <= new Date()) {
         return res.status(400).json({ error: "Invalid sign-in challenge." });
       }

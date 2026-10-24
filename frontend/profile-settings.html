@@ -5279,6 +5279,19 @@ input[type="number"],
         </div>
       </div>
 
+      <div class="settings-block security-card" id="passkeysSection">
+        <h3>Passkeys</h3>
+        <p class="muted">Sign in using your device screen lock, fingerprint, face, or security key.</p>
+        <div data-passkey-list aria-live="polite"></div>
+        <label for="passkeyCurrentPassword">Current password</label>
+        <input id="passkeyCurrentPassword" type="password" autocomplete="current-password" data-passkey-password>
+        <label for="passkeyName">Passkey name (optional)</label>
+        <input id="passkeyName" type="text" maxlength="80" autocomplete="off" placeholder="For example: Work MacBook" data-passkey-name>
+        <button type="button" class="btn btn-primary" data-passkey-add>Add a passkey</button>
+        <button type="button" class="btn btn-outline hidden" data-passkey-cancel hidden>Cancel</button>
+        <p class="muted" role="status" data-passkey-status></p>
+      </div>
+
       <div class="security-extras">
         <div class="settings-block">
           <div class="settings-title-with-help">
@@ -5560,6 +5573,8 @@ input[type="number"],
   <script src="assets/libs/cropper/cropper.main.js"></script>
   <script type="module" src="assets/scripts/attorney-tabs.js"></script>
   <script type="module" src="assets/scripts/profile-settings.js"></script>
+  <script src="/assets/vendor/simplewebauthn-13.3.0.js"></script>
+  <script type="module" src="assets/scripts/account-passkeys.js"></script>
   <script>
     // Safe, bubble-phase logout handler as a fallback for any [data-logout] trigger
     document.addEventListener("click", (evt) => {

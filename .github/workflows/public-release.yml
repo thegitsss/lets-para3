@@ -41,7 +41,7 @@ jobs:
         env:
           JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
           EMAIL_DISABLE: "true"
-        run: npm test -- --runTestsByPath tests/emailVerificationFlow.test.js tests/admissionDecisionNotifications.test.js tests/accountEmailTemplates.test.js tests/emailLayout.test.js tests/passwordPolicy.test.js tests/authPasswordResetConcurrency.test.js tests/authPasswordLoginLockConcurrency.test.js tests/authLoginRehashConcurrency.test.js tests/authFactorConcurrency.test.js tests/authFactorGoogleLinkAtomicity.test.js
+        run: npm test -- --runTestsByPath tests/emailVerificationFlow.test.js tests/admissionDecisionNotifications.test.js tests/accountEmailTemplates.test.js tests/emailLayout.test.js tests/passwordPolicy.test.js tests/authPasswordResetConcurrency.test.js tests/authPasswordLoginLockConcurrency.test.js tests/authLoginRehashConcurrency.test.js tests/authFactorConcurrency.test.js tests/authFactorGoogleLinkAtomicity.test.js tests/passkeyRelyingParty.test.js tests/passkeyAccountRoutes.test.js tests/passkeyCeremony.test.js
       - name: Install browser for public journeys
         working-directory: backend
         run: |

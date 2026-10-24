@@ -10,7 +10,9 @@ const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
 function relyingParty(req) {
   const explicitOrigin = String(process.env.WEBAUTHN_ORIGIN || "").replace(/\/+$/, "");
-  const configuredOrigin = explicitOrigin || String(process.env.APP_BASE_URL || "").replace(/\/+$/, "");
+  const appBase = String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
+  const bareSiteAddress = appBase && !/^[a-z][a-z\d+.-]*:\/\//i.test(appBase);
+  const configuredOrigin = explicitOrigin || (bareSiteAddress ? `https://${appBase}` : appBase);
   const forwardedProto = String(req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim();
   const protocol = forwardedProto || req?.protocol || "http";
   const host = String(req?.get?.("host") || req?.headers?.host || "localhost:5050");
@@ -20,7 +22,13 @@ function relyingParty(req) {
   // A development browser on localhost cannot create credentials for the
   // public site. Explicit WebAuthn settings and deployed origins stay fixed.
   const useLocalOrigin = loopback && !deployed && !explicitOrigin && !process.env.WEBAUTHN_RP_ID;
-  const origin = useLocalOrigin ? requestOrigin.origin : configuredOrigin || requestOrigin.origin;
+  let origin = useLocalOrigin ? requestOrigin.origin : configuredOrigin || requestOrigin.origin;
+  // The hosted site address may be a bare domain. Keep its HTTPS www alias
+  // usable without letting an unrelated Host header choose the credential origin.
+  if (!useLocalOrigin && !explicitOrigin && bareSiteAddress && requestOrigin.protocol === "https:") {
+    const configuredHost = new URL(configuredOrigin).hostname;
+    if ([configuredHost, `www.${configuredHost}`].includes(requestOrigin.hostname)) origin = requestOrigin.origin;
+  }
   const url = new URL(origin);
   return {
     rpID: String(process.env.WEBAUTHN_RP_ID || url.hostname),

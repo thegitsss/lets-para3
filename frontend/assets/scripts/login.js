@@ -2,6 +2,7 @@ import { fetchCSRF, persistSession } from "./auth.js";
 import "./utils/login-return-target.js";
 import { showAlert } from "./utils/dialogs.js";
 import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { runPasskeyCeremony } from "./utils/passkey-ceremony.js";
 
 const API_BASE = "/api";
 
@@ -86,16 +87,9 @@ async function fetchCsrfToken(force = false) {
   }
 }
 
-function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  const signal = options.signal || controller.signal;
-  return fetch(url, { ...options, signal }).finally(() => clearTimeout(id));
-}
-
 // The deadline covers CSRF, the credential request and its response body.
 // A late CSRF response must never start a credential request after timeout.
-async function postSignIn(endpoint, body) {
+async function postSignIn(endpoint, body, { suppressToast = endpoint === "/auth/login" } = {}) {
   const controller = new AbortController();
   let timer;
   const timeout = new Promise((_, reject) => {
@@ -110,7 +104,7 @@ async function postSignIn(endpoint, body) {
       controller.signal.throwIfAborted();
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
-        suppressToast: endpoint === "/auth/login",
+        suppressToast,
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -235,79 +229,69 @@ const initLogin = () => {
 
   if (!passkeysSupported && passkeyLoginBtn) passkeyLoginBtn.hidden = true;
 
-  const performPasskeyAuthentication = async (challengeToken = "", { useBrowserAutofill = false } = {}) => {
+  const passkeyPreparations = new Map();
+  function preparePasskeySignIn(challengeToken = "") {
+    const cached = passkeyPreparations.get(challengeToken);
+    if (cached && Date.now() - cached.createdAt < 240000) return cached.promise;
+    const record = { createdAt: Date.now(), data: null, promise: null };
+    record.promise = (async () => {
+      const { res, data } = await postSignIn("/auth/passkeys/authentication-options", challengeToken ? { challengeToken } : {}, { suppressToast: true });
+      if (!res.ok) throw new Error(res.status >= 500
+        ? "Passkey sign-in is temporarily unavailable. Please sign in with your password and try again."
+        : data?.error || data?.msg || "Unable to start passkey sign-in. Please try again.");
+      if (!data?.challengeId || !data?.options?.challenge) throw new Error("Unable to prepare passkey sign-in. Please try again.");
+      record.data = data;
+      return data;
+    })().catch(error => { if (passkeyPreparations.get(challengeToken) === record) passkeyPreparations.delete(challengeToken); throw error; });
+    passkeyPreparations.set(challengeToken, record);
+    return record.promise;
+  }
+  const performPasskeyAuthentication = async (challengeToken = "") => {
     if (!passkeysSupported) throw new Error("Passkeys are not supported by this browser or device.");
-    const csrfToken = await fetchCsrfToken(!useBrowserAutofill);
-    const headers = {
-      "Content-Type": "application/json",
-      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-    };
-    const optionsRes = await fetchWithTimeout(`${API_BASE}/auth/passkeys/authentication-options`, {
-      method: "POST",
-      credentials: "include",
-      suppressToast: useBrowserAutofill,
-      headers,
-      body: JSON.stringify(challengeToken ? { challengeToken } : {}),
+    const cached = passkeyPreparations.get(challengeToken);
+    if (!cached?.data || Date.now() - cached.createdAt >= 240000) {
+      await preparePasskeySignIn(challengeToken);
+      notify("Passkey sign-in is ready. Select the passkey button again to continue.", "ok");
+      return;
+    }
+    passkeyPreparations.delete(challengeToken);
+    const optionsData = cached.data;
+    // Options are ready before the click: the browser call starts immediately.
+    const response = await runPasskeyCeremony(() => webAuthnBrowser.startAuthentication({ optionsJSON: optionsData.options }), {
+      action: "sign-in", cancel: () => webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(),
     });
-    const optionsData = await optionsRes.json().catch(() => ({}));
-    if (!optionsRes.ok) throw new Error(optionsData?.error || "No passkey is available for this sign-in.");
-    const response = await webAuthnBrowser.startAuthentication({
-      optionsJSON: optionsData.options,
-      useBrowserAutofill,
-    });
-    const verifyRes = await fetchWithTimeout(`${API_BASE}/auth/passkeys/authenticate`, {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: JSON.stringify({
-        challengeId: optionsData.challengeId,
-        response,
-        ...(challengeToken ? { challengeToken } : {}),
-      }),
-    });
-    const data = await verifyRes.json().catch(() => ({}));
-    if (!verifyRes.ok) throw new Error(data?.error || "Passkey sign-in failed.");
+    const { res, data } = await postSignIn("/auth/passkeys/authenticate", {
+      challengeId: optionsData.challengeId, response, ...(challengeToken ? { challengeToken } : {}),
+    }, { suppressToast: true });
+    if (!res.ok) throw new Error(data?.error || data?.msg || "Passkey sign-in failed.");
     persistSession({ user: data.user || null });
     window.location.href = await resolvePostLoginTarget(data.user);
   };
-
   passkeyLoginBtn?.addEventListener("click", async () => {
     passkeyLoginBtn.disabled = true;
-    try {
-      await performPasskeyAuthentication();
-    } catch (err) {
-      if (err?.name !== "NotAllowedError") notify(err?.message || "Passkey sign-in was cancelled or failed.");
-    } finally {
-      passkeyLoginBtn.disabled = false;
-    }
+    try { await performPasskeyAuthentication(); }
+    catch (error) {
+      notify(error?.name === "NotAllowedError" || error?.name === "AbortError" ? "Passkey sign-in was canceled. You can try again or use your password." : error?.message || "Passkey sign-in failed.");
+      void preparePasskeySignIn().catch(() => {});
+    } finally { passkeyLoginBtn.disabled = false; }
   });
-
-  const startPasskeyAutofill = async () => {
-    if (!passkeysSupported || !window.PublicKeyCredential?.isConditionalMediationAvailable) return;
-    try {
-      const available = await window.PublicKeyCredential.isConditionalMediationAvailable();
-      if (!available) return;
-      await performPasskeyAuthentication("", { useBrowserAutofill: true });
-    } catch (err) {
-      // Conditional UI stays silent unless the user deliberately selects a passkey.
-      // Explicit passkey-button errors continue to use the visible notification above.
-      if (err?.name !== "AbortError" && err?.name !== "NotAllowedError") {
-        console.warn("[login] passkey autofill unavailable", err);
-      }
-    }
-  };
-
-  void startPasskeyAutofill();
-
+  if (passkeysSupported && passkeyLoginBtn) {
+    passkeyLoginBtn.disabled = true;
+    void preparePasskeySignIn().catch(() => {}).finally(() => { passkeyLoginBtn.disabled = false; });
+  }
   twoFactorPasskeyBtn?.addEventListener("click", async () => {
-    if (factorPending) return;
-    twoFactorPasskeyBtn.disabled = true;
-    try {
-      await performPasskeyAuthentication(pendingTwoFactorChallenge);
-    } catch (err) {
-      if (err?.name !== "NotAllowedError") notify(err?.message || "Passkey verification was cancelled or failed.");
+    if (factorPending || !pendingTwoFactorChallenge) return;
+    factorPending = true;
+    const controls = [document.getElementById("twoFactorVerifyBtn"), twoFactorBackupToggle, twoFactorBackBtn, twoFactorPasskeyBtn].filter(Boolean);
+    const disabledBefore = controls.map(control => control.disabled);
+    controls.forEach(control => { control.disabled = true; });
+    try { await performPasskeyAuthentication(pendingTwoFactorChallenge); }
+    catch (error) {
+      notify(error?.name === "NotAllowedError" || error?.name === "AbortError" ? "Passkey verification was canceled. You can try again." : error?.message || "Passkey verification failed.");
+      void preparePasskeySignIn(pendingTwoFactorChallenge).catch(() => {});
     } finally {
-      twoFactorPasskeyBtn.disabled = false;
+      factorPending = false;
+      controls.forEach((control, index) => { control.disabled = disabledBefore[index]; });
     }
   });
 
@@ -321,6 +305,10 @@ const initLogin = () => {
           : "Enter the verification code we just sent you.";
     }
     if (twoFactorPasskeyAction) twoFactorPasskeyAction.hidden = !(passkeysSupported && passkeyAvailable);
+    if (passkeysSupported && passkeyAvailable && twoFactorPasskeyBtn) {
+      twoFactorPasskeyBtn.disabled = true;
+      void preparePasskeySignIn(challengeToken).catch(() => {}).finally(() => { twoFactorPasskeyBtn.disabled = false; });
+    }
     if (loginPanel) loginPanel.classList.add("hidden");
     if (twoFactorPanel) twoFactorPanel.classList.remove("hidden");
     if (twoFactorCode) twoFactorCode.focus();
