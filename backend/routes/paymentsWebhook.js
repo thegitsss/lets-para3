@@ -122,7 +122,8 @@ const { verifyStripeWebhook } = require('../services/stripeWebhookSignature');
 // ----------------------------------------
 // Core webhook endpoint
 // ----------------------------------------
-router.post("/", express.raw({ type: "application/json" }), async (req, res) => {
+const { deliveryLimit, capacity } = require('../middleware/stripeWebhookProtection').createStripeWebhookProtection();
+router.post("/", deliveryLimit, capacity, express.raw({ type: "application/json", limit: "100kb" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   logger.info("Webhook delivery received.", {
     hasSignature: Boolean(sig),

@@ -71,6 +71,20 @@ async function installSettingsProjection(page, overrides = {}) {
   // the first-visit popup separately, including its account-scoped dismissal.
   if (!overrides.showResumeIntro) await page.addInitScript(ownerId => localStorage.setItem(`lpc_resume_intro_v1:${ownerId}`, 'seen'), state.user.id || state.user._id);
   await installNotificationReads(page, { ownerId: () => state.user.id || state.user._id });
+  // This UI projection models opaque recovery capabilities only. The actual
+  // mounted endpoint/encryption boundary is exercised by stage1-first-profile.
+  const draftCapsules = new Map();
+  await page.route('**/api/account/profile-draft/*', route => {
+    const input = route.request().postDataJSON();
+    if (input.expectedOwnerId !== String(state.user._id || state.user.id)) return json(route, { error: 'Account changed' }, 403);
+    if (new URL(route.request().url()).pathname.endsWith('/seal')) {
+      const capsule = `enc:v1:${require('node:crypto').randomBytes(32).toString('base64')}`;
+      draftCapsules.set(capsule, input.draft);
+      return json(route, { capsule });
+    }
+    const draft = draftCapsules.get(input.capsule);
+    return draft ? json(route, { draft }) : json(route, { error: 'Invalid capsule' }, 400);
+  });
   await page.route("**/api/csrf", (route) => json(route, { csrfToken: "synthetic-csrf" }));
   await page.route("**/api/auth/workspace-release", route => json(route, { workspace: { schemaVersion: 1, ownerId: state.user.id || state.user._id, role: "paralegal", revision: 1, version: "v2", defaultDestination: "/paralegal-v2.html#/home" } }));
   await page.route("**/api/auth/me", (route) => json(route, { user: state.user }));

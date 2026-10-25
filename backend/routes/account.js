@@ -77,6 +77,30 @@ router.get("/deactivate-result", closureGuard.privateResponse, asyncHandler(asyn
 router.use(verifyToken);
 router.use(requireApproved);
 
+// Capsules keep per-tab recovery without storing profile details in browser
+// storage or writing drafts into existing user records. Authority comes only
+// from the verified session; an input owner never selects a decryption owner.
+const protectedProfileDraft = require('../services/profileDraftProtection');
+const profileDraftLimit = require('express-rate-limit').rateLimit({
+  windowMs: 60000, limit: 600, keyGenerator: req => String(req.user.id),
+  standardHeaders: true, legacyHeaders: false,
+});
+router.post('/profile-draft/:operation', csrfProtection, profileDraftLimit, (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    if (!accountWriteGuard.checkOwner(req)) throw accountWriteGuard.invalid();
+    if (req.user.role !== 'paralegal') return res.status(403).json({ error: 'Profile draft unavailable.' });
+    const { operation } = req.params;
+    if (operation === 'seal') return res.json({ capsule: protectedProfileDraft.seal(req.user.id, req.body.draft) });
+    if (operation === 'open') return res.json({ draft: protectedProfileDraft.open(req.user.id, req.body.capsule) });
+    return res.sendStatus(404);
+  } catch (error) {
+    if (accountWriteGuard.respond(error, res)) return;
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
+});
+
 router.get(
   "/preferences",
   asyncHandler(async (req, res) => {

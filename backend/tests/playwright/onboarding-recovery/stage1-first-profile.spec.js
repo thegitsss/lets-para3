@@ -106,3 +106,53 @@ test('retained profile links stay stored while unsafe destinations remain inacti
     await expect(profile.getByRole('link', { name: 'Firm website', exact: true })).toHaveAttribute('href', 'https://firm.example.test/');
   } finally { await context.close(); }
 });
+
+test('encrypted profile recovery survives reload, rejects another owner and clears after save', async ({ browser }, info) => {
+  const actor = await server.createUser('paralegal');
+  const User = require('../../../models/User');
+  const before = await User.findById(actor.id).lean();
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addCookies([actor.cookie]);
+  await context.route('**/*', route => new URL(route.request().url()).origin === server.origin ? route.continue() : route.abort());
+  const page = await context.newPage(), errors = [];
+  page.setDefaultTimeout(20000);
+  page.on('pageerror', error => errors.push(error.message));
+  let blockSave = true;
+  await page.route(url => url.pathname === '/api/users/me', route => route.request().method() === 'PATCH' && blockSave
+    ? route.fulfill({ status: 503, json: { error: 'Synthetic interrupted save' } }) : route.fallback());
+  const key = `lpc_v2_profile_draft_v1:${actor.id}`;
+  try {
+    await page.goto(`${server.origin}/paralegal-v2.html#/settings?tab=profile`);
+    const panel = page.locator('#v2-settings-profile');
+    await expect(panel).toBeVisible();
+    const intro = page.locator('dialog.ri-dialog[open]');
+    await expect(intro).toBeVisible();
+    await intro.getByRole('button', { name: 'Enter manually', exact: true }).click();
+    await page.locator('.lpc-boot-screen[open]').waitFor({ state: 'hidden' });
+    await panel.getByRole('button', { name: 'Edit about', exact: true }).click();
+    const privateText = 'Unsaved private biography for encrypted recovery.';
+    await panel.getByLabel('Bio', { exact: true }).fill(privateText);
+    await expect.poll(() => page.evaluate(key => sessionStorage.getItem(key), key)).toMatch(/^enc:v1:/);
+    const capsule = await page.evaluate(key => sessionStorage.getItem(key), key);
+    expect(capsule).not.toContain(privateText);
+    expect((await User.findById(actor.id).lean()).bio).toBe(before.bio);
+    // Use the real session/CSRF transport against the mounted owner boundary.
+    const crossOwner = await page.evaluate(async ({ capsule }) => {
+      const { createApiClient } = await import('/assets/scripts/paralegal-v2/api-client.mjs');
+      try { await createApiClient().post('/api/account/profile-draft/open', { expectedOwnerId: '000000000000000000000001', capsule }); return 200; }
+      catch (error) { return error.status; }
+    }, { capsule });
+    expect(crossOwner).toBe(403);
+    // The synthetic error above deliberately changes only the request owner,
+    // never the actual session. Reload must recover only this session's draft.
+    page.on('dialog', dialog => dialog.accept());
+    await page.reload();
+    await expect(panel.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('encrypted-recovery-phone.png') });
+    blockSave = false;
+    await panel.getByRole('button', { name: 'Restore', exact: true }).click();
+    await expect.poll(async () => (await User.findById(actor.id).lean()).bio).toBe(privateText);
+    await expect.poll(() => page.evaluate(key => sessionStorage.getItem(key), key)).toBeNull();
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
+});

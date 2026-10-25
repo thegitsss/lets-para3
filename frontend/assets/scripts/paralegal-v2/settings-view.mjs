@@ -674,7 +674,14 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     return id ? `${PROFILE_DRAFT_PREFIX}:${id}` : "";
   }
 
+  let draftWriteRevision = 0;
+  let recoveredDraft = null;
+  let draftReadPromise = null;
+  let draftSealPending = null;
+  let draftSealRunning = false;
+
   function clearDraft() {
+    draftWriteRevision += 1; recoveredDraft = null; draftSealPending = null;
     const key = draftKey();
     if (!key) return;
     try { sessionStorage.removeItem(key); } catch {}
@@ -684,37 +691,85 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     const key = draftKey();
     if (!key || !profile) return;
     if (!dirtyProfileFields.size) { clearDraft(); return; }
-    try {
-      sessionStorage.setItem(key, JSON.stringify({
-        savedAt: Date.now(),
-        serverUpdatedAt: String(user?.updatedAt || ""),
-        fields: [...dirtyProfileFields.keys()], baselines: Object.fromEntries(dirtyProfileBaselines),
-        profile,
-      }));
-    } catch {}
+    const revision = ++draftWriteRevision;
+    const context = accountContext();
+    const draft = clone({
+      savedAt: Date.now(), serverUpdatedAt: String(user?.updatedAt || ""),
+      fields: [...dirtyProfileFields.keys()], baselines: Object.fromEntries(dirtyProfileBaselines),
+      profile: Object.fromEntries([...dirtyProfileFields.keys()].map(field => [field, profile[field]])),
+    });
+    draftSealPending = { key, revision, context, draft };
+    void sealPendingDraft();
   }
 
-  function readDraft() {
-    const key = draftKey();
-    if (!key) return null;
+  async function sealPendingDraft() {
+    if (draftSealRunning) return;
+    draftSealRunning = true;
     try {
-      const parsed = JSON.parse(sessionStorage.getItem(key) || "null");
-      const age = Date.now() - Number(parsed?.savedAt || 0);
-      if (!parsed?.profile || age < 0 || age > PROFILE_DRAFT_MAX_AGE_MS) {
-        clearDraft();
-        return null;
+      while (draftSealPending) {
+        const pending = draftSealPending; draftSealPending = null;
+        try {
+          assertAccount(pending.context);
+          const result = await accountTransport("/api/account/profile-draft/seal", {
+            method: "POST", body: JSON.stringify({ expectedOwnerId: pending.context.ownerId, draft: pending.draft }),
+          });
+          assertAccount(pending.context);
+          if (pending.revision !== draftWriteRevision || !dirtyProfileFields.size || typeof result?.capsule !== "string") continue;
+          sessionStorage.setItem(pending.key, result.capsule);
+        } catch { /* Keep unsaved values in the editor and retain the unload guard. */ }
       }
-      const saved = normalizeProfile(user);
-      const fields = Array.isArray(parsed.fields) ? parsed.fields : PROFILE_FIELDS;
-      if (!fields.some(field => PROFILE_FIELDS.includes(field) && !equal(parsed.profile[field], saved[field]))) {
-        clearDraft(); return null;
-      }
-      return parsed;
-    } catch {
-      clearDraft();
-      return null;
-    }
+    } finally { draftSealRunning = false; }
   }
+
+  async function loadProtectedDraft() {
+    if (draftReadPromise) return draftReadPromise;
+    const key = draftKey();
+    if (!key || recoveredDraft || dirtyProfileFields.size) return;
+    const context = accountContext(), revision = draftWriteRevision;
+    let capsule;
+    try { capsule = sessionStorage.getItem(key); } catch { return; }
+    if (!capsule) return;
+    draftReadPromise = (async () => {
+      try {
+        let parsed;
+        if (capsule.startsWith("enc:v1:")) {
+          const result = await accountTransport("/api/account/profile-draft/open", {
+            method: "POST", body: JSON.stringify({ expectedOwnerId: context.ownerId, capsule }),
+          });
+          parsed = result.draft;
+        } else {
+          // Preserve an earlier same-owner draft while replacing its plaintext
+          // storage immediately. Never write legacy plaintext back to storage.
+          parsed = JSON.parse(capsule);
+          sessionStorage.removeItem(key);
+          // Keep legacy recovery available in memory even if re-encryption is
+          // temporarily unavailable. Stored plaintext is never reintroduced.
+          try {
+            const result = await accountTransport("/api/account/profile-draft/seal", {
+              method: "POST", body: JSON.stringify({ expectedOwnerId: context.ownerId, draft: parsed }),
+            });
+            assertAccount(context);
+            if (revision === draftWriteRevision && typeof result?.capsule === "string") sessionStorage.setItem(key, result.capsule);
+          } catch { assertAccount(context); }
+        }
+        assertAccount(context);
+        if (revision !== draftWriteRevision || dirtyProfileFields.size) return;
+        const age = Date.now() - Number(parsed?.savedAt || 0);
+        if (!parsed?.profile || age < 0 || age > PROFILE_DRAFT_MAX_AGE_MS) { clearDraft(); return; }
+        const saved = normalizeProfile(user);
+        const fields = Array.isArray(parsed.fields) ? parsed.fields : PROFILE_FIELDS;
+        if (!fields.some(field => PROFILE_FIELDS.includes(field) && !equal(parsed.profile[field], saved[field]))) { clearDraft(); return; }
+        recoveredDraft = parsed;
+      } catch (error) {
+        // Transient offline/server failures retain the encrypted capsule for
+        // retry. Invalid/expired ciphertext is discarded, never rendered.
+        if (error?.status === 400 && revision === draftWriteRevision) clearDraft();
+      }
+    })().finally(() => { draftReadPromise = null; });
+    return draftReadPromise;
+  }
+
+  function readDraft() { return recoveredDraft; }
 
   async function loadCore({ force = false, isCurrent = () => true } = {}) {
     // Concurrent renders share the read, but only the latest live navigation
@@ -3051,6 +3106,9 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     if (!isCurrent()) return null;
     if (accountStopped) return createAccountRecoveryView();
     if (!root) {
+      await loadProtectedDraft();
+      if (!isCurrent()) return null;
+      if (accountStopped) return createAccountRecoveryView();
       buildRoot();
       for (const event of ["focusin", "input", "change", "click"]) root.addEventListener(event, () => { interactionRevision += 1; }, { capture: true });
     }
