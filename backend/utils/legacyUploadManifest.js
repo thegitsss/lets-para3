@@ -2,17 +2,30 @@
 
 const fs = require("fs");
 const { HeadObjectCommand } = require("@aws-sdk/client-s3");
+const { isRenderRuntime } = require("./releaseIdentity");
 const { digest, isProtectedUploadKey } = require("./uploadQuarantine");
 let cached;
 function loadLegacyUploadManifest(env = process.env) {
   const path = env.S3_LEGACY_UPLOAD_MANIFEST, expected = env.S3_LEGACY_UPLOAD_MANIFEST_SHA256;
   if (!path && !expected) return null;
   if (!path || !/^[a-f0-9]{64}$/.test(expected || "")) throw new Error("Legacy upload manifest requires a pinned SHA-256.");
-  const identity = `${path}:${expected}`;
+  // Render owns this exact secret mount. Its link target remains untrusted
+  // until the opened regular file passes the approved byte-for-byte digest.
+  const managedMount = env.NODE_ENV === "production" && isRenderRuntime(env)
+    && path === "/etc/secrets/lpc-legacy-upload-manifest.json";
+  const identity = `${path}:${expected}:${managedMount ? "render" : "direct"}`;
   if (cached?.identity === identity) return cached.value;
-  const stat = fs.lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024 * 1024) throw new Error("Invalid legacy upload manifest file.");
-  const bytes = fs.readFileSync(path);
+  if (!managedMount && fs.lstatSync(path).isSymbolicLink()) throw new Error("Invalid legacy upload manifest file.");
+  const flags = fs.constants.O_RDONLY | fs.constants.O_NONBLOCK
+    | (managedMount ? 0 : (fs.constants.O_NOFOLLOW || 0));
+  const descriptor = fs.openSync(path, flags);
+  let bytes;
+  try {
+    const stat = fs.fstatSync(descriptor);
+    if (!stat.isFile() || stat.size > 1024 * 1024) throw new Error("Invalid legacy upload manifest file.");
+    // Stat and read the same descriptor, including across an atomic mount swap.
+    bytes = fs.readFileSync(descriptor);
+  } finally { fs.closeSync(descriptor); }
   if (digest(bytes) !== expected) throw new Error("Legacy upload manifest digest mismatch.");
   const value = JSON.parse(bytes);
   if (value.version !== 1 || !/^[a-f0-9]{64}$/.test(value.bucketSha256 || "") || !Array.isArray(value.objects) || value.objects.length > 10000) throw new Error("Invalid legacy upload manifest.");
