@@ -21,6 +21,8 @@ export function createResumeImport({ getProfile, getUser, readPolicy, extract, a
   let trigger, reviewDraft = null;
   const decorate = () => presentation?.(dialog);
   const owner = () => String(getUser()?._id || getUser()?.id || '');
+  const hasContent = value => Array.isArray(value) ? value.some(hasContent) : value && typeof value === 'object' ? Object.values(value).some(hasContent) : typeof value === 'string' && Boolean(value.trim());
+  const hasProfileDetails = () => Object.values(getProfile() || {}).some(hasContent);
   function close() { if (saving) return; generation++; controller?.abort(); if(presentation && dialog?.querySelector('.ri-review-actions')) reviewDraft={dialog,owner:owner()};
     dialog?.close(); dialog?.remove(); dialog = null; requestAnimationFrame(() => (trigger?.isConnected ? trigger : document.querySelector('[data-resume-autofill]'))?.focus({preventScroll:true})); }
   function shell(title, copy) {
@@ -34,6 +36,14 @@ export function createResumeImport({ getProfile, getUser, readPolicy, extract, a
   async function open(origin, { automatic = false } = {}) {
     if (dialog?.open || (automatic && seen())) return;
     if (!canOpen()) { if (!automatic) toast('Finish or cancel your current Profile edit before importing.'); return; }
+    let welcomePolicy;
+    if (automatic) {
+      if (hasProfileDetails()) return;
+      const ticket = generation, account = owner();
+      try { welcomePolicy = await readPolicy(); } catch { return; }
+      // A delayed policy read must not reopen a page/account that was left.
+      if (!welcomePolicy?.enabled || ticket !== generation || account !== owner() || dialog?.open || seen() || !canOpen() || hasProfileDetails()) return;
+    }
     trigger = origin; remember();
     if(reviewDraft && reviewDraft.owner===owner()) {
       dialog=reviewDraft.dialog;reviewDraft=null;document.body.append(dialog);dialog.showModal();decorate();dialog.querySelector('h2')?.focus();return;
@@ -46,9 +56,9 @@ export function createResumeImport({ getProfile, getUser, readPolicy, extract, a
     dialog.addEventListener('pointerdown',event=>{pressedOutside=event.target===dialog&&outside(event);});
     dialog.addEventListener('click',event=>{if(presentation&&pressedOutside&&event.target===dialog&&outside(event))close();pressedOutside=false;});
     document.body.append(dialog); dialog.showModal();
-    await showWelcome();
+    await showWelcome({ policy: welcomePolicy });
   }
-  async function showWelcome({ animate = true, focusDifferent = false } = {}) {
+  async function showWelcome({ animate = true, focusDifferent = false, policy: welcomePolicy } = {}) {
     const version = ++generation;
     const hasResume = Boolean(getUser()?.resumeURL || getUser()?.resumeKey);
     const body = shell(hasResume ? 'Your résumé has a head start.' : 'Your experience. Already written.', hasResume ? 'Use the résumé you submitted to fill in your experience, education, and skills. You’ll review everything before it’s saved.' : 'Upload your résumé and we’ll bring the details into your profile. Review everything before saving.');
@@ -63,7 +73,7 @@ export function createResumeImport({ getProfile, getUser, readPolicy, extract, a
       el('summary',{text:'How Autofill works'}), processingCopy,
     ]);
     body.append(processing); decorate();
-    try { const policy = await readPolicy(); if (version !== generation || !dialog?.open) return; status.hidden = Boolean(policy.enabled); status.textContent = policy.enabled ? '' : 'Résumé Autofill is awaiting local review. You can enter your details manually.'; processingCopy.textContent = policy.disclosure || ''; processing.hidden = !policy.enabled || !policy.disclosure; run.disabled = !policy.enabled; body.querySelectorAll('button').forEach(b => { if(b.textContent==='Use a different résumé') b.disabled = !policy.enabled; }); }
+    try { const policy = welcomePolicy || await readPolicy(); if (version !== generation || !dialog?.open) return; status.hidden = Boolean(policy.enabled); status.textContent = policy.enabled ? '' : 'Résumé Autofill is awaiting local review. You can enter your details manually.'; processingCopy.textContent = policy.disclosure || ''; processing.hidden = !policy.enabled || !policy.disclosure; run.disabled = !policy.enabled; body.querySelectorAll('button').forEach(b => { if(b.textContent==='Use a different résumé') b.disabled = !policy.enabled; }); }
     catch { if(version === generation && dialog?.open) status.textContent = 'Processing options are unavailable. Please try again later or enter details manually.'; }
     if (version === generation && dialog?.open) (focusDifferent ? body.querySelector('.ri-different') || run : run).focus();
   }
