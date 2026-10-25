@@ -1,4 +1,5 @@
 'use strict';
+require('./private-evidence').applyPrivateArtifactUmask();
 // Collection only: Playwright --list never runs global setup/webServer/tests.
 // The expected union comes from the unchanged original configs, not counts in
 // the proposed group manifest. Its exact additional files are explicit below.
@@ -43,7 +44,7 @@ async function parallel(tasks){const queue=[...tasks],results=[];async function 
 const key=r=>JSON.stringify([r.source,r.line,r.column,r.title,r.engine]);
 // Reviewed manual browser contexts explicitly own 1366x900. Fail closed if
 // those callback/config bytes drift; equal titles alone cannot authorize dedup.
-const reviewedDuplicatePins={"tests/playwright/financial-lifecycle/journey.spec.js":"2b26a5c4a1ebafd4410bf92893bc502d164eddda02fa3e668d3f3ab405eff72b","tests/playwright/financial-lifecycle/exception.spec.js":"5c0ae7a5ab5d2e730cae8bfffd2adbf0a4eeaa9c065a0ee727883b4a293e3462","tests/playwright/financial-lifecycle/submission-journey.spec.js":"9fd9f8867fac496285e4637acf5cf2c0a3a36917a7fd7465fef21c81f24b7a45","tests/playwright/financial-lifecycle/playwright.config.js":"6e3070755f08b4811c379e0737075558396853f1cb70f507e325eeb05aeef200","tests/playwright/shared-matter/playwright.config.js":"356ac93f9f21d6277ed564621c210ad7dc056619f6528235c30f9324767fc0a8"};
+const reviewedDuplicatePins={"tests/playwright/financial-lifecycle/journey.spec.js":"2b26a5c4a1ebafd4410bf92893bc502d164eddda02fa3e668d3f3ab405eff72b","tests/playwright/financial-lifecycle/exception.spec.js":"7edfa181d8be3c88e17a9c31fda0a802adfb6d4710c6f16ade55d86105623d7b","tests/playwright/financial-lifecycle/submission-journey.spec.js":"9fd9f8867fac496285e4637acf5cf2c0a3a36917a7fd7465fef21c81f24b7a45","tests/playwright/financial-lifecycle/playwright.config.js":"6e3070755f08b4811c379e0737075558396853f1cb70f507e325eeb05aeef200","tests/playwright/shared-matter/playwright.config.js":"356ac93f9f21d6277ed564621c210ad7dc056619f6528235c30f9324767fc0a8"};
 for(const [file,hash]of Object.entries(reviewedDuplicatePins))if(sha(fs.readFileSync(path.join(backend,file)))!==hash)throw Error('Shared/financial duplicate source contract changed: '+file);
 
 (async()=>{

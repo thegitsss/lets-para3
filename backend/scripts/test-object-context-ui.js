@@ -186,7 +186,13 @@ async function installRoutes(page, counters, role = "attorney") {
       return;
     }
     if (url.pathname === `/api/messages/${matterId}/read`) {
-      counters.readRequests += 1;
+      const body = route.request().postDataJSON() || {};
+      if (body.messageId) {
+        assert.equal(body.messageId, messageId);
+        assert.equal(body.upTo, "2026-08-02T10:00:00.000Z");
+        assert.match(route.request().headers()["x-lpc-owner-id"] || "", /^[a-f0-9]{24}$/i);
+        counters.exactMessageReadRequests = (counters.exactMessageReadRequests || 0) + 1;
+      } else counters.readRequests += 1;
       await route.fulfill({ json: { ok: true } });
       return;
     }

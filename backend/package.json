@@ -176,7 +176,7 @@
     "stripe": "^22.5.0",
     "web-vitals": "6.1.1",
     "word-extractor": "1.0.4",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

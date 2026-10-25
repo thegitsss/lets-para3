@@ -791,13 +791,13 @@
       "reviewedChangedSpecs": [
         {
           "path": "tests/playwright/financial-lifecycle/admission-journey.spec.js",
-          "currentSha256": "eb59a48feda81550f25a07f6e8c702f745d76f40d501a9af824294de0248f886",
+          "currentSha256": "755af0fca70475d51805d2e3fc06ea25b9c9216663acce83825f3d55d23d30e6",
           "handoffSha256": "24b3eadb233f9d6dd34a516458fc1fdddb043b470dffa44ed372234ae513d375",
           "disposition": "Combined tour/manual-entry/document controls reconciled to native27case evidence; original registration, approval, privacy, upload ownership, cancellation, retry, persistence and other declared lifecycle requirements preserved. Review: docs/testing/ONBOARDING_FIXTURE_REVIEW_20261019.json."
         },
         {
           "path": "tests/playwright/financial-lifecycle/exception.spec.js",
-          "currentSha256": "5c0ae7a5ab5d2e730cae8bfffd2adbf0a4eeaa9c065a0ee727883b4a293e3462",
+          "currentSha256": "7edfa181d8be3c88e17a9c31fda0a802adfb6d4710c6f16ade55d86105623d7b",
           "handoffSha256": "b26986574042eced5b16d19a85a11466fcacfd4ef26da68b5d731b0d15736dec",
           "disposition": "Exact root-reviewed native current-control/readiness fixture; original lifecycle money, accounting, owner-loss, native gesture and exact downloaded-byte requirements retained. Source integrated; final native runtime outcome is separately pending."
         },
@@ -1056,13 +1056,13 @@
     },
     {
       "path": "tests/playwright/financial-lifecycle/admission-journey.spec.js",
-      "currentSha256": "eb59a48feda81550f25a07f6e8c702f745d76f40d501a9af824294de0248f886",
+      "currentSha256": "755af0fca70475d51805d2e3fc06ea25b9c9216663acce83825f3d55d23d30e6",
       "handoffSha256": "24b3eadb233f9d6dd34a516458fc1fdddb043b470dffa44ed372234ae513d375",
       "disposition": "Combined tour/manual-entry/document controls reconciled to native27case evidence; original registration, approval, privacy, upload ownership, cancellation, retry, persistence and other declared lifecycle requirements preserved. Review: docs/testing/ONBOARDING_FIXTURE_REVIEW_20261019.json."
     },
     {
       "path": "tests/playwright/financial-lifecycle/exception.spec.js",
-      "currentSha256": "5c0ae7a5ab5d2e730cae8bfffd2adbf0a4eeaa9c065a0ee727883b4a293e3462",
+      "currentSha256": "7edfa181d8be3c88e17a9c31fda0a802adfb6d4710c6f16ade55d86105623d7b",
       "handoffSha256": "b26986574042eced5b16d19a85a11466fcacfd4ef26da68b5d731b0d15736dec",
       "disposition": "Exact root-reviewed native current-control/readiness fixture; original lifecycle money, accounting, owner-loss, native gesture and exact downloaded-byte requirements retained. Source integrated; final native runtime outcome is separately pending."
     },
