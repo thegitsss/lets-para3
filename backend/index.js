@@ -44,7 +44,10 @@ app.use(releaseIdentityMiddleware(process.env));
 app.use((req, res, next) => {
   if (req.hostname === "lets-paraconnect.com") {
     if (!req.url.startsWith("/")) return res.status(400).send("Invalid request path.");
-    return res.redirect(301, "https://www.lets-paraconnect.com" + req.url);
+    const canonical = new URL("https://www.lets-paraconnect.com");
+    canonical.pathname = req.path;
+    canonical.search = new URL(req.url, canonical).search;
+    return res.redirect(301, canonical.href);
   }
   next();
 });

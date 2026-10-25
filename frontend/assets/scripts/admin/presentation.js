@@ -38,4 +38,4 @@ export function badge(value,text) {
   return `<span class="admin-status admin-status-${tone}">${esc(text||statusText(value))}</span>`;
 }
 export const emptyState=(title,description,name='check')=>`<div class="admin-empty"><span class="admin-empty-icon">${icon(name)}</span><strong>${esc(title)}</strong>${description ? `<p>${esc(description)}</p>` : ''}</div>`;
-export function safeHref(value){try{const u=new URL(value,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:'';}catch{return '';}}
+export function safeHref(value){try{const u=new URL(value,location.origin);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password?u.href:'';}catch{return '';}}
