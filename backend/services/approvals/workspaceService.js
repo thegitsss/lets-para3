@@ -185,7 +185,7 @@ async function hydrateApprovalTask(task = {}) {
 
 async function listApprovalWorkspaceItems({ pillar = "", itemType = "", status = "" } = {}) {
   const query = {};
-  if (status) query.approvalState = status;
+  if (status) query.approvalState = String(status);
   const tasks = await ApprovalTask.find(query)
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();

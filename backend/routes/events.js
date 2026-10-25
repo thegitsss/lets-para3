@@ -103,7 +103,7 @@ router.get(
       start: { $gte: from, $lte: to },
     };
 
-    if (type) filter.type = type;
+    if (type) filter.type = String(type);
     if (caseId) {
       const ok = await ensureEventCaseAccess(req, res, caseId);
       if (!ok) return;

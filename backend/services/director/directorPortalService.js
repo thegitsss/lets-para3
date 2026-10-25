@@ -285,8 +285,8 @@ function textToHtml(text = "") {
 function renderOutreachTemplate(template = "", attorneyName = "") {
   const name = String(attorneyName || "").trim();
   return String(template || "")
-    .replace(/\{\{\s*attorneyName\s*\}\}/gi, name)
-    .replace(/\{\{\s*name\s*\}\}/gi, name);
+    .replace(/\{\{\s*attorneyName\s*\}\}/gi, () => name)
+    .replace(/\{\{\s*name\s*\}\}/gi, () => name);
 }
 
 function validationError(message, statusCode = 400) {
@@ -376,7 +376,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
     const text = templateText
       ? renderOutreachTemplate(templateText, normalizedName)
       : renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+>/g, "");
-    const html = templateHtml ? renderOutreachTemplate(templateHtml, normalizedName) : textToHtml(text);
+    const html = templateHtml ? renderOutreachTemplate(templateHtml, escapeHtml(normalizedName)) : textToHtml(text);
 
     if (manualRequest && session) {
       // Serialize the exact locked profile/template used for this send. This
@@ -953,7 +953,7 @@ async function listDirectorRecords({ user = {}, state = "", stage = "", rangeDay
   Object.assign(filter, range.filter);
   const normalizedState = normalizeState(state);
   if (normalizedState) filter.state = normalizedState;
-  if (stage) filter.stage = stage;
+  if (stage) filter.stage = String(stage);
 
   const refreshed = await refreshDirectorRecords({ directorUserId: role === "director" ? user.id || user._id : null, deferVerify: true });
   const records = await DirectorOutreachRecord.find(filter)

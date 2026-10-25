@@ -12,6 +12,7 @@ async function createAccount(payload = {}) {
 
   let linkedUserId = payload.linkedUserId || null;
   if (linkedUserId) {
+    if (!require("mongoose").isValidObjectId(linkedUserId)) throw Object.assign(new Error("Invalid linked user ID."), { statusCode: 400 });
     const user = await User.findById(linkedUserId).select("_id").lean();
     if (!user) throw new Error("Linked user not found.");
   }

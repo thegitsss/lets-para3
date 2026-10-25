@@ -85,7 +85,7 @@ router.get(
   "/items",
   asyncHandler(async (req, res) => {
     const query = {};
-    if (req.query.collectionId) query.collectionId = req.query.collectionId;
+    if (req.query.collectionId) query.collectionId = String(req.query.collectionId);
     if (req.query.approvalState) query.approvalState = String(req.query.approvalState);
     const items = await KnowledgeItem.find(query)
       .sort({ updatedAt: -1, title: 1 })

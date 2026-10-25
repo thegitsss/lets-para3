@@ -138,7 +138,7 @@ async function generateFAQCandidates() {
 
 async function listFAQCandidates({ approvalState, limit = 50 } = {}) {
   const query = {};
-  if (approvalState) query.approvalState = approvalState;
+  if (approvalState) query.approvalState = String(approvalState);
   return FAQCandidate.find(query)
     .sort({ updatedAt: -1, createdAt: -1 })
     .limit(Math.min(100, Math.max(1, Number(limit) || 50)))

@@ -40,7 +40,7 @@ const validReaction = value => typeof value === 'string' && value.trim().length 
 
 function sanitizeText(s) {
   if (typeof s !== "string") return "";
-  const stripped = s.replace(/<[^>]*>/g, "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001F\u007F]/g, "").trim();
+  const stripped = require("../utils/sanitize").stripHtmlTags(s).replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001F\u007F]/g, "").trim();
   if (!stripped) return "";
   const limited = stripped.slice(0, 2000);
   return containsProfanity(limited) ? maskProfanity(limited) : limited;

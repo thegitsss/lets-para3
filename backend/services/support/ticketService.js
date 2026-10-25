@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Application = require("../../models/Application");
 const Case = require("../../models/Case");
 const Incident = require("../../models/Incident");
@@ -277,6 +278,9 @@ function applyRoutingOverride(baseRouting = {}, payload = {}) {
 }
 
 async function loadContextSnapshot({ requesterUserId, caseId, jobId, applicationId } = {}) {
+  for (const value of [requesterUserId, caseId, jobId, applicationId]) {
+    if (value && !mongoose.isValidObjectId(value)) throw Object.assign(new Error("Invalid support context ID."), { statusCode: 400 });
+  }
   const [user, supportCase, job, application] = await Promise.all([
     requesterUserId ? User.findById(requesterUserId).select("firstName lastName email role status").lean() : null,
     caseId ? Case.findById(caseId).select("title status attorneyId paralegalId pausedReason").lean() : null,
@@ -638,7 +642,7 @@ async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", statu
     // SMTP and recording its known result remain outside that transaction.
     return replyByEmail({ ticket: initial, adminUser, text: replyText, status: normalizeTicketStatus(status, "waiting_on_user"), requestId, write });
   }
-  if (requestId && !/^[a-f0-9-]{36}$/i.test(String(requestId))) throw Object.assign(new Error('Invalid reply request ID.'), { statusCode: 400 });
+  if (requestId && (typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId))) throw Object.assign(new Error('Invalid reply request ID.'), { statusCode: 400 });
 
   const persist = async (session, receiptOnlyError) => {
     const options = session ? { session } : {};

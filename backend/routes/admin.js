@@ -1638,10 +1638,10 @@ const { status, attorney, paralegal, q } = req.query;
 const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
 
 const filter = {};
-if (status) filter.status = status;
+if (status) filter.status = String(status);
 if (attorney && isObjId(attorney)) filter.attorney = attorney;
 if (paralegal && isObjId(paralegal)) filter.paralegal = paralegal;
-if (q && q.trim()) filter.title = new RegExp(q.trim(), "i");
+if (q && q.trim()) filter.title = new RegExp(q.trim().slice(0, 200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
 const [items, total] = await Promise.all([
 Case.find(filter)

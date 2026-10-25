@@ -279,7 +279,7 @@ function replyByEmail(options) {
   return require('../../utils/decisionTurn')(`email:${ticket._id}:${requestId}:${adminUser._id || adminUser.id}`, () => sendReplyByEmail(options));
 }
 async function sendReplyByEmail({ ticket, adminUser, text, status, requestId, write }) {
-  if (!/^[a-f0-9-]{36}$/i.test(String(requestId || ''))) throw Object.assign(new Error('A reply request ID is required.'), { statusCode: 400 });
+  if (typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)) throw Object.assign(new Error('A reply request ID is required.'), { statusCode: 400 });
   const existing = value => {
     const prior = value?.emailReplies?.find(r => r.requestId === requestId);
     if (!prior) return null;

@@ -34,7 +34,8 @@ function letterEmail(body, { title = 'Let’s-ParaConnect', footer = '' } = {}) 
   if (String(body).includes('data-lpc-email="letter"')) return body;
   const documentBody = String(body).match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
   if (documentBody) body = documentBody[1];
-  if (!/<[a-z][\s\S]*>/i.test(String(body))) body = `<p>${escape(body).replace(/\n/g, '<br>')}</p>`;
+  const openingTag = /<[a-z]/i.exec(String(body));
+  if (!openingTag || String(body).indexOf(">", openingTag.index + 2) === -1) body = `<p>${escape(body).replace(/\n/g, '<br>')}</p>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)}</title></head><body data-lpc-email="letter" style="margin:0;padding:0;background:#f6f8fa;font-family:Arial,Helvetica,sans-serif;color:#596579;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="max-width:640px;table-layout:fixed;overflow-wrap:anywhere;word-wrap:break-word;background:#ffffff;"><tr><td style="padding:32px 28px;">
 <p style="margin:0 0 28px;padding:0 0 24px;border-bottom:1px solid #e3e7ed;color:${BLUE};font-family:Georgia,'Times New Roman',serif;font-size:23px;line-height:1.3;">Let’s-ParaConnect</p>

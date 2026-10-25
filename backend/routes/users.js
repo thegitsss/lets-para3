@@ -146,7 +146,7 @@ const parseParalegalFilters = (query = {}) => {
   const l = clamp(parseInt(limit, 10) || 20, 1, 100);
   const filter = { role: "paralegal", status: "approved" };
   if (availability) {
-    filter.availability = new RegExp(String(availability).trim(), "i");
+    filter.availability = new RegExp(String(availability).trim().slice(0, 200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
   } else if (available !== undefined) {
     const availableClause = require("../utils/availability").buildEffectiveAvailableClause();
     filter.$and = [String(available) === "true" ? availableClause : { $nor: [availableClause] }];
@@ -155,9 +155,9 @@ const parseParalegalFilters = (query = {}) => {
     const rx = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     filter.$or = [{ firstName: rx }, { lastName: rx }, { bio: rx }, { about: rx }];
   }
-  if (practice) filter.practiceAreas = new RegExp(String(practice).trim(), "i");
-  if (skill) filter.skills = new RegExp(String(skill).trim(), "i");
-  if (location) filter.location = new RegExp(String(location).trim(), "i");
+  if (practice) filter.practiceAreas = new RegExp(String(practice).trim().slice(0, 200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  if (skill) filter.skills = new RegExp(String(skill).trim().slice(0, 200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  if (location) filter.location = new RegExp(String(location).trim().slice(0, 200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
   if (minYears) {
     const years = Math.max(0, parseInt(minYears, 10) || 0);
     filter.yearsExperience = { $gte: years };
@@ -535,7 +535,7 @@ router.get(
       }
     }
     if (role && ["attorney", "paralegal", "admin"].includes(String(role))) {
-      filter.role = role;
+      filter.role = String(role);
     }
 
     const users = await User.find(filter)

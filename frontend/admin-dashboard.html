@@ -5161,9 +5161,16 @@ const labelTd = document.createElement('td');
 labelTd.textContent = label;
 const valueTd = document.createElement('td');
 
+let detailUrl = null;
 if (options.link && value) {
+try {
+const candidate = new URL(String(value), location.origin);
+if (['http:', 'https:'].includes(candidate.protocol) && !candidate.username && !candidate.password) detailUrl = candidate.href;
+} catch {}
+}
+if (detailUrl) {
 const link = document.createElement('a');
-link.href = value;
+link.href = detailUrl;
 link.target = '_blank';
 link.rel = 'noopener';
 link.textContent = options.linkLabel || 'View';
