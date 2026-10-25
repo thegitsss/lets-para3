@@ -126,8 +126,8 @@ test('encrypted profile recovery survives reload, rejects another owner and clea
     const panel = page.locator('#v2-settings-profile');
     await expect(panel).toBeVisible();
     const intro = page.locator('dialog.ri-dialog[open]');
-    await expect(intro).toBeVisible();
-    await intro.getByRole('button', { name: 'Enter manually', exact: true }).click();
+    await page.evaluate(() => window.LPC_PORTAL_BOOT?.finished);
+    await expect(intro).toHaveCount(0);
     await page.locator('.lpc-boot-screen[open]').waitFor({ state: 'hidden' });
     await panel.getByRole('button', { name: 'Edit about', exact: true }).click();
     const privateText = 'Unsaved private biography for encrypted recovery.';
