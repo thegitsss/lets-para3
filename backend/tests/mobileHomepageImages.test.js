@@ -4,11 +4,11 @@ const fs = require("fs");
 const path = require("path");
 const { mountMobileHomepageImages, MOBILE_MOUNTAIN_PATH } = require("../utils/mobileHomepageImages");
 const frontend = path.resolve(__dirname, "../../frontend");
-function fixture() {
+function fixture(root = frontend) {
   const app = express();
   app.use((_req, res, next) => { res.set({ "Cache-Control": "no-store", Pragma: "no-cache", Expires: "0" }); next(); });
-  mountMobileHomepageImages(app, frontend);
-  app.use(express.static(frontend));
+  mountMobileHomepageImages(app, root);
+  app.use(express.static(root));
   app.get("/api/example", (_req, res) => res.json({ ok: true }));
   return app;
 }
@@ -40,4 +40,19 @@ describe("mobile homepage image delivery", () => {
     const api = await request(app).get("/api/example");
     expect(api.headers["cache-control"]).toBe("no-store");
   });
+});
+
+
+test("the production build directory serves the same image without exposing hidden files", async () => {
+  const temporary = fs.mkdtempSync(path.join(require("os").tmpdir(), "lpc-mobile-image-"));
+  const built = path.join(temporary, ".lpc-build", "frontend");
+  const target = path.join(built, MOBILE_MOUNTAIN_PATH.slice(1));
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const expected = fs.readFileSync(path.join(frontend, MOBILE_MOUNTAIN_PATH.slice(1)));
+    fs.writeFileSync(target, expected); fs.writeFileSync(path.join(built, ".private"), "not public");
+    const response = await request(fixture(built)).get(MOBILE_MOUNTAIN_PATH);
+    expect(response.status).toBe(200); expect(response.body).toEqual(expected);
+    expect((await request(fixture(built)).get("/.private")).status).toBe(404);
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 });

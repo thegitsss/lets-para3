@@ -1,5 +1,3 @@
-const path = require("path");
-
 const MOBILE_MOUNTAIN_PATH = "/assets/images/homepage-capacity/mountain-mobile-1920-fb4e1e2d7eff.jpg";
 
 function mountMobileHomepageImages(app, frontendDir) {
@@ -7,7 +5,7 @@ function mountMobileHomepageImages(app, frontendDir) {
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.removeHeader("Pragma");
     res.removeHeader("Expires");
-    res.sendFile(path.join(frontendDir, MOBILE_MOUNTAIN_PATH.slice(1)));
+    res.sendFile(MOBILE_MOUNTAIN_PATH.slice(1), { root: frontendDir });
   });
   // Hidden desktop SVG references still request this URL on phones. Send them
   // to the same cached mobile copy, without changing desktop responses.

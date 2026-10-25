@@ -85,7 +85,7 @@ jobs:
           tests/workspaceReleasePolicy.test.js tests/productionOrigin.test.js
           tests/uploadQuarantine.test.js tests/profileDraftProtection.test.js
           tests/stripeWebhookProtection.test.js tests/stripeWebhookSignature.test.js
-          tests/webhookHandling.test.js tests/predeployIndexCompatibility.test.js
+          tests/webhookHandling.test.js tests/predeployIndexCompatibility.test.js tests/mobileHomepageImages.test.js
       - run: npm audit --omit=dev --audit-level=moderate
   browser:
     name: Browser contracts
