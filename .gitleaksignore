@@ -199,3 +199,11 @@ b5113b26c5222f93821f86077fe23b56be09045a:docs/attorney-v2/CHECKLIST_COVERAGE.jso
 b5113b26c5222f93821f86077fe23b56be09045a:docs/attorney-v2/PHASE4_FILE_DOWNLOADS.md:generic-api-key:45
 b5113b26c5222f93821f86077fe23b56be09045a:frontend/assets/scripts/attorney-v2/matter-creation.mjs:generic-api-key:4
 f9b36eaead55fd9ebd98dfe1ade3c9b8b15e9955:backend/tests/setup.js:generic-api-key:7
+
+# Six reviewed isolated test-server copies use the same synthetic encryption fixture.
+c9b2e1f00a8265406f0542c5bafdc4c8a16b63cb:docs/audits/completion-2026-09-09/blocks/backend-browser-server.cjs:generic-api-key:14
+c9b2e1f00a8265406f0542c5bafdc4c8a16b63cb:docs/audits/completion-2026-09-09/closure/paralegal/backend-browser-server.cjs:generic-api-key:10
+c9b2e1f00a8265406f0542c5bafdc4c8a16b63cb:docs/audits/completion-2026-09-09/closure/backend-browser-server.cjs:generic-api-key:10
+c9b2e1f00a8265406f0542c5bafdc4c8a16b63cb:docs/audits/completion-2026-09-09/help/backend-browser-server.cjs:generic-api-key:6
+c9b2e1f00a8265406f0542c5bafdc4c8a16b63cb:docs/audits/completion-2026-09-09/accounts/backend-browser-server.cjs:generic-api-key:12
+c9b2e1f00a8265406f0542c5bafdc4c8a16b63cb:docs/audits/completion-2026-09-09/security/backend-browser-server.cjs:generic-api-key:10

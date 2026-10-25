@@ -1,0 +1,4 @@
+require('./scripts/private-evidence').applyPrivateArtifactUmask();
+const {defineConfig}=require('playwright/test');
+const {CURRENT_BROWSER_PROJECTS}=require('./playwright.browser-matrix');
+module.exports=defineConfig({testDir:'./tests/playwright',testMatch:['financial-lifecycle/admission-journey.spec.js','onboarding-recovery/profile-saveall-actual.spec.js','onboarding-recovery/stage1-first-profile.spec.js'],workers:1,retries:0,timeout:180000,expect:{timeout:15000},globalSetup:require.resolve('./tests/helpers/financialLifecycleGlobalSetup'),globalTeardown:require.resolve('./tests/helpers/globalMongoTeardown'),projects:CURRENT_BROWSER_PROJECTS,use:{headless:true,viewport:{width:1366,height:900},screenshot:'only-on-failure',trace:'retain-on-failure'},reporter:[['line'],['json',{outputFile:'test-results/v2-stage1/results.json'}]],outputDir:'test-results/v2-stage1/artifacts'});
