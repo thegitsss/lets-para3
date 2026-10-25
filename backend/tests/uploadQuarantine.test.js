@@ -96,3 +96,27 @@ test("S3 client initialization rejects a manifest for another bucket, including 
   expect(() => createS3Client({ ...env, S3_BUCKET: "different-bucket" })).toThrow(/match S3_BUCKET/);
   expect(() => createS3Client({ ...env, S3_BUCKET: "" })).toThrow(/match S3_BUCKET/);
 });
+
+
+function mountedManifest(run, target = process.env.S3_LEGACY_UPLOAD_MANIFEST) {
+  const mounted = "/etc/secrets/lpc-legacy-upload-manifest.json";
+  const originalOpen = fs.openSync.bind(fs);
+  const spy = jest.spyOn(fs, "openSync").mockImplementation((file, ...args) => originalOpen(file === mounted ? target : file, ...args));
+  try { return run({ NODE_ENV: "production", RENDER: "true", S3_LEGACY_UPLOAD_MANIFEST: mounted, S3_LEGACY_UPLOAD_MANIFEST_SHA256: process.env.S3_LEGACY_UPLOAD_MANIFEST_SHA256 }); }
+  finally { spy.mockRestore(); }
+}
+test("Render managed mount can resolve a link only with the exact pinned manifest bytes", () => {
+  const link = path.join(dir, "render-link.json"); fs.symlinkSync(process.env.S3_LEGACY_UPLOAD_MANIFEST, link);
+  mountedManifest(env => expect(loadLegacyUploadManifest(env).objects.has(digest(oldKey))).toBe(true), link);
+});
+test("Render managed link still rejects a mismatched digest", () => {
+  const link = path.join(dir, "render-link.json"); fs.symlinkSync(process.env.S3_LEGACY_UPLOAD_MANIFEST, link);
+  mountedManifest(env => expect(() => loadLegacyUploadManifest({ ...env, S3_LEGACY_UPLOAD_MANIFEST_SHA256: "1".repeat(64) })).toThrow(/digest mismatch/), link);
+});
+test("non-managed manifest links remain rejected even with a correct digest", () => {
+  const link = path.join(dir, "local-link.json"); fs.symlinkSync(process.env.S3_LEGACY_UPLOAD_MANIFEST, link);
+  expect(() => loadLegacyUploadManifest({ NODE_ENV: "production", RENDER: "true", S3_LEGACY_UPLOAD_MANIFEST: link, S3_LEGACY_UPLOAD_MANIFEST_SHA256: process.env.S3_LEGACY_UPLOAD_MANIFEST_SHA256 })).toThrow(/Invalid legacy upload manifest file/);
+});
+test("managed mount must still resolve to a bounded regular file", () => {
+  mountedManifest(env => expect(() => loadLegacyUploadManifest({ ...env, S3_LEGACY_UPLOAD_MANIFEST_SHA256: "2".repeat(64) })).toThrow(/Invalid legacy upload manifest file/), dir);
+});
