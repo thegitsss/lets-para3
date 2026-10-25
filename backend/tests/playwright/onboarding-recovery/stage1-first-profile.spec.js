@@ -148,6 +148,8 @@ test('encrypted profile recovery survives reload, rejects another owner and clea
     page.on('dialog', dialog => dialog.accept());
     await page.reload();
     await expect(panel.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+    await page.locator('.lpc-boot-screen[open]').waitFor({ state: 'hidden' });
+    await panel.getByRole('button', { name: 'Restore', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('encrypted-recovery-phone.png') });
     blockSave = false;
     await panel.getByRole('button', { name: 'Restore', exact: true }).click();
