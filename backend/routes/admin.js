@@ -110,7 +110,8 @@ return mongoose.isValidObjectId(id);
 }
 
 function isEmail(value = "") {
-return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
+const email = String(value).toLowerCase();
+return email.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function sanitizeAdminNote(value = "", max = 4000) {

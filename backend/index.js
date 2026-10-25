@@ -43,6 +43,7 @@ app.use(requestIdMiddleware);
 app.use(releaseIdentityMiddleware(process.env));
 app.use((req, res, next) => {
   if (req.hostname === "lets-paraconnect.com") {
+    if (!req.url.startsWith("/")) return res.status(400).send("Invalid request path.");
     return res.redirect(301, "https://www.lets-paraconnect.com" + req.url);
   }
   next();

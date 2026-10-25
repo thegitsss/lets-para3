@@ -97,7 +97,7 @@ module.exports = function createMatterPostingsRouter({ practiceAreas, normalizeP
   }
   function text(value, max, multiline = false) {
     if (typeof value !== "string" || value.length > max) fail(400, "POSTING_FIELDS_INVALID", `A text field is missing or exceeds its ${max}-character limit.`);
-    return value.replace(/<[^>]*>/g, "").replace(multiline ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g : /[\u0000-\u001F\u007F]/g, "").trim();
+    return require("../utils/sanitize").stripHtmlTags(value).replace(multiline ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g : /[\u0000-\u001F\u007F]/g, "").trim();
   }
   function changes(input, existing, { partialDraft = false } = {}) {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key) => !fields.includes(key))) fail(400, "POSTING_FIELDS_INVALID", "Only posting fields may be changed here.");
