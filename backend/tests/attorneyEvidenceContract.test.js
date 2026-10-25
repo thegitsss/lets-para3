@@ -11,6 +11,19 @@ jest.mock("../ai/supportAgentTools", () => ({
 }));
 
 const { auditManagerReply, buildValidationSafeFallback } = require("../ai/supportManagerAgent");
+const { bindAccountOverviewToActor } = require("../ai/aggregateOverviewGrounding");
+const OVERVIEW_OWNER = "507f1f77bcf86cd799439011";
+
+function overviewTrace() {
+  const result = { ok: true, available: true, role: "attorney", totalCount: 9, activeCount: 5, completedCount: 4, byStatus: {}, requestedScope: "completed", recentCases: [], matchingCaseCount: 4, returnedCaseCount: 0, truncated: false };
+  const observedAt = new Date().toISOString();
+  return bindAccountOverviewToActor({ name: "get_my_case_overview", result: {
+    ...result, evidenceState: "verified", evidence: {
+      ...normalizeAttorneyToolEvidence({ toolName: "get_my_case_overview", result, retrievedAt: observedAt }),
+      state: "verified", source: "get_my_case_overview", observedAt,
+    },
+  } }, { id: OVERVIEW_OWNER, role: "attorney" });
+}
 
 function workflowResult(overrides = {}) {
   return {
@@ -18,8 +31,8 @@ function workflowResult(overrides = {}) {
     available: true,
     authoritativeWorkflow: true,
     requirements: {
-      paymentMethodRequiredBeforePosting: true,
-      paymentMethodRequiredBeforeApplications: true,
+      paymentMethodRequiredBeforePosting: false,
+      paymentMethodRequiredBeforeApplications: false,
       paymentMethodRequiredBeforeHiring: true,
       chargeTiming: "charged_when_hire_is_confirmed",
       postHireWorkflow: {
@@ -36,8 +49,12 @@ function workflowResult(overrides = {}) {
         allScopeTasksCompleteRequired: true,
         verifiedFundingRequired: true,
         paralegalPayoutSetupRequired: true,
-        bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-        bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+        bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+        bankDepositTimingDependsOn: [
+          "stripe_account_country",
+          "stripe_payout_schedule",
+          "financial_institution",
+        ],
         resultingMatterStatus: "completed",
         paymentReleased: true,
       },
@@ -118,7 +135,8 @@ describe("attorney normalized evidence contract", () => {
       "completion.actor",
       "completion.resulting_matter_status",
       "completion.payout_release_trigger",
-      "payout.bank_deposit_estimate_business_days",
+      "payout.bank_deposit_timing_source",
+      "payout.bank_deposit_timing_dependencies",
     ]));
   });
 
@@ -181,7 +199,8 @@ describe("attorney normalized evidence contract", () => {
       evidenceEnvelopes: [envelope("deposit_timing")],
     });
     expect(rendered.reply).toMatch(/attorney marks the matter complete/i);
-    expect(rendered.reply).toMatch(/3–5 business days/i);
+    expect(rendered.reply).toMatch(/Stripe provides the current payout status and estimated arrival/i);
+    expect(rendered.reply).toMatch(/payout schedule/i);
   });
 
   test("attributes one shared workflow tool to the selected semantic capability", () => {
@@ -194,7 +213,8 @@ describe("attorney normalized evidence contract", () => {
   test("keeps a verified core answer and removes an irrelevant suggestion", () => {
     const audit = auditManagerReply(reply({ suggestions: ["Open billing"] }), {
       messageText: "How many cases have I completed?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, available: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.valid).toBe(true);
     expect(audit.data.reply).toBe("You have 4 completed cases.");
@@ -211,7 +231,8 @@ describe("attorney normalized evidence contract", () => {
       },
     }), {
       messageText: "How many cases have I completed?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, available: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.valid).toBe(true);
     expect(audit.data.navigation).toBeNull();
@@ -223,7 +244,8 @@ describe("attorney normalized evidence contract", () => {
       reply: "You have 4 completed cases. Your current matter is disputed.",
     }), {
       messageText: "How many cases have I completed?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, available: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.valid).toBe(true);
     expect(audit.data.reply).toBe("You have 4 completed cases.");
@@ -282,17 +304,17 @@ describe("attorney normalized evidence contract", () => {
     expect(audit.failureClasses).toContain(FAILURE_CLASSES.PLANNER_WRONG_SOURCE);
   });
 
-  test("renders available payout facts and names only the missing deposit estimate", () => {
+  test("renders available payout facts and names only the missing timing source", () => {
     const result = workflowResult();
-    delete result.requirements.paralegalPayoutTiming.bankDepositEstimateBusinessDays;
+    delete result.requirements.paralegalPayoutTiming.bankDepositTimingSource;
     const rendered = renderAttorneyEvidenceAnswer({
       capability: "deposit_timing",
       evidenceEnvelopes: [envelope("deposit_timing", result)],
     });
     expect(rendered.ok).toBe(true);
     expect(rendered.reply).toMatch(/released when the attorney marks the matter complete/i);
-    expect(rendered.reply).toMatch(/bank-deposit estimate is not available/i);
-    expect(rendered.missingFacts).toContain("payout.bank_deposit_estimate_business_days");
+    expect(rendered.reply).toMatch(/source of the current bank-deposit timing is not available/i);
+    expect(rendered.missingFacts).toContain("payout.bank_deposit_timing_source");
   });
 
   test("refuses evidence rendering when lifecycle evidence contradicts itself", () => {

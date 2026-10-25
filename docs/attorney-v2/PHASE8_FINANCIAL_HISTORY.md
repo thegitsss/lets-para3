@@ -1,0 +1,38 @@
+# Attorney financial history and CSV
+
+September 9, 2026. This implements the financial-history portion of P8-04 under the owner’s instruction to continue through final-review preparation. The [Product North Star](../LPC_PRODUCT_NORTH_STAR.md) and [editorial standard](EDITORIAL_STANDARD.md) control the work. Full attorney acceptance, financial reconciliation, provider acceptance and production release remain separate, open work.
+
+## Behavior
+
+Payments now includes actual financial-event history, with record-type and Matter-title filters, exact linked-Matter scope, 50-record pages, actual filtered counts and a CSV of the entire filtered selection. CSV does not stop at the visible page or the former 500-record limit. It preserves separate currencies, integer cents, known UTC dates and exact original-funding or withdrawal receipt links. There are no invented invoice records or current bank balances.
+
+Funding totals require a unique original payment pointer, one successful funding operation, matching Matter/operation amount and currency, charge and balance-transaction identifiers, verified gross/processor-fee/net arithmetic, and matching known provider mode. Duplicate funding references on another Matter or operation require review without exposing that record. Funding totals retain original charges before refunds. A successful refund request alone does not prove processing; its row remains unconfirmed and points to the funding receipt for a current provider check.
+
+Payout totals require a retained, explicitly paid payout and an unambiguous current-assignment, settlement or withdrawal match. Pending, failed, reversed, missing-status and inconsistent operation/Case records are excluded. Repeated assignments cannot borrow a later payout. Each retained withdrawal decision remains independently listed, including decisions with a payout; decision amounts are not added to payout totals. Missing dates remain missing. Unsupported or mismatched currency does not become a dollar amount. Platform accounting adjustments are not presented as additional attorney charges.
+
+The two new GET endpoints read whitelisted persisted fields and verify the current approved owner before and after a stable inventory. They make no provider calls, repair writes or financial mutations. Pagination and export bind to the reviewed inventory and filters; changed data requires refresh. A 10,000-record inventory/export limit and 32 MB CSV limit fail explicitly, with individual-Matter history available as a narrower scope. Per-Matter receipt-history bounds also apply. These are bounded reads, not a claim of unlimited account inventory.
+
+The browser clears prior amounts after denied, changed, malformed or unavailable reads, cancels pending requests on navigation/account loss and verifies the account again before handing CSV bytes to the browser. It validates the complete filtered totals against the displayed records, CSV MIME/header and download size. Private amounts are not persisted in browser storage. CSV escapes quotes/line breaks and neutralizes leading spreadsheet formulas.
+
+## Evidence and preserved failures
+
+Checkpoint: `backend/backups/attorney-v2-financial-history-start/`, initially 3,745 file hashes. Thirteen owned paths include the new backend service, client model/controller, route/API connection, tests, ledger/checklist, this evidence and the adopted heading helper. The private candidates inherit only verified preceding candidates and explicitly owned files. They do not blindly include unrelated working-tree changes.
+
+- Candidate 2: **101/101 backend/client/consumer checks**, five suites, 41.347 seconds. This followed correction of escaping in the child-process CSV test fixture.
+- Candidate 5: **103/103 final backend/client/consumer checks**, the same five suites, 29.959 seconds. Additional coverage prevents stale paid payout records from overriding a changed current Matter payout status and preserves individual withdrawal decisions across repeated assignments. The server export includes 505 matching records plus its header.
+- Candidate 3 combined financial/Payments browser run: **49/51 passed**. Cancellation worked, but the combined cancellation/account-change fixture navigated to the identical fragment and incorrectly expected a remount in Chromium/Firefox. WebKit passed. The fixture now tests cancellation and account change independently. All 27 existing Payments scenarios passed without changes to their assertions.
+- Candidate 5: **27/27 financial-history scenarios passed** across Chromium, Firefox and WebKit. Tests cover actual downloaded bytes/filename/all 505 records, filtered totals, old-Matter links and refresh, distinct currency/status/date meaning, malformed/failed/stale reads, stale or invalid CSV, cancellation and account loss, literal unsafe titles, keyboard focus and AA accessibility at 320/390/768/1366 pixels.
+- Visual inspection found an `undefined` Payments introduction in the private candidate. The already-present working-tree `dom.mjs` correction was reviewed and intentionally adopted: an omitted description creates no paragraph. Its existing refresh-label and optional region-heading changes were inspected together; the exact adopted diff is retained. The synthetic missing-card fixture was also corrected to include the endpoint’s required `paymentMethod: null` field.
+- Candidate 5 source checks: **459 API literals resolve against 427 mounted patterns**; the supplemental exported frontend checker finds no issues in five owned frontend modules, with all 99 entry-graph modules reachable. This supplemental check does not replace the Git-dependent whole-frontend check. Runtime binding still reports the inherited, unrelated `services/support/zohoMailbox.js:34` unused `full` parameter.
+
+Candidate 6 passed **9/9 final browser checks**: the full financial-list layout/keyboard/AA scenario and both actual/synthetic Home summary checks in all three engines. Only screenshot coverage changed after candidate 5; the runtime is identical. The corrected desktop heading and lower financial lists on Chromium desktop and WebKit phone were visually inspected. Candidate 7 adds the final documentation, with its exact file manifest retained as `isolated-candidate-7.json`.
+
+Tests use isolated accounts, ephemeral MongoDB and synthetic provider data. They do not establish real Stripe settlement/bank arrival, live storage behavior or release readiness. The PDF renderer is unchanged by this slice.
+
+## Remaining financial work
+
+September 10 return: shared summary, Home/dashboard aggregates and active/pending funds are now [locally complete under F-01](../audits/completion-2026-09-09/financial/CLOSURE.md). The older summary statement below is historical. Original `/history` and `/export/csv` agreement continues under F-02; complete financial/provider acceptance remains open.
+
+P8-03 funding and eligible amount controls, P8-06 withdrawal decisions/relisting, and P8-09 reconciliation remain open. The existing `/summary`, `/history`, `/export/csv`, Home financial aggregates, paralegal earnings and financial writers are not replaced by this slice. Their known Case-flag, legacy payout-fallback, webhook ordering and retention issues remain in the active work. P8-04 stays open for exact agreement across those views; this financial-history implementation is not a substitute for that acceptance.
+
+The whole LPC layout/copy pass also remains open. The interface preserves original-versus-refunded amounts, payout-versus-bank-arrival and decision-versus-transfer meaning; final wording and persistent Matter context will be reviewed with the rest of the attorney experience.

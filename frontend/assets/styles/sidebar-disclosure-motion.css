@@ -1,0 +1,5 @@
+/* Only the expanding list moves; disclosure rows retain their position. */
+.av2 .av2-matters-nav-heading,body.lpc-v2 .v2-matters-heading {cursor:pointer;}
+body.lpc-v2 .v2-sidebar .v2-more-tools,
+body.lpc-v2 .v2-sidebar .v2-more-tools[open] {margin:0;padding-left:0;border-left:0;}
+body.lpc-v2 .v2-sidebar .v2-more-tools-list > .v2-nav-link {padding-left:48px;}

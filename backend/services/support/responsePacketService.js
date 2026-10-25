@@ -121,10 +121,10 @@ async function findLinkedIncidentAdvisories(ticket = {}) {
 function buildNeededFacts(ticket = {}, category = "") {
   const needed = [];
   if ((category === "case_workflow" || category === "payments_risk") && !ticket.caseId) {
-    needed.push("Case or matter identifier");
+    needed.push("Matter identifier");
   }
   if (category === "job_application" && !ticket.jobId) {
-    needed.push("Related job or application identifier");
+    needed.push("Related Matter posting or application identifier");
   }
   if (category === "account_access" && !ticket.requesterEmail && !ticket.requesterUserId) {
     needed.push("Account email or user record");

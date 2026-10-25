@@ -1,0 +1,11 @@
+.verification-resend { margin-top: 18px; color: #425b7a; font: 300 .85rem/1.5 'Sarabun', sans-serif; }
+.verification-resend[hidden] { display: none; }
+details.verification-resend summary { cursor: pointer; color: #385f9e; min-height: 44px; display: list-item; padding-block: 10px; }
+.verification-resend form { margin-top: 12px; }
+.verification-resend label { display: block; margin-bottom: 6px; font: inherit; }
+.verification-resend input[type="email"] { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #d4dce6; border-radius: 8px; background: #fff; color: #27394d; font: inherit; font-size: 16px; }
+body.auth-secondary .verification-resend input[type="email"] { margin-bottom: 12px; }
+.verification-resend button { box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid #27394d; border-radius: 8px; background: #27394d; color: #fff; cursor: pointer; font: inherit; }
+.verification-resend button:disabled { opacity: .65; cursor: wait; }
+.verification-resend [role="status"] { margin: 12px 0 0; overflow-wrap: anywhere; }
+.verification-resend :is(input, button, summary):focus-visible { outline: 2px solid #385f9e; outline-offset: 3px; }

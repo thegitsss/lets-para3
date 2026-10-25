@@ -1,0 +1,20 @@
+# Retained Matter correspondence
+
+Locally verified under `backend/backups/attorney-v2-phase7-retained-conversation-start/`. Existing active conversation writes retain their current access boundary. A separate owner-only retained read uses `matterExports.accessFor`, with no generated-ZIP prerequisite or full archive materialization. Completed/closed retention and manually archived records follow that existing authority; a paused or disputed Matter is not newly made readable merely by this implementation.
+
+Reads page 50 records by converted recorded date and ID, retaining undated records explicitly and supporting ObjectId/string references. Exact message links, soft deletion, sender names, text/audio/system messages and legacy attachment references remain distinguishable. All history actions are read-only; no read acknowledgement or presence is written from the retained panel.
+
+Attachment IDs identify primary or exact earlier array slots without exposing storage keys. Downloads and same-origin audio use the current scan policy and recheck account, Matter retention and message revision around storage. Arbitrary URL references have no download action. Unchanged message nodes retain audio during the shared Matter refresh; access loss clears the panel and players.
+
+GET `/api/cases/:caseId/retained-messages` verifies current account/token/session, both owner and assignment aliases, retention and the exact loaded message page before delivery. Raw date conversion preserves earlier ISO strings and leaves invalid/missing dates explicitly unavailable. The existing per-Matter message index limits the query's scope; aggregation has a ten-second maximum and disk-backed sorting. Downloads select primary or exact `content.files[]` attachments through the existing same-Matter `documents/` boundary. Other unverified or out-of-scope references remain unavailable; no arbitrary stored URL is followed.
+
+## Local evidence
+
+The checkpoint began with 2,696 file hashes and owns 15 paths, all existing ones matching the preceding isolated Dates candidate. Final source is `isolated-candidate-4.json` (1,476 files). Each predecessor manifest was checked before assembly.
+
+- Candidate 1 passed **83/83** backend/client/consumer checks across five suites: retained correspondence, retained model, protected message attachments, attachment client and archive exports. They cover 237 dated/undated records, raw string references, exact old links, missing/deleted messages, legacy encrypted attachment aliases, original sender names, unsupported references, retention rules, owner changes and late storage delivery.
+- Candidate 2 passed **81/81** browser scenarios across Chromium, Firefox and WebKit: 18 retained, 24 attachments and 39 active conversation checks. Retained controls make no sends, edits, reactions, acknowledgements or presence writes. Native audio is requested explicitly, survives unchanged polling and stops on expiry. Exact earlier array attachments deliver actual selected bytes and filenames. Late downloads cannot attach to another Matter section. Long text, literal HTML, focus and accessibility checks cover 320/390/768/1366px; Chromium 320/1366px screenshots were visually inspected.
+- Candidate 3 removes an invented primary placeholder for array-only earlier messages and scopes unavailable-copy to the affected attachment. All **54/54** affected backend/client checks and **3/3** focused multiple-attachment browser repeats passed. This final focused repeat supplements the earlier complete run.
+- API checks resolve **446 literals against 415 mounted route patterns**. Supplemental owned frontend checks report no findings in five sources and an 85-module entry graph. The private candidate's runtime checker retains the unrelated `services/support/zohoMailbox.js:34` unused parameter finding.
+
+The broader thread list, unread/global notification convergence, document cleanup, lifecycle/Payments, account/tools and full editorial/layout pass remain open. This slice does not establish readiness for the owner's final review or production release.

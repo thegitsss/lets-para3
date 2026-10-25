@@ -11,6 +11,7 @@ const adminKnowledgeRouter = require("../routes/adminKnowledge");
 const adminSupportRouter = require("../routes/adminSupport");
 const aiAdminRouter = require("../routes/aiAdmin");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+const { createAuthSession } = require("../services/authSessionService");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "support-phase2-test-secret";
 
@@ -31,6 +32,8 @@ const app = (() => {
 function authCookieFor(user) {
   const payload = {
     id: user._id.toString(),
+    sid: user.$locals?.managedSessionId,
+    av: Number(user.authVersion || 0),
     role: user.role,
     email: user.email,
     status: user.status,
@@ -40,7 +43,7 @@ function authCookieFor(user) {
 }
 
 async function createAdmin() {
-  return User.create({
+  const user = await User.create({
     firstName: "Admin",
     lastName: "Owner",
     email: "support-phase2-admin@lets-paraconnect.test",
@@ -49,6 +52,9 @@ async function createAdmin() {
     status: "approved",
     state: "CA",
   });
+  const managed = await createAuthSession(user, { headers: { "user-agent": "Original Admin API fixture" } });
+  user.$locals.managedSessionId = managed.sessionId;
+  return user;
 }
 
 async function createApprovedUser({ role, email, firstName, lastName }) {
@@ -222,6 +228,11 @@ describe("Support Phase 2", () => {
       })
     );
     expect(candidate.question).toMatch(/approval-based/i);
+    const { ensureFAQCandidateApprovalTask } = require('../services/support/reviewService');
+    const approvals = require('../models/ApprovalTask');
+    await approvals.deleteMany({ targetType: 'faq_candidate', targetId: String(candidate._id) });
+    await Promise.all(Array.from({ length: 3 }, () => ensureFAQCandidateApprovalTask(candidate, { userId: admin._id, label: 'Owner' })));
+    expect(await approvals.countDocuments({ targetType: 'faq_candidate', targetId: String(candidate._id), approvalState: 'pending' })).toBe(1);
 
     expect(insight).toEqual(
       expect.objectContaining({
@@ -241,5 +252,47 @@ describe("Support Phase 2", () => {
         expect.stringMatching(/support insight/i),
       ])
     );
+    const { generateFAQCandidates } = require('../services/support/faqCandidateService');
+    const { approveFAQCandidate, rejectFAQCandidate } = require('../services/support/reviewService');
+    const ApprovalTask = require('../models/ApprovalTask');
+    const filter = { targetType: 'faq_candidate', targetId: String(candidate._id) };
+    await FAQCandidate.updateOne({ _id: candidate._id }, { $set: { draftAnswer: 'Owner-corrected answer retained for review.' } });
+    const edited = await FAQCandidate.findById(candidate._id).lean();
+    await generateFAQCandidates();
+    expect((await FAQCandidate.findById(candidate._id)).draftAnswer).toBe('Owner-corrected answer retained for review.');
+    expect((await FAQCandidate.findById(candidate._id)).updatedAt).toEqual(edited.updatedAt);
+    expect(await ApprovalTask.countDocuments(filter)).toBe(1);
+    await approveFAQCandidate({ candidateId: candidate._id, actor: { userId: admin._id, label: 'Owner' } });
+    await generateFAQCandidates();
+    expect((await FAQCandidate.findById(candidate._id)).approvalState).toBe('approved');
+    expect(await ensureFAQCandidateApprovalTask(candidate)).toBeNull();
+    expect(await ApprovalTask.countDocuments({ ...filter, approvalState: 'pending' })).toBe(0);
+    await rejectFAQCandidate({ candidateId: candidate._id, actor: { userId: admin._id, label: 'Owner' } });
+    await generateFAQCandidates();
+    expect((await FAQCandidate.findById(candidate._id)).approvalState).toBe('rejected');
+    expect(await ApprovalTask.countDocuments({ ...filter, approvalState: 'pending' })).toBe(0);
   });
+  test.each(['approve', 'reject'])('an owner %s decision wins over an already-started FAQ task claim', async decision => {
+    const { ensureFAQCandidateApprovalTask, approveFAQCandidate, rejectFAQCandidate } = require('../services/support/reviewService');
+    const ApprovalTask = require('../models/ApprovalTask');
+    const candidate = await FAQCandidate.create({ key: `claim-${decision}`, title: 'Reviewed answer', question: 'How does LPC work?' });
+    let release, entered;
+    const gate = new Promise(resolve => { release = resolve; });
+    const arrived = new Promise(resolve => { entered = resolve; });
+    const original = FAQCandidate.updateOne;
+    const claim = jest.spyOn(FAQCandidate, 'updateOne').mockImplementationOnce(async function (...args) {
+      entered(); await gate;
+      return original.apply(this, args);
+    });
+    const pending = ensureFAQCandidateApprovalTask(candidate);
+    try {
+      await arrived;
+      await (decision === 'approve' ? approveFAQCandidate : rejectFAQCandidate)({ candidateId: candidate._id, actor: { label: 'Owner' } });
+      release();
+      expect(await pending).toBeNull();
+      expect(await ApprovalTask.countDocuments({ targetType: 'faq_candidate', targetId: String(candidate._id), approvalState: 'pending' })).toBe(0);
+      expect((await FAQCandidate.findById(candidate._id)).approvalState).toBe(decision === 'approve' ? 'approved' : 'rejected');
+    } finally { release(); claim.mockRestore(); await pending; }
+  });
+
 });

@@ -65,7 +65,7 @@ export function createSaveParalegal(id, { api, signal, ownerId, prompt = false, 
   signal.addEventListener('abort', () => section.replaceChildren(), { once: true });
   section.readiness = load(); return section;
 }
-export function createSavedParalegals({ api, signal, ownerId, legacy = false, context = new URLSearchParams(), returnTo = '#/paralegals?view=saved' }) {
+export function createSavedParalegals({ api, signal, ownerId, legacy = false, context = new URLSearchParams(), returnTo = '#/paralegals?view=saved', onCount = null }) {
   styles();
   const profileContext = new URLSearchParams(context); profileContext.set('returnTo', returnTo);
   const section = node('section', { className: 'lpc-saved-paralegals', 'aria-label': 'Saved paralegals', 'data-saved-paralegals': '' });
@@ -74,12 +74,16 @@ export function createSavedParalegals({ api, signal, ownerId, legacy = false, co
   let page = 1, sequence = 0;
   async function load() {
     const ticket = ++sequence;
+    onCount?.(null);
+    status.classList.remove('lpc-save-status-quiet');
     status.textContent = 'Loading saved paralegals…'; content.replaceChildren(); controls.replaceChildren();
     try {
       const value = await api.readSavedParalegals(page, { signal, ownerId });
       if (signal.aborted || ticket !== sequence) return;
       if (value?.ownerId !== ownerId || !Array.isArray(value.items) || !Number.isSafeInteger(value.total) || value.total < 0 || value.page !== page || !Number.isSafeInteger(value.pages) || value.pages < 0 || value.items.some(item => !validId(item.id) || item.profile !== null && (typeof item.profile?.name !== 'string' || !Array.isArray(item.profile.practiceAreas)))) throw new Error('Invalid saved list');
       if (!value.items.length && page > 1) { page--; return load(); }
+      onCount?.(value.total);
+      status.classList.toggle('lpc-save-status-quiet', Boolean(onCount && value.total));
       status.textContent = value.total ? `${value.total} saved ${value.total === 1 ? 'paralegal' : 'paralegals'}` : 'No saved paralegals yet. Save someone from their profile or after completing a matter together.';
       for (const item of value.items) {
         const profile = item.profile, notice = node('p', { role: 'status' });

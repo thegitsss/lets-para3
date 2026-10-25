@@ -135,6 +135,19 @@ describe("attorney semantic response validator", () => {
     })).toContain("unsupported_receipt_readiness_claim");
   });
 
+  test("rejects invoice-record claims while allowing the implemented receipt boundary", () => {
+    expect(audit({
+      reply: "You can find your invoices in Payments.",
+      messageText: "Where are my invoices?",
+      toolOutputs: [{ name: "get_attorney_receipt_history", result: { ok: true, receipts: [] } }],
+    })).toContain("unsupported_invoice_record_claim");
+    expect(audit({
+      reply: "LPC does not create invoice records. You can find Matter payment history and receipts in Payments.",
+      messageText: "Where are my invoices?",
+      toolOutputs: [{ name: "get_attorney_receipt_history", result: { ok: true, receipts: [] } }],
+    })).not.toContain("unsupported_invoice_record_claim");
+  });
+
   test("accepts verified zero-value fee, charge, or payout states", () => {
     expect(auditMonetaryClaims("The attorney platform fee was waived.", "attorneyFee waived"))
       .toEqual([]);

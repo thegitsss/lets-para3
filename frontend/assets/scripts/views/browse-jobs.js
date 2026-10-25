@@ -1198,6 +1198,7 @@ async function openJobModal(job) {
 
   jobModal.classList.remove("hidden");
   jobModal.setAttribute("aria-hidden", "false");
+  if (allowApply) void secureFetch(`/api/jobs/${encodeURIComponent(job.caseId || job.id || job._id)}/view`, { method: 'POST' }).catch(() => { console.warn("[browse] Matter view count could not be recorded."); });
   document.body.classList.add("modal-open");
 }
 

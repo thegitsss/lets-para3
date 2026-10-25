@@ -1,10 +1,10 @@
 const path = require("path");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
 const OpenAIImport = require("openai");
 const OpenAI = OpenAIImport.default || OpenAIImport;
-const { AI_MODELS } = require("../ai/config");
+const { AI_MODELS, buildOpenAIClientOptions } = require("../ai/config");
 const { buildAttorneyEvidencePlan } = require("../ai/attorneyConversationPolicy");
 const {
   buildManagerInstructions,
@@ -143,7 +143,7 @@ async function main() {
     return;
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI(buildOpenAIClientOptions(process.env.OPENAI_API_KEY));
   const startedAt = new Date();
   const results = await runWithConcurrency(jobs, concurrency, async (job) => {
     const { testCase, repetition, request } = job;

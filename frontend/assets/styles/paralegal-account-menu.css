@@ -1,0 +1,28 @@
+/* Compact account dropdown only. The accepted navigation shell is unchanged. */
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] {
+  box-sizing:border-box; width:min(240px,calc(100vw - 56px)); max-width:calc(100vw - 56px);
+  padding:4px; border:1px solid var(--v2-line); border-radius:7px; background:var(--v2-white); box-shadow:0 8px 24px #10243f16;
+}
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] .v2-menu-identity {
+  display:flex; align-items:center; flex-direction:column; gap:10px; padding:16px 8px 18px; margin:0; text-align:center; border-bottom:0;
+}
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] .v2-menu-identity :is(img,.portal-identity-initials) { width:48px; height:48px; flex:0 0 48px; font-size:calc(17 * var(--lpc-reading-unit, 1px)); }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] .v2-menu-identity strong { font:500 calc(16 * var(--lpc-reading-unit, 1px))/calc(22 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; overflow-wrap:anywhere; }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] .v2-menu-identity small { margin:2px 0 0; font:400 calc(12 * var(--lpc-reading-unit, 1px))/calc(18 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > :is(a,button) {
+  box-sizing:border-box; display:flex; align-items:center; gap:8px; min-height:32px; height:auto; width:100%; margin:0; padding:6px 8px;
+  border:0; border-radius:3px; background:transparent; box-shadow:none; font:400 calc(14 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; color:var(--v2-ink); text-align:left; text-decoration:none;
+}
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > :is(a,button) > svg { width:16px; height:16px; flex:0 0 16px; }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > :is(a,button):hover { background:var(--v2-soft); }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > :is(a,button):focus-visible { outline:2px solid var(--v2-blue-hover); outline-offset:-2px; background:var(--v2-soft); }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > [data-v2-sign-out] { border-top:1px solid var(--v2-line); border-radius:0; margin-top:4px; color:var(--v2-danger); }
+:root.theme-dark body.lpc-v2:not(.av2) [data-v2-profile-menu] > [data-v2-sign-out] { color:#ff9ca8; }
+@media(pointer:coarse) { :root body.lpc-v2:not(.av2) [data-v2-profile-menu] > :is(a,button) { min-height:44px; } }
+
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] .v2-menu-identity > span:not(.portal-identity-initials) { display:block; min-width:0; width:100%; text-align:center; }
+
+/* The existing identity block is now the profile link; preserve its layout. */
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > a.v2-menu-identity { color:var(--v2-ink); text-decoration:none; }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > a.v2-menu-identity:hover { background:transparent; }
+:root body.lpc-v2:not(.av2) [data-v2-profile-menu] > a.v2-menu-identity:hover strong { text-decoration:underline; text-underline-offset:3px; }

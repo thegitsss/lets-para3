@@ -134,7 +134,7 @@ The current commission structure is:
 
 Directors do not earn commission from the paralegal platform fee.
 
-Commission applies only to the first 50 completed commissionable matters assigned to that director.
+Commission applies to the first 50 completed commissionable Matters **total per director, across all referred attorneys**. It does not restart for each attorney or reporting period. Later Matters do not increase the commission earned.
 
 Commission is earned only after:
 
@@ -142,6 +142,18 @@ Commission is earned only after:
 2. The attorney is approved to use the platform.
 3. The attorney completes a matter through Let's-ParaConnect.
 4. LPC receives the attorney platform fee for that completed matter.
+
+## Payment History
+
+Commission is based on the attorney fee actually retained for the Matter. Historical fee terms can differ from today's standard rate. Missing or conflicting financial evidence is shown for review. Currencies and test/live records remain separate.
+
+Directors can expand a payment status to see recorded amounts, dates, corrections and the remaining balance. New commission earned after an earlier payment remains outstanding.
+
+Administrators record payments already sent outside LPC in Director Oversight. The form requires a reviewed balance, amount, currency/mode, date sent, reference and note. Saving this history does not send a payment. A correction preserves the original entry and records its reversal; any bank transfer or refund is handled separately.
+
+A previous paid flag without an amount stays under review until an administrator confirms the actual historical payment or confirms none was sent. If a save result is unconfirmed, use Retry record to check the same request without creating another entry.
+
+Finance's Director commissions view shows the same outstanding amounts and opens the exact referral audit. Exports retain separate units and payment history.
 
 ## Dashboard Metrics
 

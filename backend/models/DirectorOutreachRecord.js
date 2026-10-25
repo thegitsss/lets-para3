@@ -40,6 +40,20 @@ const directorOutreachRecordSchema = new Schema(
     commissionPaidAt: { type: Date, default: null },
     commissionPaidByAdminId: { type: Types.ObjectId, ref: "User", default: null },
     commissionPayoutNote: { type: String, trim: true, default: "", maxlength: 500 },
+    // Preserve the old estimate/paid flag before replacing derived caches with
+    // retained evidence. This snapshot is not proof of a collected fee or an
+    // external payment; unresolved historical claims remain reviewable.
+    commissionLegacySnapshot: { type: Schema.Types.Mixed, default: undefined },
+    commissionEvidenceVersion: { type: Number, default: 0 },
+    commissionState: { type: String, enum: ["none", "recorded", "needs_review"], default: "none" },
+    commissionCurrency: { type: String, default: null },
+    commissionStripeMode: { type: String, enum: ["test", "live", null], default: null },
+    commissionCurrencies: { type: [Schema.Types.Mixed], default: [] },
+    commissionReviewCount: { type: Number, min: 0, default: 0 },
+    // Append-only manual bookkeeping. The existing paid fields are retained as
+    // legacy claims; new balance and payment state are projected from history.
+    commissionPaymentLedger: { type: [Schema.Types.Mixed], default: undefined },
+    commissionPaymentVersion: { type: Number, min: 0, default: 0 },
     source: { type: String, trim: true, default: "zoho_import", maxlength: 120 },
     suppressedAt: { type: Date, default: null },
     suppressedReason: { type: String, trim: true, default: "", maxlength: 500 },

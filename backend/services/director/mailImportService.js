@@ -21,7 +21,8 @@ const INTERNAL_REPLY_DOMAINS = new Set(["lets-paraconnect.com"]);
 
 function normalizeEmail(value = "") {
   const text = String(value || "").trim().toLowerCase();
-  const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  if (text.length > 4096) return "";
+  const match = text.match(/(?<![A-Z0-9._%+-])[A-Z0-9._%+-]{1,64}@[A-Z0-9.-]{1,253}\.[A-Z]{2,63}(?![A-Z0-9.-])/i);
   return match ? match[0].toLowerCase() : "";
 }
 

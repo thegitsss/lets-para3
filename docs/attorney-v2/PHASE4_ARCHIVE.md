@@ -1,0 +1,49 @@
+# Attorney V2 — manual archive and restore
+
+September 5, 2026. This continuation implements the manual archive/restore portion of P4-03 in both attorney dashboards. P4-03 remains open for download/receipt entry points and dependent lifecycle workflows. The checklist remains at 22 of 99 checked items. The remote V2 cohort stays disabled and empty; localhost retains its preview access.
+
+## Review and confirmation
+
+V2 Matter actions link to an Archive and restore page. The current dashboard's existing Archive Matter and Restore Matter entries open the same controls in its modal; ineligible Matters offer archive-status information. Opening either surface reads a fresh, account-verified projection. Choosing Review archive change shows the specific action and its effects. Only the final confirmation sends a mutation.
+
+The current client previously attempted a general status PATCH before restoring, then an archive PATCH and a fallback write. That sequence has been removed. Both dashboards now send one reviewed archive operation containing the expected actor, a revision, an explicit boolean and a unique request ID. Neither automatically retries an uncertain write. The current dashboard refreshes its lists only after a matching saved result is confirmed.
+
+An interrupted response retains the pending request in page memory. Checking status, revisiting the V2 route or reopening the current modal can recover that exact request through its saved receipt. No matching receipt means the UI shows the present state and requires a new review; it does not infer that the earlier request succeeded. A later unrelated lifecycle change may coexist with an earlier receipt, so the UI distinguishes the recorded change from the current status. Only the latest manual archive receipt is retained. Reloading the whole page discards local pending identity and shows a fresh state rather than claiming recovery.
+
+Stale reviews cannot silently perform the opposite action. Failed reads remove the previous projection and disable confirmation. Account changes, access loss, navigation and closed dialogs clear or cancel their private surfaces and suppress late results. Private Matter titles, reviews and request state are not written to browser storage. The existing current-dialog layout keeps the controls usable on mobile.
+
+## Backend contract and lifecycle preservation
+
+GET and PATCH `/api/cases/:caseId/archive` require current owner or existing admin access and return private, non-cacheable projections. PATCH also requires CSRF and a matching expected account. Blind legacy `{ archived: true }` writes no longer satisfy the account/revision contract. Both in-repository attorney clients have been migrated together; stale clients must refresh before writing.
+
+The final caller census also found the existing admin Archive post action. Its bounded compatibility adapter now reads the current title and archive policy before confirmation, verifies the admin identity again before writing, supplies CSRF/account/revision/request identity and recognizes only an exact saved receipt. Cancel sends no mutation. An unconfirmed result prompts a current-state check without retrying; reopening the action on an already archived post reports that state without a second write. This preserves the existing admin entry point without adding a new admin workflow.
+
+The service reads raw Case fields with support for historical text owner references as well as ObjectIds. A single compare-and-set update checks ownership, lifecycle, assignment, active claims, invitations/applicants and the previous receipt. A conflicting concurrent change returns 409. A private-note change is outside this revision and survives. A same-request replay does not write again, repeat audit logging or repeat projection events.
+
+The update touches only `archived`, `updatedAt` and the actor-bound receipt, with one existing legacy exception: restoring an archived Matter whose status is missing or `draft` explicitly sets it to `open`. The UI labels that action Restore as open posting and warns that it reopens a posting. Inconsistent assignment or prior hire evidence blocks this legacy exception.
+
+Other restores preserve raw lifecycle status, read-only restrictions, unknown fields, monetary amounts, files, notes, applications, invitations and linked Job records. A paused historical Matter can remain in Archived after its manual flag is removed; its existing lifecycle determines whether relisting is available. Restoring a disputed or assigned in-progress Matter does not reopen it as an unassigned posting. Completed/closed, payment-released, purging or scheduled-for-purge Matters cannot be reopened here. Unsupported or contradictory ownership/assignment states are unavailable. Archiving assigned Matters or Matters with unresolved hiring/completion claims is blocked.
+
+Both hiring-claim compare-and-set branches now also reject archived Matters, closing the race between the earlier hire preflight and claiming the Case. If hiring claims first, the archive revision/atomic guard rejects the archive. If archiving wins first, hiring cannot acquire the claim or begin charging. Existing application and invitation-response guards continue blocking archived Matters while retaining their recorded history.
+
+Open-list discovery now checks legacy Job linkage through both Case `jobId` and historical `job` aliases, including text IDs. An archived or otherwise ineligible linked Case hides that legacy listing. Restoring reevaluates eligibility without rewriting the Job or its financial/history fields. Existing canonical Case/Job links remain covered. Large-account pagination and broader reconciliation are still separate work.
+
+Accepted changes publish the existing Case and participant/discovery refresh signals and request one audit entry. The receipt proves the database change; audit logging and projection delivery remain best-effort effects, not delivery guarantees. This work does not add a durable event outbox, payment operation, deletion, purge, relist transition or file download.
+
+## Verification and scope
+
+The checkpoint is `backend/backups/attorney-v2-phase4-archive-start/`, with a pre-edit manifest of 1,435 files and an archive of 44 selected source files. The admin HTML was additionally checkpointed before its edit and verified against the original manifest. Source ownership is limited to 24 paths, including eight new files. The release identifier is `attorney-v2-archive-20260905`.
+
+The final targeted backend/model run passed **111/111 across ten suites**, including the admin adapter. Earlier diagnostic runs included two unexpected authentication/read failures whose unchanged assertions passed in a 31/31 recheck, and a command that also matched an unintended test copy under release evidence. Subsequent runs use Jest `--runTestsByPath`; the final 111-test run is clean.
+
+Coverage includes atomic preservation, legacy ownership/status/linkage, admin and unauthorized roles, request validation, stale/duplicate/concurrent changes, interrupted database acknowledgements, assignment/hire races, archived discovery, retained invitations, and the existing lifecycle/recommendation projections. No real accounts, payments, email or production records are used.
+
+The combined browser regression passed **117/120** across Chromium, Firefox and WebKit, including all **93/93** existing notes, invitation and Matter-list scenarios. Its three remaining failures were one combined account-change test reusing a session cleared by its first dashboard. The initial 21/27 archive run also exposed incorrect test assumptions about the current dashboard's unconfirmed cached row and V2's account-change signal. Those tests now use the existing cached row for receipt recovery and V2's verified storage/session boundary.
+
+After splitting the two account-change checks and adding admin compatibility, the archive run passed **30/33**: all attorney scenarios passed, including mobile/desktop accessibility, keyboard cancellation, private-state clearing and interrupted requests. The three admin scenarios timed out before login because their manually created contexts inherited the attorney test session. Their recheck explicitly starts with empty cookies and storage. Application source was unchanged by these test corrections.
+
+The mobile and desktop archive screenshots were visually inspected. The added mobile geometry check verifies that the final action scrolls into view above the current modal's Close footer. Syntax, runtime/frontend bindings, frontend hygiene, API contract, route-security and performance checks pass. The admin adapter has an explicit module entry for the existing asset-reachability check as well as its inline caller import; the browser evaluates the shared module once.
+
+The final admin recheck passed **3/3** across all three browsers, including cancellation, a recorded archive and checking a lost response without another mutation. There are **126 distinct browser scenarios with passing latest results**: the 93 shared regression scenarios, 30 attorney archive scenarios and three admin archive scenarios across these sequential runs. This is not a claim of one clean 126-test batch. Only the admin HTML/adapter changed application source after the combined 120-scenario run; attorney application source stayed unchanged. Application source was frozen during every browser run.
+
+No pre-existing file outside the 24 owned paths changed during this continuation. The checkpoint includes the exact baselines, final hashes, bounded source patch, source archive, test logs, browser artifacts and `acceptance.json`. Manual archive/restore is accepted locally within this scope. Full repository regression, owner visual acceptance, production release and retirement remain open. No deployment, commit, production migration or live-data changes are included.

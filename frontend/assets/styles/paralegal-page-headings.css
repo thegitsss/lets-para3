@@ -1,0 +1,19 @@
+/* One primary page-title standard. Profile identity names and section labels
+   retain their own hierarchy; the portal header/sidebar are outside this scope. */
+:root body.lpc-v2 .v2-view :is(.pv2-overview-header,.v2-work-titlebar,.pv2-conversations .av2-view-header,.v2-browse-results-header,.v2-settings-header,.v2-help-heading,.lc-heading) h1,
+:root body.lpc-v2 .v2-view .v2-payouts > h1 {
+  font-family:var(--v2-font-sans);
+  font-size:calc(28 * var(--lpc-reading-unit,1px));
+  font-weight:600 !important;
+  line-height:1.25;
+  letter-spacing:-.025em;
+  color:var(--v2-ink);
+  text-align:left;
+}
+:root body.lpc-v2 .v2-work-titlebar {align-items:flex-start;}
+:root body.lpc-v2 .v2-payouts {padding-top:0;}
+/* Align Home's title without changing its accepted section widths or spacing. */
+:root body.lpc-v2 .pv2-overview-header {position:relative;top:-20px;margin-inline:calc(-1 * var(--v2-gutter));}
+@media(min-width:901px){:root body.lpc-v2 .pv2-overview-header {margin-inline:-40px;}}
+@media(max-width:900px){:root body.lpc-v2 .pv2-overview-header {margin-inline:-16px;}}
+@media(max-width:600px){:root body.lpc-v2 .pv2-overview-header {top:-24px;}}

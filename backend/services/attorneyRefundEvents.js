@@ -1,0 +1,330 @@
+"use strict";
+
+const { reportOperationalFailure } = require("../utils/operationalFailure");
+const mongoose = require("mongoose");
+const Case = require("../models/Case"), Operation = require("../models/PaymentOperation"), Payout = require("../models/Payout"), Audit = require("../models/AuditLog"), Delivery = require("../models/WebhookEvent");
+const { fingerprint } = require("./matterDraftRevision"), { expectedCaseFunding, validatePaymentIntentForCase } = require("../utils/paymentIntegrity"), { currentStripeMode } = require("../utils/stripeMode");
+const id = value => String(value?._id || value?.id || value || ""), cents = value => Number.isSafeInteger(value) && value >= 0;
+const external = (value, prefix) => typeof value === "string" && new RegExp(`^${prefix}_[A-Za-z0-9_]{1,200}$`).test(value);
+const date = seconds => Number.isSafeInteger(seconds) && seconds > 0 && Number.isFinite(new Date(seconds * 1000).getTime()) ? new Date(seconds * 1000) : null;
+const statuses = new Set(["pending", "requires_action", "succeeded", "failed", "canceled"]), negative = new Set(["failed", "canceled"]);
+const types = new Set(["charge.refunded", "charge.refund.updated", "refund.created", "refund.updated", "refund.failed"]);
+
+async function inventory(intentId, session) {
+  const options = { session };
+  const cases = await Case.collection.find({ $or: [{ paymentIntentId: intentId }, { escrowIntentId: intentId }] }, options).sort({ _id: 1 }).limit(3).toArray();
+  const references = await Operation.collection.find({ stripePaymentIntentId: intentId }, options).sort({ _id: 1 }).limit(4001).toArray();
+  if (references.length > 4000) throw new Error("The refund reference inventory exceeds its verification limit.");
+  const caseIds = [...new Set([...cases.map(row => id(row._id)), ...references.map(row => id(row.caseId))])];
+  if (cases.length > 1 || caseIds.length !== 1 || !/^[a-f0-9]{24}$/i.test(caseIds[0])) return { problem: caseIds.length ? "ambiguous_payment" : "unassociated_payment", cases, references };
+  const raw = cases[0] || await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(caseIds[0]) }, options);
+  if (!raw) return { problem: "missing_matter", cases, references };
+  const refs = [raw._id, id(raw._id)];
+  const operations = await Operation.collection.find({ caseId: { $in: refs } }, options).sort({ _id: 1 }).limit(4001).toArray();
+  const payouts = await Payout.collection.find({ caseId: { $in: refs } }, options).sort({ _id: 1 }).limit(4001).toArray();
+  const requests = await Audit.collection.find({ case: raw._id, action: "dispute.refund.requested" }, options).sort({ _id: 1 }).limit(4001).toArray();
+  if ([operations, payouts, requests].some(rows => rows.length > 4000)) throw new Error("The Matter refund inventory exceeds its verification limit.");
+  const problem = [raw.paymentIntentId, raw.escrowIntentId].filter(Boolean).some(value => value !== intentId) ? "conflicting_payment_references" : raw.attorney && raw.attorneyId && id(raw.attorney) !== id(raw.attorneyId) ? "owner_mismatch" : "";
+  return { problem, raw, cases, references, operations, payouts, requests };
+}
+async function refundReferences(refunds, session) {
+  const ids = refunds.map(refund => refund.id);
+  const rows = await Operation.collection.find({ $or: [{ stripeRefundId: { $in: ids } }, { stripeObjectId: { $in: ids } }] }, { session }).sort({ _id: 1 }).limit(4001).toArray();
+  if (rows.length > 4000) throw new Error("The retained refund inventory exceeds its verification limit.");
+  return rows;
+}
+async function allRefunds(stripe, chargeId) {
+  const refunds = [], seen = new Set(); let after;
+  do {
+    const page = await stripe.refunds.list({ charge: chargeId, limit: 100, ...(after ? { starting_after: after } : {}) });
+    if (!Array.isArray(page?.data) || typeof page.has_more !== "boolean" || page.data.length > 100 || page.has_more && !page.data.length) throw new Error("Stripe returned an incomplete refund list.");
+    for (const refund of page.data) {
+      if (!external(refund?.id, "re") || seen.has(refund.id)) throw new Error("Stripe returned duplicate or invalid refund references.");
+      seen.add(refund.id); refunds.push(refund);
+    }
+    if (refunds.length > 4000) throw new Error("The charge refund list exceeds its verification limit.");
+    if (!page.has_more) return refunds;
+    after = refunds.at(-1).id;
+  } while (after);
+  throw new Error("The refund list could not be completed.");
+}
+function refundShape(refund) { return [refund.id, refund.status, refund.amount, refund.currency, id(refund.charge), id(refund.payment_intent)]; }
+function evidenceProblem({ event, target, charge, intent, refunds, raw }) {
+  const expected = expectedCaseFunding(raw), mode = currentStripeMode();
+  if (intent?.object !== "payment_intent" || !external(intent.id, "pi") || intent.status !== "succeeded" || !validatePaymentIntentForCase(intent, raw).valid || intent.amount !== expected.totalAmount || intent.amount_received !== expected.totalAmount || intent.livemode !== event.livemode || mode !== "unknown" && mode !== (event.livemode ? "live" : "test") || intent.metadata?.attorneyId && intent.metadata.attorneyId !== id(raw.attorney || raw.attorneyId)) return "payment_mismatch";
+  if (charge?.object !== "charge" || !external(charge.id, "ch") || id(charge.payment_intent) !== intent.id || id(intent.latest_charge) !== charge.id || charge.paid !== true || charge.captured !== true || charge.status !== "succeeded" || charge.amount !== expected.totalAmount || charge.amount_captured !== expected.totalAmount || charge.currency !== intent.currency || charge.livemode !== event.livemode || !cents(charge.amount_refunded) || charge.amount_refunded > charge.amount) return "capture_mismatch";
+  if (!refunds.length) return "missing_refunds";
+  for (const refund of refunds) {
+    if (refund.object !== "refund" || !statuses.has(refund.status) || !cents(refund.amount) || !refund.amount || refund.amount > charge.amount || refund.currency !== charge.currency || id(refund.charge) !== charge.id || id(refund.payment_intent) !== intent.id || refund.metadata?.caseId && refund.metadata.caseId !== id(raw._id)) return "refund_mismatch";
+  }
+  if (target && (target.object !== "refund" || id(target.payment_intent) !== intent.id || id(target.charge) !== charge.id || target.currency !== charge.currency)) return "refund_mismatch";
+  if (target && (!refunds.some(refund => refund.id === target.id) || fingerprint(refundShape(refunds.find(refund => refund.id === target.id))) !== fingerprint(refundShape(target)))) return "refund_snapshot_changed";
+  const succeeded = refunds.filter(refund => refund.status === "succeeded").reduce((sum, refund) => sum + refund.amount, 0);
+  const active = refunds.filter(refund => !negative.has(refund.status)).reduce((sum, refund) => sum + refund.amount, 0);
+  if (!cents(succeeded) || !cents(active) || active > charge.amount || ![succeeded, active].includes(charge.amount_refunded)) return "refund_totals_changed";
+  return "";
+}
+function associations({ event, target, refunds, view, references, intent, charge }) {
+  const result = [];
+  for (const refund of refunds) {
+    const matches = references.filter(row => row.stripeRefundId === refund.id || row.stripeObjectId === refund.id);
+    if (matches.length > 1) return { problem: "ambiguous_refund" };
+    let operation = matches[0] || null;
+    if (!operation && target?.id === refund.id && typeof event.request?.idempotency_key === "string") {
+      // The signed original request key, not editable refund metadata, connects
+      // an interrupted create response with the durable server-side request.
+      const requests = view.requests.filter(row => row.meta?.idempotencyKey === event.request.idempotency_key);
+      if (requests.length > 1) return { problem: "ambiguous_refund_request" };
+      if (requests.length === 1) {
+        const requested = requests[0];
+        operation = view.operations.find(row => id(row._id) === requested.meta.operationId && row.operationKey === requested.meta.operationKey);
+        if (!operation || requested.meta.paymentIntentId !== intent.id || requested.meta.chargeId !== charge.id || requested.meta.amount !== refund.amount || requested.meta.currency !== refund.currency || refund.metadata?.disputeId && refund.metadata.disputeId !== requested.meta.disputeId) return { problem: "refund_request_mismatch" };
+      }
+    }
+    if (!operation && view.requests.some(requested => view.operations.some(row => id(row._id) === requested.meta?.operationId && !row.stripeRefundId))) return { problem: "unassociated_refund_request" };
+    if (operation) {
+      const expectedAmount = operation.refundAmount > 0 ? operation.refundAmount : operation.kind === "refund" ? operation.amount : null;
+      if (id(operation.caseId) !== id(view.raw._id) || !["refund", "dispute_settlement"].includes(operation.kind) || operation.stripeRefundId && operation.stripeRefundId !== refund.id || operation.stripePaymentIntentId && operation.stripePaymentIntentId !== intent.id || operation.stripeChargeId && operation.stripeChargeId !== charge.id || expectedAmount != null && expectedAmount !== refund.amount || operation.currency && operation.currency !== refund.currency || ["test", "live"].includes(operation.stripeMode) && operation.stripeMode !== (event.livemode ? "live" : "test")) return { problem: "refund_operation_mismatch" };
+    }
+    result.push({ refund, operation });
+  }
+  return { result, problem: "" };
+}
+
+// Shared read-only provider/association verification. Admin recovery must use
+// the same authoritative rules as a real refund delivery, never replay writes.
+async function inspectRefundEvidence(event, stripe) {
+  const object = event.data?.object || {}, chargeEvent = event.type === "charge.refunded";
+  let problem = !types.has(event.type) ? "unsupported_refund_event" : typeof event.livemode !== "boolean" ? "invalid_mode" : event.account ? "unsupported_connected_account_refund" : !external(object.id, chargeEvent ? "ch" : "re") || object.object !== (chargeEvent ? "charge" : "refund") ? "invalid_refund_event" : "";
+  let view, target, charge, intent, refunds = [], references = [], matched = [];
+  if (!problem) {
+    target = chargeEvent ? null : await stripe.refunds.retrieve(object.id);
+    const chargeId = chargeEvent ? object.id : id(target?.charge);
+    if (!external(chargeId, "ch") || target && target.id !== object.id) problem = "invalid_refund_reference";
+    else {
+      charge = await stripe.charges.retrieve(chargeId);
+      const intentId = id(charge?.payment_intent);
+      if (!external(intentId, "pi") || charge?.id !== chargeId) problem = "invalid_charge_reference";
+      else {
+        view = await inventory(intentId); problem = view.problem;
+        if (!problem) {
+          intent = await stripe.paymentIntents.retrieve(intentId, { expand: ["latest_charge"] });
+          refunds = await allRefunds(stripe, chargeId);
+          problem = evidenceProblem({ event, target, charge, intent, refunds, raw: view.raw });
+          if (["refund_snapshot_changed", "refund_totals_changed"].includes(problem)) throw new Error("Stripe refund records changed during verification; a fresh delivery is required.");
+          if (!problem) {
+            references = await refundReferences(refunds);
+            const association = associations({ event, target, refunds, view, references, intent, charge }); problem = association.problem; matched = association.result || [];
+          }
+        }
+      }
+    }
+  }
+  return { problem, view, target, charge, intent, refunds, references, matched };
+}
+function refundProjection(view, charge, refunds) {
+  const confirmedTotal = refunds.filter(refund => refund.status === "succeeded").reduce((sum, refund) => sum + refund.amount, 0);
+  const pending = refunds.some(refund => ["pending", "requires_action"].includes(refund.status));
+  const paymentStatus = confirmedTotal === charge.amount ? "refunded" : confirmedTotal > 0 ? "partially_refunded" : pending ? "refund_pending" : "refund_failed";
+  const knownPaymentStatuses = [null, undefined, "", "pending", "succeeded", "refunded", "partially_refunded", "refund_pending", "refund_failed", "refund_canceled", "requires_payment_method", "requires_confirmation", "requires_action", "processing", "requires_capture", "canceled", "verification_failed"];
+  const protectedStatus = !knownPaymentStatuses.includes(view.raw.paymentStatus) || view.operations.some(row => row.kind === "chargeback" && ["pending_review", "acknowledged"].includes(row.administrativeStatus));
+  return { confirmedTotal, paymentStatus, protectedStatus, needsReview: refunds.some(refund => negative.has(refund.status)) || Boolean(charge.disputed) || protectedStatus };
+}
+async function verifyRefundSources(review, session) {
+  if (review.view && fingerprint(await inventory(id(review.charge.payment_intent), session)) !== fingerprint(review.view)) throw new Error("The Matter refund records changed during provider verification.");
+  if (!review.problem && fingerprint(await refundReferences(review.refunds, session)) !== fingerprint(review.references)) throw new Error("The refund references changed during verification.");
+}
+async function reviewAttention({ event, stripe }) {
+  const review = await inspectRefundEvidence(event, stripe);
+  if (review.problem) return { ...review, ready: false, reason: review.problem };
+  const projected = refundProjection(review.view, review.charge, review.refunds);
+  let reason = projected.needsReview ? "refund_needs_review" : review.refunds.some(refund => refund.status !== "succeeded") ? "refund_not_settled" : review.view.raw.paymentStatus !== projected.paymentStatus ? "projection_not_reconciled" : "";
+  if (!reason && review.matched.some(({ refund, operation }) => !operation || operation.refundEvidenceStatus !== "verified" || operation.refundStatus !== "succeeded" || operation.refundAmount !== refund.amount || operation.stripeRefundId !== refund.id || operation.stripePaymentIntentId !== review.intent.id || operation.stripeChargeId !== review.charge.id || operation.currency !== refund.currency || operation.stripeMode !== (event.livemode ? "live" : "test"))) reason = "operation_not_reconciled";
+  return { ...review, projected, ready: !reason, reason };
+}
+
+// A webhook endpoint and Events GET can render the same event using different
+// API versions. Keep the original signed-body hash exact, and bridge only an
+// authenticated re-delivery to an explicit, fixed-order business snapshot.
+function recoveryFingerprint(event) {
+  const object = event?.data?.object, request = event?.request;
+  if (!types.has(event?.type) || !external(event?.id, "evt") || !Number.isSafeInteger(event.created) || event.created <= 0 || typeof event.livemode !== "boolean" || event.account || !object || request != null && (typeof request !== "object" || Array.isArray(request)) || [request?.id, request?.idempotency_key].some(value => value != null && typeof value !== "string")) return null;
+  const metadata = object.metadata || {};
+  if (typeof metadata !== "object" || Array.isArray(metadata) || [metadata.caseId, metadata.disputeId, metadata.attorneyId].some(value => value != null && typeof value !== "string")) return null;
+  const common = [event.id, event.type, event.created, event.livemode, event.account || null, request?.id ?? null, request?.idempotency_key ?? null];
+  let snapshot;
+  if (event.type === "charge.refunded") {
+    if (object.object !== "charge" || !external(object.id, "ch") || !external(id(object.payment_intent), "pi") || ![object.amount, object.amount_captured, object.amount_refunded].every(cents) || [object.paid, object.captured, object.refunded, object.disputed, object.livemode].some(value => typeof value !== "boolean") || object.livemode !== event.livemode || typeof object.currency !== "string" || !/^[a-z]{3}$/.test(object.currency) || !Number.isSafeInteger(object.created) || object.created <= 0 || typeof object.status !== "string") return null;
+    snapshot = [object.object, object.id, object.created, object.amount, object.amount_captured, object.amount_refunded, object.currency, id(object.payment_intent), object.paid, object.captured, object.status, object.livemode, object.refunded, object.disputed, metadata.caseId ?? null, metadata.attorneyId ?? null];
+  } else {
+    if (object.object !== "refund" || !external(object.id, "re") || !external(id(object.charge), "ch") || !external(id(object.payment_intent), "pi") || !cents(object.amount) || !object.amount || typeof object.currency !== "string" || !/^[a-z]{3}$/.test(object.currency) || !Number.isSafeInteger(object.created) || object.created <= 0 || !statuses.has(object.status)) return null;
+    snapshot = [object.object, object.id, object.created, object.amount, object.currency, id(object.charge), id(object.payment_intent), object.status, metadata.caseId ?? null, metadata.disputeId ?? null];
+  }
+  return fingerprint([1, common, snapshot]);
+}
+const originalAuditId = event => new mongoose.Types.ObjectId(fingerprint(["stripe_refund_event", event.id]).slice(0, 24));
+const recoveryObservationId = eventId => new mongoose.Types.ObjectId(fingerprint(["stripe_refund_recovery_observation", eventId]).slice(0, 24));
+const signedFingerprint = event => fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, event.data?.object || {}]);
+function originalAuditAgrees(audit, event, proof) {
+  return Boolean(audit && audit.action === event.type && audit.actorRole === "system" && audit.actor == null && audit.meta?.kind === "refund_observation" && audit.meta.eventId === event.id && audit.meta.externalRef === event.data.object.id && /^[a-f0-9]{64}$/.test(audit.meta.eventHash || "") && !audit.meta.associationProblem && proof.projected && audit.meta.outcome === proof.projected.paymentStatus && audit.meta.confirmedRefundAmount === proof.projected.confirmedTotal && audit.meta.refundCount === proof.refunds.length && audit.meta.currency === proof.intent.currency && id(audit.case) === id(proof.view.raw._id));
+}
+function recoveryObservationMatches(observation, audit, row, event, proof) {
+  const canonical = recoveryFingerprint(event), meta = observation?.meta;
+  return Boolean(canonical && observation && observation.actor === null && observation.actorRole === "system" && observation.action === "payment.attention.provider_observed" && observation.targetType === "event" && observation.targetId === id(row._id) && id(observation.case) === id(proof.view.raw._id) && observation.method === "POST" && observation.path === "/api/webhooks/stripe" && meta?.schemaVersion === 1 && meta.eventId === event.id && meta.eventType === event.type && meta.originalAuditId === id(audit._id) && meta.originalAuditFingerprint === fingerprint(audit) && meta.signedEventHash === audit.meta.eventHash && meta.eventCanonicalHash === canonical && meta.paymentIntentId === proof.intent.id && meta.chargeId === proof.charge.id && fingerprint(meta.refundIds) === fingerprint(proof.refunds.map(refund => refund.id).sort()) && meta.confirmedRefundAmount === proof.projected.confirmedTotal && meta.currency === proof.intent.currency && meta.outcome === proof.projected.paymentStatus);
+}
+async function observeRecovery({ event, stripe, ip, ua }) {
+  if (!types.has(event.type)) return null;
+  const row = await Delivery.collection.findOne({ eventId: event.id });
+  if (!row || row.status !== "processed" || row.attentionRequired !== true || row.attentionCategory !== "processing") return null;
+  const denied = { recoveryObserved: false, reason: "The original signed refund and current accounting could not be verified. Keep this alert open for payment review." };
+  const audit = await Audit.collection.findOne({ _id: originalAuditId(event) });
+  const canonical = recoveryFingerprint(event), mode = currentStripeMode();
+  if (!canonical || row.type !== event.type || row.stripeMode !== (event.livemode ? "live" : "test") || mode !== row.stripeMode || !audit || audit.meta?.eventHash !== signedFingerprint(event)) return denied;
+  const current = await stripe.events.retrieve(event.id);
+  if (recoveryFingerprint(current) !== canonical) return denied;
+  const proof = await reviewAttention({ event, stripe });
+  if (!proof.ready || !originalAuditAgrees(audit, event, proof)) return denied;
+  const observationId = recoveryObservationId(event.id), session = await mongoose.startSession();
+  try {
+    session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+    if (fingerprint(row) !== fingerprint(await Delivery.collection.findOne({ _id: row._id }, { session })) || fingerprint(audit) !== fingerprint(await Audit.collection.findOne({ _id: audit._id }, { session }))) throw new Error("The signed recovery source changed before observation.");
+    await verifyRefundSources(proof, session);
+    const previous = await Audit.collection.findOne({ _id: observationId }, { session });
+    if (previous) {
+      if (!recoveryObservationMatches(previous, audit, row, event, proof)) throw new Error("The retained signed recovery observation does not match this event.");
+    } else {
+      const raw = proof.view.raw;
+      // Metadata-only serialization with a concurrent financial source write.
+      const guard = await Case.collection.updateOne({ _id: raw._id, __v: raw.__v === undefined ? { $exists: false } : raw.__v }, { $inc: { __v: 1 } }, { session });
+      if (guard.matchedCount !== 1 || guard.modifiedCount !== 1) throw new Error("The refund source changed before observation.");
+      await Audit.create([{ _id: observationId, actor: null, actorRole: "system", action: "payment.attention.provider_observed", targetType: "event", targetId: id(row._id), case: raw._id, method: "POST", path: "/api/webhooks/stripe", ip, ua, meta: { schemaVersion: 1, eventId: event.id, eventType: event.type, originalAuditId: id(audit._id), originalAuditFingerprint: fingerprint(audit), signedEventHash: audit.meta.eventHash, eventCanonicalHash: canonical, signedEventApiVersion: event.api_version || null, retrievedEventApiVersion: current.api_version || null, paymentIntentId: proof.intent.id, chargeId: proof.charge.id, refundIds: proof.refunds.map(refund => refund.id).sort(), confirmedRefundAmount: proof.projected.confirmedTotal, currency: proof.intent.currency, outcome: proof.projected.paymentStatus, caseVersionBefore: raw.__v ?? null, caseVersionAfter: Number(raw.__v || 0) + 1 } }], { session });
+    }
+    await session.commitTransaction();
+    return { recoveryObserved: true };
+  } catch (error) { if (session.inTransaction()) await session.abortTransaction().catch(reportOperationalFailure("services.attorneyRefundEvents.recovery_observation_abort")); throw error; }
+  finally { await session.endSession(); }
+}
+
+// A sibling observation may add verification timestamps/status without changing
+// a financial source. Re-read only that metadata race; real Matter, amount,
+// reference, status, payout, or ownership changes must still fail closed.
+const without = (row, fields) => row && Object.fromEntries(Object.entries(row).filter(([key]) => !fields.includes(key)));
+const observationMetadata = ["updatedAt", "refundEvidenceStatus", "refundVerifiedAt", "refundStatus", "refundCreatedAt"];
+const financialRows = rows => rows.map(row => without(row, observationMetadata));
+function financialInventory(view) {
+  return { ...view,
+    raw: without(view.raw, ["updatedAt", "__v"]),
+    cases: view.cases.map(row => without(row, ["updatedAt", "__v"])),
+    references: financialRows(view.references),
+    ...(view.operations ? { operations: financialRows(view.operations) } : {}),
+  };
+}
+const refundSourcesChanged = message => Object.assign(new Error(message), { code: "REFUND_SOURCES_CHANGED" });
+const REFUND_WRITE_ATTEMPTS = 3;
+function knownPrecommitConflict(error) {
+  const unknownCommit = error?.hasErrorLabel?.("UnknownTransactionCommitResult") || error?.errorLabels?.includes("UnknownTransactionCommitResult");
+  const transient = error?.hasErrorLabel?.("TransientTransactionError") || error?.errorLabels?.includes("TransientTransactionError");
+  return !unknownCommit && (
+    transient && (error?.code === 112 || error?.codeName === "WriteConflict") ||
+    error?.code === "REFUND_SOURCES_CHANGED"
+  );
+}
+async function record(input) {
+  for (let attempt = 0; attempt < REFUND_WRITE_ATTEMPTS; attempt += 1) {
+    const state = { retryable: false };
+    try { return await recordAttempt(input, state); }
+    catch (error) {
+      if (!state.retryable || attempt + 1 === REFUND_WRITE_ATTEMPTS) throw error;
+      // Only an acknowledged abort of a pre-commit write conflict or changed
+      // verification snapshot reaches here.
+      // Re-read current provider evidence and every retained source on the next
+      // attempt; never replay a provider mutation or uncertain commit.
+      await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
+}
+async function recordAttempt({ event, receiptFilter, stripe, ip, ua }, state) {
+  const object = event.data?.object || {};
+  const eventHash = fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, object]);
+  const auditId = new mongoose.Types.ObjectId(fingerprint(["stripe_refund_event", event.id]).slice(0, 24));
+  const alreadyRecorded = await Audit.collection.findOne({ _id: auditId }, { readConcern: { level: "majority" } });
+  const verification = alreadyRecorded ? { problem: "", refunds: [], references: [], matched: [] } : await inspectRefundEvidence(event, stripe);
+  let { problem, view, charge, intent, refunds, references, matched } = verification;
+  const session = await mongoose.startSession();
+  let commitStarted = false;
+  try {
+    session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+    const currentDelivery = await Delivery.collection.findOne(receiptFilter, { session });
+    if (!currentDelivery) throw new Error("The refund delivery attempt is no longer current.");
+    const previous = await Audit.collection.findOne({ _id: auditId }, { session });
+    let result = { caseId: view?.raw?._id || null, needsReview: Boolean(problem), outcome: problem ? "needs_review" : "observed" };
+    if (previous) {
+      if (previous.meta?.eventHash !== eventHash) throw new Error("The retained refund event does not match this delivery.");
+      result = { caseId: previous.case || null, needsReview: false, outcome: "already_recorded" };
+    } else {
+      if (alreadyRecorded) throw new Error("The retained refund event disappeared during verification.");
+      if (view) {
+        const current = await inventory(id(charge.payment_intent), session);
+        if (fingerprint(current) !== fingerprint(view)) {
+          const message = "The Matter refund records changed during provider verification.";
+          if (!problem && fingerprint(financialInventory(current)) === fingerprint(financialInventory(view))) throw refundSourcesChanged(message);
+          throw new Error(message);
+        }
+      }
+      if (!problem) {
+        const current = await refundReferences(refunds, session);
+        if (fingerprint(current) !== fingerprint(references)) {
+          const message = "The refund references changed during verification.";
+          if (fingerprint(financialRows(current)) === fingerprint(financialRows(references))) throw refundSourcesChanged(message);
+          throw new Error(message);
+        }
+      }
+      let confirmedTotal = null;
+      if (!problem) {
+        const now = new Date(), mode = event.livemode ? "live" : "test";
+        for (const { refund, operation } of matched) {
+          const values = { stripeRefundId: refund.id, refundAmount: refund.amount, stripePaymentIntentId: intent.id, stripeChargeId: charge.id, currency: refund.currency, stripeMode: mode, refundStatus: refund.status, refundEvidenceStatus: "verified", refundVerifiedAt: now, refundCreatedAt: date(refund.created), updatedAt: now };
+          if (!operation) {
+            await Operation.create([{ operationKey: `stripe_refund:${mode}:${refund.id}`, caseId: view.raw._id, kind: "refund", fingerprint: fingerprint([id(view.raw._id), intent.id, charge.id, refund.id, refund.amount, refund.currency, mode]), amount: refund.amount, stripeObjectId: refund.id, status: refund.status === "succeeded" ? "succeeded" : negative.has(refund.status) ? "failed" : "pending", ...values }], { session });
+          } else {
+            if (operation.kind === "refund") Object.assign(values, { status: refund.status === "succeeded" ? "succeeded" : negative.has(refund.status) ? "failed" : "pending", stripeObjectId: refund.id });
+            else if (negative.has(refund.status) && operation.status !== "succeeded") Object.assign(values, { status: "needs_reconciliation", evidenceStatus: "quarantined", lastError: "Stripe recorded a refund that did not complete for this settlement." });
+            const saved = await Operation.collection.updateOne({ _id: operation._id }, { $set: values }, { session });
+            if (saved.matchedCount !== 1) throw new Error("The retained refund operation could not be updated.");
+          }
+        }
+        const projected = refundProjection(view, charge, refunds);
+        confirmedTotal = projected.confirmedTotal;
+        const { paymentStatus, protectedStatus } = projected;
+        // A refund to the attorney does not undo a separate paralegal transfer,
+        // reopen the Matter, or restore its remaining amount.
+        const values = !protectedStatus && view.raw.paymentStatus !== paymentStatus ? { paymentStatus } : {};
+        const saved = await Case.collection.updateOne({ _id: view.raw._id }, { $set: { ...values, updatedAt: now }, $inc: { __v: 1 } }, { session });
+        if (saved.matchedCount !== 1) throw new Error("The Matter refund projection could not be updated.");
+        result.outcome = paymentStatus;
+        result.needsReview = projected.needsReview;
+      }
+      await Audit.create([{
+        _id: auditId, actor: null, actorRole: "system", action: event.type, targetType: "payment", case: result.caseId, ip, ua, method: "POST", path: "/api/webhooks/stripe",
+        meta: { eventId: event.id, eventHash, kind: "refund_observation", externalRef: typeof object.id === "string" ? object.id.slice(0, 220) : null, outcome: result.outcome, associationProblem: problem || null, confirmedRefundAmount: confirmedTotal, refundCount: refunds.length, currency: intent?.currency || null },
+      }], { session });
+    }
+    const recoveredProcessing = !previous && !problem && !result.needsReview && refunds.length > 0 && refunds.every(refund => refund.status === "succeeded") && currentDelivery.attentionCategory === "processing";
+    const finalized = await Delivery.updateOne(receiptFilter, { $set: { status: "processed", lastError: "", ...(result.needsReview ? { attentionRequired: true, attentionCategory: "refund" } : recoveredProcessing ? { attentionRequired: false, attentionCategory: "" } : {}) } }, { session });
+    if (!finalized.matchedCount) throw new Error("The refund delivery attempt changed before commit.");
+    commitStarted = true;
+    await session.commitTransaction();
+    return result;
+  } catch (error) {
+    let aborted = false;
+    if (session.inTransaction()) {
+      try { await session.abortTransaction(); aborted = true; }
+      catch (abortError) { reportOperationalFailure("services.attorneyRefundEvents.transaction_abort")(abortError); }
+    }
+    state.retryable = !commitStarted && aborted && knownPrecommitConflict(error);
+    throw error;
+  }
+  finally { await session.endSession(); }
+}
+
+module.exports = { record, reviewAttention, verifyRefundSources, observeRecovery, originalAuditAgrees, recoveryObservationId, recoveryObservationMatches };

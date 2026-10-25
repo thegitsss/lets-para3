@@ -1,0 +1,72 @@
+/* Dashboard Search presentation, scoped to Attorney V2's authorized controller. */
+body.av2 #av2-search { padding:0; width:360px; max-width:none; max-height:320px; border:1px solid rgba(60,66,87,.14); border-radius:9px; background:#fff; color:#162b3d; box-shadow:none; font:200 calc(17 * var(--lpc-reading-unit, 1px))/1.6 "Sarabun",sans-serif; }
+body.av2 #av2-search [data-av2-search-form] { margin:0; padding:0; border-bottom:1px solid rgba(15,23,42,.1); }
+body.av2 #av2-search .av2-search-row { display:block; position:relative; margin:0; padding:0; border:0; border-radius:0; background:transparent; }
+body.av2 #av2-search .av2-search-row svg { position:absolute; top:50%; left:15px; width:17px; height:17px; transform:translateY(-50%); color:#64748b; pointer-events:none; }
+body.av2 #av2-search #av2-query { box-sizing:border-box; display:block; width:100%; height:44px; min-height:44px; margin:0; padding:8px 14px 8px 40px; border:0; border-radius:8px 8px 0 0; background:#fff; color:#162b3d; font:200 calc(14.96 * var(--lpc-reading-unit, 1px))/calc(23.936 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; }
+body.av2 #av2-search #av2-query:focus { outline:none; box-shadow:inset 0 0 0 2px rgba(182,164,122,.62); }
+body.av2 #av2-search [data-av2-search-results] { min-height:52px; max-height:296px; margin:0; padding:5px 6px 7px; scrollbar-gutter:auto; }
+body.av2 #av2-search .lpc-search-group { display:grid; gap:1px; margin:0; }
+body.av2 #av2-search .lpc-search-group + .lpc-search-group { margin-top:5px; }
+body.av2 #av2-search .lpc-search-group-title { margin:0; padding:6px 8px 3px; color:#1a1a1a; font:300 calc(12.07 * var(--lpc-reading-unit, 1px))/calc(19.312 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; letter-spacing:.02em; text-transform:none; }
+body.av2 #av2-search .lpc-search-result { display:block; min-height:40px; padding:5px 8px; border:1px solid transparent; border-radius:7px; color:#162b3d; text-decoration:none; }
+body.av2 #av2-search .lpc-search-result:is(:hover,:focus-visible,.is-active) { border-color:rgba(182,164,122,.2); background:rgba(182,164,122,.09); outline:none; }
+body.av2 #av2-search .lpc-search-copy { display:block; }
+body.av2 #av2-search .lpc-search-copy strong { display:block; color:inherit; font:200 calc(14.96 * var(--lpc-reading-unit, 1px))/calc(23.936 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.av2 #av2-search .lpc-search-copy > span { display:block; margin-top:2px; color:#52697e; font:200 calc(12.75 * var(--lpc-reading-unit, 1px))/calc(20.4 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.av2 #av2-search .lpc-search-arrow { display:none; }
+body.av2 #av2-search .lpc-search-state { font-size:calc(13.26 * var(--lpc-reading-unit, 1px)); text-align:center; justify-content:center; }
+@media(max-width:640px) {
+ body.av2 #av2-search { border-radius:10px; }
+ body.av2 #av2-search [data-av2-search-results] { max-height:calc(100dvh - 132px); }
+}
+
+/* Search keeps its caption and geometry through hover, focus and open states. */
+body.av2 .av2-header .av2-search-slot,
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) { width:90px; min-width:90px; max-width:90px; height:30px; flex:0 0 90px; transition:none; }
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger,
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) > .av2-search-trigger { width:100%; height:30px; padding:0 8px; gap:7px; border-radius:5px; color:var(--av2-ink); visibility:visible; transition:background-color .15s ease,color .15s ease; }
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger span,
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) > .av2-search-trigger span { max-width:none; opacity:1; color:var(--av2-muted); transition:none; }
+body.av2 #av2-search { border-color:var(--av2-line); border-radius:6px; background:var(--av2-bg); color:var(--av2-ink); }
+body.av2 #av2-search #av2-query { background:var(--av2-bg); color:var(--av2-ink); }
+
+/* Keep the mobile launcher legible when text is enlarged. Its accessible name
+   and native button stay intact; the familiar icon leaves room for New Matter. */
+@media(max-width:600px) {
+ body.av2 .av2-header .av2-search-slot,
+ body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) { width:44px; min-width:44px; max-width:44px; height:44px; flex:0 0 44px; }
+ body.av2 .av2-header .av2-search-slot > .av2-search-trigger,
+ body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) > .av2-search-trigger { height:44px; justify-content:center; padding:0; }
+ body.av2 .av2-header .av2-search-slot > .av2-search-trigger span { display:none; }
+ body.av2 .av2-header .av2-search-slot > .av2-search-trigger svg { display:block; flex:none; }
+}
+
+body.av2 .av2-header .av2-header-tools .av2-search-slot > .av2-search-trigger:is(:hover,:focus-visible) {background:var(--av2-soft);color:var(--av2-ink);}
+@media(prefers-reduced-motion:reduce) {body.av2 .av2-header .av2-search-slot > .av2-search-trigger {transition:none;}}
+
+/* Desktop search reveals the existing field in place, like Paralegal V2. */
+@media(min-width:901px) {
+ body.av2 .av2-header .av2-search-slot,body.av2 .av2-header .av2-search-slot:hover {position:relative;justify-content:flex-start;width:90px;min-width:90px;max-width:280px;flex:0 1 auto;border:1px solid transparent;border-radius:6px;transition:width .16s ease,background-color .15s ease,border-color .15s ease;}
+ body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open) {width:280px;min-width:90px;max-width:280px;flex:0 1 auto;border-color:var(--av2-line);background:var(--av2-bg);transition:width .16s ease,background-color .15s ease,border-color .15s ease;}
+ body.av2 .av2-header .av2-search-slot > .av2-search-trigger {width:100%;height:28px;flex:none;}
+ body.av2 .av2-header .av2-search-slot > .av2-search-trigger span {display:inline;}
+ body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open) > .av2-search-trigger {width:34px;height:28px;padding:0 8px;justify-content:flex-start;background:transparent;}
+ body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open) > .av2-search-trigger span {display:none;}
+ body.av2 .av2-header .av2-search-slot > [data-av2-search-form] {position:absolute;inset:0 0 0 34px;display:block;width:auto;margin:0;padding:0;border:0;opacity:0;visibility:hidden;transition:opacity .15s ease;}
+ body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open) > [data-av2-search-form] {width:auto;opacity:1;visibility:visible;}
+ body.av2 .av2-header .av2-search-slot .av2-search-row {display:block;border:0;border-radius:0;background:transparent;}
+ body.av2 .av2-header .av2-search-slot .av2-search-row > svg {display:none;}
+ body.av2 .av2-header .av2-search-slot #av2-query {display:block;width:100%;height:28px;min-height:28px;margin:0;padding:4px 8px 4px 0;border:0;border-radius:0;background:transparent;color:var(--av2-ink);font:400 calc(12 * var(--lpc-reading-unit, 1px))/calc(18 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif;outline:none;box-shadow:none;}
+ body.av2 .av2-header .av2-search-slot:has(#av2-query:focus-visible) {outline:2px solid var(--av2-accent);outline-offset:2px;}
+ body.av2 .av2-header .av2-search-slot.is-open {border-bottom-color:transparent;border-radius:6px 6px 0 0;}
+ body.av2 #av2-search {border-radius:0 0 6px 6px;}
+}
+@media(prefers-reduced-motion:reduce) {body.av2 .av2-header .av2-search-slot,body.av2 .av2-header .av2-search-slot:hover,body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open),body.av2 .av2-header .av2-search-slot > [data-av2-search-form] {transition:none;}}
+
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger {font:400 calc(12 * var(--lpc-reading-unit, 1px))/calc(18 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif !important;}
+@media(pointer:coarse) {
+ body.av2 .av2-header .av2-search-slot,body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open) {height:44px;min-height:44px;}
+ body.av2 .av2-header .av2-search-slot > .av2-search-trigger,body.av2 .av2-header .av2-search-slot:is(.is-hovered,:focus-within,.is-open) > .av2-search-trigger {min-height:44px;}
+ body.av2 .av2-header .av2-search-slot #av2-query {min-height:44px;}
+}

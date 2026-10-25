@@ -31,7 +31,7 @@ const marketingPublishingSettingsSchema = new Schema(
     enabledChannels: {
       type: [String],
       enum: MARKETING_PUBLISHING_CHANNELS,
-      default: ["linkedin_company", "facebook_page"],
+      default: ["linkedin_company"],
     },
     pauseReason: { type: String, trim: true, default: "", maxlength: 500 },
     maxOpenCycles: { type: Number, min: 1, max: 5, default: 1 },

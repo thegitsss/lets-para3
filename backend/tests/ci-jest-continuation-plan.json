@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "mode": "whole-file-source-bound-backend-continuation",
+  "currentCommit": "@checked-out-head",
+  "priorRunId": 39076828223,
+  "priorAttempt": 1,
+  "priorHead": "c3ee5566fbaf562d22ee7536807c4da2bf248006",
+  "priorPlanSha256": "8062ba0fc37920e1e6e90d371e6b9f436120af291f21748ea7415e0cbf0284dd",
+  "artifacts": [
+    {
+      "id": 12117875580,
+      "name": "jest-shard-39076828223-1-5",
+      "bytes": 478521,
+      "sha256": "9a1ba513c3ad84b017216cf546eb5e6ed2d2627db01adf7bbca8ca8ca6164755",
+      "kind": "shard"
+    },
+    {
+      "id": 12117706220,
+      "name": "jest-shard-39076828223-1-1",
+      "bytes": 457618,
+      "sha256": "fbd32c426a2013b8ffd18aca381d07f7eba445d9e7a9c542398f2800265c63c1",
+      "kind": "shard"
+    },
+    {
+      "id": 12117575877,
+      "name": "jest-shard-39076828223-1-4",
+      "bytes": 486886,
+      "sha256": "fe994ee0f352592cfc9677908c56dfe9fa67b1d80a55e16c93ab882a08afe1dd",
+      "kind": "shard"
+    },
+    {
+      "id": 12117427253,
+      "name": "jest-shard-39076828223-1-7",
+      "bytes": 490820,
+      "sha256": "0c225a4fead92fe5f90976c7cc6f9b783e171ebdb554d8db6f7eece1ba721814",
+      "kind": "shard"
+    },
+    {
+      "id": 12117346192,
+      "name": "jest-plan-39076828223-1",
+      "bytes": 128921,
+      "sha256": "10d83a208c77f3b3e9f2d7ed17e8779ef74a39c39ba8e319f0055caa0811af07",
+      "kind": "plan"
+    },
+    {
+      "id": 12117203218,
+      "name": "jest-shard-39076828223-1-8",
+      "bytes": 488666,
+      "sha256": "ced14ef3b54d90b6a9bc0575a6a6f3bf160d91a15ec04570506f0da79ee667d7",
+      "kind": "shard"
+    },
+    {
+      "id": 12117108600,
+      "name": "jest-shard-39076828223-1-6",
+      "bytes": 469145,
+      "sha256": "c0d4c345353246d5011fd4cebd29fd70e6d15544137037fc791c8ee56e83b70b",
+      "kind": "shard"
+    },
+    {
+      "id": 12117073679,
+      "name": "jest-shard-39076828223-1-2",
+      "bytes": 489717,
+      "sha256": "9cbd4305e9e3ff1e4375704a794ce3a533e2c216cfc077b5b6ebbe2df77e1f9b",
+      "kind": "shard"
+    },
+    {
+      "id": 12117049055,
+      "name": "jest-shard-39076828223-1-3",
+      "bytes": 445743,
+      "sha256": "aa17c3e9a64c167efea7f845e74fba96180591bcbdd8d65c2d631a31cdc85fc5",
+      "kind": "shard"
+    }
+  ],
+  "changes": [
+    {
+      "path": "backend/scripts/import-ci-jest-prior.js",
+      "beforeSha256": "7758bb534f59fde855698f167284a86bc093377e0ba12ba3a78654e15f7c20e2",
+      "afterSha256": "38e367ab376aaddd0af99f32761b332d294b540f3ba82e4b1d76b56e83f57bea",
+      "kind": "ci-control",
+      "affectedSuites": [
+        "tests/ciJestShards.test.js"
+      ],
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
+    },
+    {
+      "path": "backend/tests/ciJestShards.test.js",
+      "beforeSha256": "639e17c9dfce5ebc35eff722f85d94643e0c5de0f3dca7d84a4c3271b36ec0e0",
+      "afterSha256": "c7e2f178157cd8db7d0fe5469ebc9369373c7ba275498a618a36b61d455a6814",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/ciJestShards.test.js"
+      ],
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
+    },
+    {
+      "path": "backend/tests/privateNoteWriteAuthorityBoundary.test.js",
+      "beforeSha256": "d59e7914ba50c8d8c718d2da31caad86daf48f5928c5a72599be01b403df8179",
+      "afterSha256": "d59dfae8ee3568794dd9f18fc98e591316319d76367cbd91616ee18b5e7d3212",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/privateNoteWriteAuthorityBoundary.test.js"
+      ],
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
+    },
+    {
+      "path": "backend/tests/ci-jest-continuation-plan.json",
+      "beforeSha256": "58dfb36e9b854e7a4e989bb4e66b17785451a21316d88e0e2fb8b584ea02f22a",
+      "afterSha256": "@approved-plan",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/privateNoteWriteAuthorityBoundary.test.js",
+        "tests/ciJestShards.test.js",
+        "tests/ciJestCoverage.test.js",
+        "tests/ciWorkflowContract.test.js",
+        "tests/ciArtifactBudget.test.js",
+        "tests/releaseCandidate.test.js",
+        "tests/releaseIdentity.test.js",
+        "tests/runtimePolicy.test.js"
+      ],
+      "reviewedEvidenceSha256": "382d9141a1598cac7f474314388fce3ead340a2abe1103546e3b408b0ab6892e",
+      "applicability": "No application source change; execute corrected real-expiry suite and complete original CI/runtime/release controls across the existing eight required serial groups. Preserve exact-source prior passed whole suites and original failed reports."
+    },
+    {
+      "path": "backend/ai/paralegalResponseValidator.js",
+      "beforeSha256": "1dc11d72e11eae16278d6107a2cd47489eeeaa108148762e3a75453d5ccf1900",
+      "afterSha256": "448e681b49fba136d3b064b8fc791d191c452399619e28c01e6169d90b518b90",
+      "kind": "product-change",
+      "affectedSuites": [
+        "tests/paralegalResponseValidator.test.js",
+        "tests/paralegalResponsePipeline.test.js",
+        "tests/paralegalResponseUiPolicy.test.js",
+        "tests/paralegalEvidenceContract.test.js",
+        "tests/paralegalSupportManagerAgent.test.js",
+        "tests/paralegalSupportAgentTools.test.js",
+        "tests/paralegalSupportDatabaseIntegration.test.js",
+        "tests/paralegalSupportReliability.test.js",
+        "tests/paralegalSupportLiveEval.test.js"
+      ],
+      "reviewedEvidenceSha256": "8e094926e52fbb9a99e442e91ca82145482f1b24b3d2512d312a00176f29a601",
+      "applicability": "Accept only exact percentage present in verified authorized explicitly policy-scoped P31 knowledge answer facts; titles/URLs/unavailable/unauthorized/other capability evidence cannot authorize it. Existing actual Matter financial snapshots retain typed evidence and cannot be replaced by current policy. Fees, policies, accounting and permission boundaries unchanged."
+    },
+    {
+      "path": "backend/tests/paralegalResponseValidator.test.js",
+      "beforeSha256": "3ceb890d482acd3f41e16b170de3f5b537aa4daa6cdc0097227c6a3699ee0680",
+      "afterSha256": "ae4630d5b8c71d78525827cf3fdc2859feede69f1533a7690820c034fada1599",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/paralegalResponseValidator.test.js"
+      ],
+      "reviewedEvidenceSha256": "8e094926e52fbb9a99e442e91ca82145482f1b24b3d2512d312a00176f29a601",
+      "applicability": "Accept only exact percentage present in verified authorized explicitly policy-scoped P31 knowledge answer facts; titles/URLs/unavailable/unauthorized/other capability evidence cannot authorize it. Existing actual Matter financial snapshots retain typed evidence and cannot be replaced by current policy. Fees, policies, accounting and permission boundaries unchanged."
+    },
+    {
+      "path": "backend/ai/supportManagerAgent.js",
+      "beforeSha256": "adcc0d58ffe85638dabad7deadfced9d0058770223c7504578db1c771ebfc8fa",
+      "afterSha256": "3281f110e509c467a34b69b0c42e1045c3bd125f7fe18df73090f71183f17402",
+      "kind": "product-change",
+      "affectedSuites": [
+        "tests/attorneyAggregateOverviewGrounding.test.js",
+        "tests/attorneyResponseValidator.test.js",
+        "tests/attorneyEvidenceContract.test.js",
+        "tests/supportManagerAgent.test.js",
+        "tests/attorneySupportDatabaseIntegration.test.js",
+        "tests/supportCostBudgetCeiling.test.js",
+        "tests/supportCostBudget.test.js"
+      ],
+      "reviewedEvidenceSha256": "3e7151d16c2f543622846c4387f537ecf4178761d28965365bae60108c95391b",
+      "applicability": "Clarify per-field known bool versus feature availability versus blocked profile completion in production manager instructions; update the required exact manager source fingerprint. No validator, critical classification, threshold, stored record, fee or permission rule changes."
+    },
+    {
+      "path": "backend/ai/supportCostBudget.js",
+      "beforeSha256": "50097f61aab0c975d0487230339e11171436c7b02630d0e08c9d980354c1119b",
+      "afterSha256": "7159940f47fb975e7afe24ce8fb5e54e673b3e91e352267f93f30c69a7dd3514",
+      "kind": "product-change",
+      "affectedSuites": [
+        "tests/attorneyAggregateOverviewGrounding.test.js",
+        "tests/attorneyResponseValidator.test.js",
+        "tests/attorneyEvidenceContract.test.js",
+        "tests/supportManagerAgent.test.js",
+        "tests/attorneySupportDatabaseIntegration.test.js",
+        "tests/supportCostBudgetCeiling.test.js",
+        "tests/supportCostBudget.test.js"
+      ],
+      "reviewedEvidenceSha256": "3e7151d16c2f543622846c4387f537ecf4178761d28965365bae60108c95391b",
+      "applicability": "Clarify per-field known bool versus feature availability versus blocked profile completion in production manager instructions; update the required exact manager source fingerprint. No validator, critical classification, threshold, stored record, fee or permission rule changes."
+    },
+    {
+      "path": "backend/tests/supportManagerAgent.test.js",
+      "beforeSha256": "7374d6d8e6a107fc8d746f90ebd5cee876a4a0cac7fbf356d760e4dc16051c60",
+      "afterSha256": "fbc78cfbb01d5a4edf721d21af54da52d1b14b12f1e9f58128f6aa90811c8f72",
+      "kind": "test-fixture",
+      "affectedSuites": [
+        "tests/supportManagerAgent.test.js"
+      ],
+      "reviewedEvidenceSha256": "3e7151d16c2f543622846c4387f537ecf4178761d28965365bae60108c95391b",
+      "applicability": "Clarify per-field known bool versus feature availability versus blocked profile completion in production manager instructions; update the required exact manager source fingerprint. No validator, critical classification, threshold, stored record, fee or permission rule changes."
+    }
+  ]
+}

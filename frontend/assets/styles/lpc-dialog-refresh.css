@@ -1,0 +1,138 @@
+/* Compact LPC treatment for the legacy image-card notice and onboarding dialogs. */
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) {
+  width: min(440px, calc(100vw - 32px));
+  border: 1px solid #d7dee5 !important;
+  border-radius: 3px !important;
+  color: #17233b;
+  background: #fff !important;
+  box-shadow: none !important;
+  text-align: left;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-hero {
+  height: 6px;
+  background: #0d263f !important;
+  background-image: none !important;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-content {
+  padding: 28px 30px 30px;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-title {
+  margin: 0;
+  padding-right: 42px;
+  color: #17233b !important;
+  font-family: var(--font-sans, "Söhne", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  line-height: 1.25;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-text {
+  max-width: 38rem;
+  margin: 9px 0 24px;
+  color: #657187 !important;
+  font-size: .93rem;
+  line-height: 1.6;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-actions {
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-btn {
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid #ccd5de !important;
+  border-radius: 2px !important;
+  color: #17233b !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  transform: none !important;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-btn.primary {
+  border-color: #0d263f !important;
+  color: #fff !important;
+  background: #0d263f !important;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-btn:hover {
+  border-color: #8593a2 !important;
+  background: #f5f7f8 !important;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-btn.primary:hover {
+  border-color: #173b5e !important;
+  background: #173b5e !important;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-close {
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border: 0 !important;
+  border-radius: 2px !important;
+  color: #657187 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-close:hover {
+  color: #17233b !important;
+  background: #f2f4f6 !important;
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) :is(textarea, input, select) {
+  border: 1px solid #ccd5de;
+  border-radius: 2px;
+  color: #17233b;
+  background: #fff;
+  box-shadow: none;
+}
+
+body.dashboard-no-shadows :is(.tour-overlay, .onboarding-overlay)::before {
+  background: rgba(9, 24, 40, .46);
+}
+
+body.dashboard-no-shadows .onboarding-overlay {
+  background: rgba(9, 24, 40, .46);
+}
+
+body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) :where(button, textarea, input, select):focus-visible {
+  outline: 2px solid #315f8a !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) {
+    width: calc(100vw - 24px);
+  }
+
+  body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-content {
+    padding: 25px 20px 22px;
+  }
+
+  body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) .tour-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.dashboard-no-shadows :is(.tour-modal, .onboarding-modal) {
+    transition: none !important;
+  }
+}

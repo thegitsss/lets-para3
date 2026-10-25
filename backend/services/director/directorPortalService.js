@@ -1,13 +1,22 @@
+const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:director:directorPortalService");
 const mongoose = require("mongoose");
+const { randomUUID, createHash } = require("crypto");
+const { lockActiveAccounts } = require("../../utils/activeAccountWrite");
+const { isDefiniteSmtpFailure } = require("../../utils/smtpDeliveryOutcome");
 
 const Case = require("../../models/Case");
 const DirectorOutreachEvent = require("../../models/DirectorOutreachEvent");
 const DirectorOutreachRecord = require("../../models/DirectorOutreachRecord");
 const DirectorProfile = require("../../models/DirectorProfile");
-const PlatformIncome = require("../../models/PlatformIncome");
 const User = require("../../models/User");
+const AuditLog = require("../../models/AuditLog");
+const { COMMISSION_CAP } = require("./commissionCap");
+const commissionEvidence = require("./commissionEvidence");
+const manualImportAuthority = require("./manualImportAuthority");
 const sendEmail = require("../../utils/email");
 const {
+  directorStageLabel,
   buildDirectorFollowUpHtml,
   buildDirectorFollowUpText,
   DIRECTOR_FOLLOW_UP_SUBJECT,
@@ -111,7 +120,7 @@ function serializeProfile(profile = {}) {
     status: profile.status || "active",
     outreachSubject: profile.outreachSubject || DIRECTOR_OUTREACH_SUBJECT,
     outreachConfigured: Boolean(String(profile.outreachTemplateText || profile.outreachTemplateHtml || "").trim()),
-    commissionCapMatterCount: profile.commissionCapMatterCount || 50,
+    commissionCapMatterCount: COMMISSION_CAP,
     commissionSharePctOfAttorneyFee: profile.commissionSharePctOfAttorneyFee || 50,
   };
 }
@@ -125,19 +134,31 @@ function escapeHtml(value = "") {
     .replace(/'/g, "&#39;");
 }
 
-async function ensureDirectorProfile(user = {}) {
+function initialDirectorProfile(user = {}) {
+  const email = normalizeEmail(user.email);
+  return { userId: user.id || user._id, email, zohoEmail: email,
+    displayName: String(user.email || "").split("@")[0] || "Director",
+    activeState: "TX", outreachSubject: DIRECTOR_OUTREACH_SUBJECT };
+}
+
+async function ensureDirectorProfile(user = {}, { session = null } = {}) {
   const email = normalizeEmail(user.email);
   if (!user.id && !user._id) throw new Error("Director user is required.");
-  let profile = await DirectorProfile.findOne({ userId: user.id || user._id });
+  let profile = await DirectorProfile.findOne({ userId: user.id || user._id }).session(session);
   if (profile) return profile;
-  profile = await DirectorProfile.create({
-    userId: user.id || user._id,
-    email,
-    zohoEmail: email,
-    displayName: String(user.email || "").split("@")[0] || "Director",
-    activeState: "TX",
-    outreachSubject: DIRECTOR_OUTREACH_SUBJECT,
-  });
+  try {
+    profile = await DirectorProfile.findOneAndUpdate({ userId: user.id || user._id }, { $setOnInsert: {
+      userId: user.id || user._id, email, zohoEmail: email,
+      displayName: String(user.email || "").split("@")[0] || "Director",
+      activeState: "TX", outreachSubject: DIRECTOR_OUTREACH_SUBJECT,
+    } }, { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, session });
+  } catch (error) {
+    // Another initial request may have inserted the same unique user profile.
+    // Do not hide unrelated write failures or overwrite that profile's settings.
+    if (error.code !== 11000 || session) throw error;
+    profile = await DirectorProfile.findOne({ userId: user.id || user._id });
+    if (!profile) throw error;
+  }
   return profile;
 }
 
@@ -146,23 +167,24 @@ async function getProfileForRequest(user = {}) {
   return ensureDirectorProfile(user);
 }
 
-async function updateDirectorProfile(user = {}, payload = {}) {
-  const profile = await ensureDirectorProfile(user);
+async function updateDirectorProfile(user = {}, payload = {}, { session = null } = {}) {
+  const profile = await ensureDirectorProfile(user, { session });
   const activeState = normalizeState(payload.activeState);
   if (activeState) profile.activeState = activeState;
   if (typeof payload.displayName === "string") profile.displayName = payload.displayName.trim().slice(0, 160);
-  await profile.save();
+  if (session) await profile.save({ session });
+  else await profile.save();
   return profile;
 }
 
-async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
+async function upsertRecordFromImport({ profile, item, state = "", session = null, committedEvents = null } = {}) {
   const attorneyEmail = normalizeEmail(item.attorneyEmail);
   if (!attorneyEmail) return null;
   const existingOtherDirectorRecord = await DirectorOutreachRecord.findOne({
     attorneyEmail,
     directorUserId: { $ne: profile.userId },
     stage: { $ne: "suppressed" },
-  }).lean();
+  }).session(session).lean();
   if (existingOtherDirectorRecord) return null;
 
   const eventType = item.eventType;
@@ -173,10 +195,19 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
       stage: { $ne: "suppressed" },
     })
       .select("_id")
+      .session(session)
       .lean();
     if (!existingDirectorRecord) return null;
   }
   const assignedState = normalizeState(state);
+  // An existing provider event is an idempotent manual no-op. Catching a
+  // duplicate-key error would leave the transaction aborted and unusable.
+  if (session && item.providerMessageId) {
+    const existing = await DirectorOutreachEvent.findOne({ directorUserId: profile.userId,
+      providerMessageId: item.providerMessageId, eventType }).session(session).lean();
+    if (existing) return DirectorOutreachRecord.findOne({ _id: existing.recordId,
+      directorUserId: profile.userId, attorneyEmail }).session(session);
+  }
   const update = {
     $setOnInsert: {
       directorUserId: profile.userId,
@@ -209,12 +240,12 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
   const record = await DirectorOutreachRecord.findOneAndUpdate(
     { directorUserId: profile.userId, attorneyEmail },
     update,
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, session }
   );
 
   let eventCreated = false;
   try {
-    await DirectorOutreachEvent.create({
+    const event = {
       recordId: record._id,
       directorUserId: profile.userId,
       directorEmail: profile.email,
@@ -226,15 +257,18 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
       providerThreadId: item.providerThreadId || "",
       occurredAt: item.occurredAt || new Date(),
       metadata: item.metadata || {},
-    });
+    };
+    if (session) await DirectorOutreachEvent.create([event], { session });
+    else await DirectorOutreachEvent.create(event);
     eventCreated = true;
   } catch (err) {
-    if (err?.code !== 11000) throw err;
+    if (err?.code !== 11000 || session) throw err;
   }
 
-  if (eventCreated && eventType === "reply_received") {
+  if (eventCreated && committedEvents) committedEvents.push({ record, item });
+  if (eventCreated && eventType === "reply_received" && !committedEvents) {
     await notifyFounderOfReply({ record, item }).catch((err) => {
-      console.warn("[director] founder reply notification failed", err?.message || err);
+      runtimeLogger.warn("[director] founder reply notification failed", err?.message || err);
     });
   }
 
@@ -251,8 +285,8 @@ function textToHtml(text = "") {
 function renderOutreachTemplate(template = "", attorneyName = "") {
   const name = String(attorneyName || "").trim();
   return String(template || "")
-    .replace(/\{\{\s*attorneyName\s*\}\}/gi, name)
-    .replace(/\{\{\s*name\s*\}\}/gi, name);
+    .replace(/\{\{\s*attorneyName\s*\}\}/gi, () => name)
+    .replace(/\{\{\s*name\s*\}\}/gi, () => name);
 }
 
 function validationError(message, statusCode = 400) {
@@ -304,43 +338,72 @@ async function sendDirectorEmail(profile = {}, to, subject, html, opts = {}) {
   });
 }
 
-async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmail = "", state = "" } = {}) {
-  const profile = await ensureDirectorProfile(user);
-  if (profile.status !== "active") throw validationError("Director outreach is paused for this account.", 403);
+async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmail = "", state = "", manualRequest = null } = {}) {
+  let authorizationId = null;
+  const prepare = async (session = null, currentUser = user) => {
+    const profile = await ensureDirectorProfile(currentUser, { session });
+    if (profile.status !== "active") throw validationError("Director outreach is paused for this account.", 403);
+  
+    const normalizedName = String(attorneyName || "").trim().slice(0, 240);
+    const normalizedEmail = normalizeEmail(attorneyEmail);
+    const normalizedState = normalizeState(state);
+  
+    if (!normalizedName) throw validationError("Attorney name is required.");
+    if (!normalizedEmail) throw validationError("Attorney email is required.");
+    if (!normalizedState) throw validationError("Attorney state is required.");
+  
+    const templateText = String(profile.outreachTemplateText || "").trim();
+    const templateHtml = String(profile.outreachTemplateHtml || "").trim();
+    if (!templateText && !templateHtml) {
+      throw validationError("Director outreach template is not configured yet. Add the locked template before sending.", 409);
+    }
+  
+    const existing = await DirectorOutreachRecord.findOne({
+      attorneyEmail: normalizedEmail,
+      firstOutreachSentAt: { $ne: null },
+    }).session(session).lean();
+    if (existing) {
+      const sameDirector = String(existing.directorUserId || "") === String(profile.userId || "");
+      throw validationError(
+        sameDirector
+          ? "This attorney has already been contacted by this director."
+          : "This attorney is already assigned to another director.",
+        409
+      );
+    }
+  
+    const subject = String(profile.outreachSubject || DIRECTOR_OUTREACH_SUBJECT).trim() || DIRECTOR_OUTREACH_SUBJECT;
+    const text = templateText
+      ? renderOutreachTemplate(templateText, normalizedName)
+      : renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+>/g, "");
+    const html = templateHtml ? renderOutreachTemplate(templateHtml, escapeHtml(normalizedName)) : textToHtml(text);
 
-  const normalizedName = String(attorneyName || "").trim().slice(0, 240);
-  const normalizedEmail = normalizeEmail(attorneyEmail);
-  const normalizedState = normalizeState(state);
-
-  if (!normalizedName) throw validationError("Attorney name is required.");
-  if (!normalizedEmail) throw validationError("Attorney email is required.");
-  if (!normalizedState) throw validationError("Attorney state is required.");
-
-  const templateText = String(profile.outreachTemplateText || "").trim();
-  const templateHtml = String(profile.outreachTemplateHtml || "").trim();
-  if (!templateText && !templateHtml) {
-    throw validationError("Director outreach template is not configured yet. Add the locked template before sending.", 409);
-  }
-
-  const existing = await DirectorOutreachRecord.findOne({
-    attorneyEmail: normalizedEmail,
-    firstOutreachSentAt: { $ne: null },
-  }).lean();
-  if (existing) {
-    const sameDirector = String(existing.directorUserId || "") === String(profile.userId || "");
-    throw validationError(
-      sameDirector
-        ? "This attorney has already been contacted by this director."
-        : "This attorney is already assigned to another director.",
-      409
-    );
-  }
-
-  const subject = String(profile.outreachSubject || DIRECTOR_OUTREACH_SUBJECT).trim() || DIRECTOR_OUTREACH_SUBJECT;
-  const text = templateText
-    ? renderOutreachTemplate(templateText, normalizedName)
-    : renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+>/g, "");
-  const html = templateHtml ? renderOutreachTemplate(templateHtml, normalizedName) : textToHtml(text);
+    if (manualRequest && session) {
+      // Serialize the exact locked profile/template used for this send. This
+      // short authorization transaction ends before the mail transport begins.
+      const locked = await DirectorProfile.collection.updateOne({
+        _id: profile._id, status: "active", updatedAt: profile.updatedAt,
+      }, { $inc: { __v: 1 } }, { session });
+      if (locked.modifiedCount !== 1) throw validationError("The Director profile changed. Review it before sending.", 409);
+      const intentId = randomUUID();
+      const payloadSha256 = createHash("sha256").update(JSON.stringify({
+        recipient: normalizedEmail, attorneyName: normalizedName, state: normalizedState,
+        subject, text, html, from: directorFrom(profile), replyTo: profile.zohoEmail || profile.email,
+      })).digest("hex");
+      const authorization = await AuditLog.logFromReq(manualRequest, "director.outreach.authorized", {
+        targetType: "other", targetId: intentId, session,
+        meta: { intentId, directorProfileId: String(profile._id),
+          profileUpdatedAt: profile.updatedAt, recipient: normalizedEmail,
+          attorneyState: normalizedState, payloadSha256 },
+      });
+      authorizationId = String(authorization._id);
+    }
+    return { profile, normalizedName, normalizedEmail, normalizedState, subject, text, html };
+  };
+  const prepared = manualRequest
+    ? await manualImportAuthority.write(manualRequest, prepare)
+    : await prepare();
+  const { profile, normalizedName, normalizedEmail, normalizedState, subject, text, html } = prepared;
   const now = new Date();
 
   const info = await sendDirectorEmail(profile, normalizedEmail, subject, html, {
@@ -367,7 +430,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
         updatedAt: now,
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   );
 
   try {
@@ -385,6 +448,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
       metadata: {
         portalSend: true,
         state: normalizedState,
+        ...(authorizationId ? { authorizationId } : {}),
       },
     });
   } catch (err) {
@@ -416,7 +480,7 @@ async function notifyFounderOfReply({ record, item } = {}) {
   });
 }
 
-async function updateDirectorZohoSyncStatus(profile, payload = {}) {
+async function updateDirectorZohoSyncStatus(profile, payload = {}, { session = null } = {}) {
   if (!profile?._id) return null;
   return DirectorProfile.findByIdAndUpdate(
     profile._id,
@@ -428,8 +492,65 @@ async function updateDirectorZohoSyncStatus(profile, payload = {}) {
         zohoLastSyncError: String(payload.error || "").slice(0, 1000),
       },
     },
-    { new: true }
+    { returnDocument: "after", session }
   );
+}
+
+function verifyImportMailbox(before, current) {
+  if (String(before.userId) !== String(current.userId) || before.email !== current.email ||
+      before.zohoEmail !== current.zohoEmail || before.status !== current.status) {
+    throw Object.assign(new Error("The mailbox settings changed. Refresh and review before syncing again."), { statusCode: 409, publicCode: "DIRECTOR_IMPORT_CHANGED" });
+  }
+}
+
+async function importDirectorMailManually({ user, req, state, folderKind, fromDate, toDate, recordSyncStatus }) {
+  await manualImportAuthority.verify(req);
+  // No profile initialization is persisted before an awaited mailbox read.
+  const before = await DirectorProfile.findOne({ userId: user.id || user._id }) || new DirectorProfile(initialDirectorProfile(user));
+  let messages, items;
+  const failureStatus = async () => manualImportAuthority.write(req, async (session, actor) => {
+    const profile = await ensureDirectorProfile(actor, { session });
+    verifyImportMailbox(before, profile);
+    if (recordSyncStatus) await updateDirectorZohoSyncStatus(profile, { status: "failed",
+      summary: folderKind === "sent" ? "Sent mail import failed." : "Inbox import failed.",
+      error: "Mailbox import did not complete. Review the saved records before syncing again." }, { session });
+  });
+  try {
+    messages = await fetchZohoMessages({ profile: before, folderKind, fromDate, toDate });
+    if (!Array.isArray(messages)) throw new Error("Mailbox response was not a message list");
+    items = folderKind === "sent" ? messages.flatMap(message => mapSentMessage(message, before)).filter(Boolean) : messages.map(message => mapInboxMessage(message, before)).filter(Boolean);
+  } catch (_error) {
+    await failureStatus();
+    throw validationError("Mailbox import failed. Refresh and review saved records before syncing again.", 502);
+  }
+  let accepted;
+  try {
+    accepted = await manualImportAuthority.write(req, async (session, actor) => {
+      const profile = await ensureDirectorProfile(actor, { session }), committedEvents = [];
+      verifyImportMailbox(before, profile);
+      for (const item of items) await upsertRecordFromImport({ profile, item, state, session, committedEvents });
+      await refreshDirectorRecords({ directorUserId: profile.userId, session });
+      if (recordSyncStatus) await updateDirectorZohoSyncStatus(profile, { status: "success",
+        summary: `${folderKind === "sent" ? "Sent mail" : "Inbox"} scanned: ${messages.length}. ${folderKind === "sent" ? "Outreach records" : "Replies"} imported: ${committedEvents.length}.` }, { session });
+      return { profile, committedEvents };
+    });
+  } catch (error) {
+    // Authority loss, a changed source or an unknown commit is never rewritten
+    // as a definite failed import, and never retried by this writer.
+    if (error.status === 403 || error.statusCode === 403 || error.status === 409 || error.statusCode === 409 || error.publicCode === "ACCOUNT_WRITE_UNCONFIRMED") throw error;
+    await failureStatus();
+    throw validationError("Mailbox import failed. Refresh and review saved records before syncing again.", 502);
+  }
+  accepted.profile.$session(null);
+  for (const receipt of accepted.committedEvents) receipt.record.$session(null);
+  // These existing notices describe committed new reply events only. They
+  // cannot escape a rolled-back import or repeat an existing provider event.
+  for (const receipt of accepted.committedEvents) if (receipt.item.eventType === "reply_received") {
+    try { await manualImportAuthority.verify(req); }
+    catch (error) { throw manualImportAuthority.savedReview(error); }
+    await notifyFounderOfReply(receipt).catch(error => runtimeLogger.warn("[director] founder reply notification failed", error?.message || error));
+  }
+  return { imported: accepted.committedEvents.length, scanned: messages.length, profile: serializeProfile(accepted.profile) };
 }
 
 async function importDirectorSentMail({
@@ -438,7 +559,9 @@ async function importDirectorSentMail({
   fromDate = startOfRecentImportWindow(),
   toDate = new Date(),
   recordSyncStatus = true,
+  manualRequest = null,
 } = {}) {
+  if (manualRequest) return importDirectorMailManually({ user, req: manualRequest, state, folderKind: "sent", fromDate, toDate, recordSyncStatus });
   const profile = await ensureDirectorProfile(user);
   try {
     const messages = await fetchZohoMessages({ profile, folderKind: "sent", fromDate, toDate });
@@ -466,7 +589,7 @@ async function importDirectorSentMail({
         status: "failed",
         summary: "Sent mail import failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] sent-mail failure status persistence failed"));
     }
     throw err;
   }
@@ -477,7 +600,9 @@ async function importDirectorInboxReplies({
   fromDate = startOfToday(),
   toDate = new Date(),
   recordSyncStatus = true,
+  manualRequest = null,
 } = {}) {
+  if (manualRequest) return importDirectorMailManually({ user, req: manualRequest, folderKind: "inbox", fromDate, toDate, recordSyncStatus });
   const profile = await ensureDirectorProfile(user);
   try {
     const messages = await fetchZohoMessages({ profile, folderKind: "inbox", fromDate, toDate });
@@ -505,7 +630,7 @@ async function importDirectorInboxReplies({
         status: "failed",
         summary: "Inbox import failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] inbox failure status persistence failed"));
     }
     throw err;
   }
@@ -571,27 +696,30 @@ async function autoImportDirectorMail({
         status: "failed",
         summary: "Auto-sync failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] auto-sync failure status persistence failed"));
     }
   }
 
   return result;
 }
 
-async function refreshDirectorRecords({ directorUserId = null } = {}) {
+async function refreshDirectorRecords({ directorUserId = null, deferVerify = false, session = null } = {}) {
   const filter = directorUserId ? { directorUserId } : {};
-  const records = await DirectorOutreachRecord.find(filter);
-  if (!records.length) return { updated: 0 };
+  const records = await DirectorOutreachRecord.find(filter).session(session);
 
   const emails = records.map((record) => record.attorneyEmail).filter(Boolean);
-  const users = await User.find({ email: { $in: emails }, role: "attorney" })
+  const users = await User.find({ $or: [{ email: { $in: emails } }, { _id: { $in: records.map(record => record.registeredUserId).filter(Boolean) } }], role: "attorney" })
     .select("_id email createdAt approvedAt status state location")
+    .session(session)
     .lean();
   const userByEmail = new Map(users.map((user) => [String(user.email || "").toLowerCase(), user]));
-  const attorneyIds = users.map((user) => user._id);
+  const userById = new Map(users.map(user => [String(user._id), user]));
+  const registeredUser = record => record.registeredUserId ? userById.get(String(record.registeredUserId)) : userByEmail.get(String(record.attorneyEmail || "").toLowerCase());
+  const attorneyIds = [...new Set([...users.map(user => String(user._id)), ...records.map(record => record.registeredUserId ? String(record.registeredUserId) : "").filter(Boolean)])];
   const cases = attorneyIds.length
-    ? await Case.find({ attorney: { $in: attorneyIds } })
+    ? await Case.find({ $or: [{ attorney: { $in: attorneyIds } }, { attorneyId: { $in: attorneyIds } }] })
         .select("_id attorney attorneyId status createdAt completedAt payoutFinalizedAt payoutTransferId feeAttorneyAmount feeAttorneyPct lockedTotalAmount totalAmount")
+        .session(session)
         .lean()
     : [];
   const casesByAttorney = new Map();
@@ -601,37 +729,38 @@ async function refreshDirectorRecords({ directorUserId = null } = {}) {
     bucket.push(caseDoc);
     casesByAttorney.set(key, bucket);
   });
-  const caseIds = cases.map((caseDoc) => caseDoc._id);
-  const incomeDocs = caseIds.length ? await PlatformIncome.find({ caseId: { $in: caseIds } }).lean() : [];
-  const incomeByCase = new Map(incomeDocs.map((income) => [String(income.caseId), income]));
-
+  // Bind a registration before taking the financial source snapshot. An email
+  // change must not switch a retained referral to a different account.
+  for (const record of records) {
+    const user = registeredUser(record);
+    if (user && !record.registeredUserId) {
+      const bound = await DirectorOutreachRecord.updateOne({ _id: record._id, registeredUserId: null }, { $set: { registeredUserId: user._id } }, { session });
+      if (!bound.matchedCount) {
+        const current = await DirectorOutreachRecord.collection.findOne({ _id: record._id }, { projection: { registeredUserId: 1 }, session });
+        if (String(current?.registeredUserId || "") !== String(user._id)) throw Object.assign(new Error("The referred account changed. Refresh to continue."), { statusCode: 409 });
+      }
+      record.registeredUserId = user._id;
+    }
+  }
+  await commissionEvidence.retainLegacyClaims({ directorUserId, session });
+  const financial = await commissionEvidence.read({ directorUserId, session });
+  const isCompleted = caseDoc => Boolean(caseDoc.completedAt || caseDoc.payoutFinalizedAt || caseDoc.payoutTransferId || ["completed", "closed"].includes(String(caseDoc.status || "").toLowerCase()));
   let updated = 0;
   for (const record of records) {
-    if (record.stage === "suppressed") continue;
-    const user = userByEmail.get(String(record.attorneyEmail || "").toLowerCase()) || null;
+    const user = registeredUser(record) || null;
     const userCases = user ? casesByAttorney.get(String(user._id)) || [] : [];
     const postedCase = userCases.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0] || null;
-    const completedCases = userCases.filter((caseDoc) => {
-      const status = String(caseDoc.status || "").toLowerCase();
-      return Boolean(caseDoc.completedAt || caseDoc.payoutFinalizedAt || caseDoc.payoutTransferId || status === "completed" || status === "closed");
-    });
-    const commissionCap = 50;
-    const commissionableCases = completedCases
-      .filter((caseDoc) => incomeByCase.has(String(caseDoc._id)) || Number(caseDoc.feeAttorneyAmount || 0) > 0)
-      .slice(0, commissionCap);
-    const commissionEarnedCents = commissionableCases.reduce((sum, caseDoc) => {
-      const income = incomeByCase.get(String(caseDoc._id));
-      const attorneyFee = Number(caseDoc.feeAttorneyAmount || 0) || Math.round(Number(caseDoc.lockedTotalAmount || caseDoc.totalAmount || 0) * (Number(caseDoc.feeAttorneyPct || 22) / 100));
-      const amount = income ? attorneyFee : attorneyFee;
-      return sum + Math.max(0, Math.round(amount * 0.5));
-    }, 0);
-
+    const completedCases = userCases.filter(isCompleted);
+    const projection = financial.records.get(String(record._id));
+    if (!projection) throw Object.assign(new Error("Commission records changed. Refresh to continue."), { statusCode: 409 });
     let nextStage = record.stage;
-    if (record.stage === "follow_up_failed") {
+    if (record.stage === "suppressed") {
+      nextStage = "suppressed";
+    } else if (record.stage === "follow_up_failed") {
       nextStage = "follow_up_failed";
     } else if (record.founderAttentionAt) {
       nextStage = "founder_attention";
-    } else if (commissionableCases.length > 0) {
+    } else if (projection.commissionState === "recorded" && projection.commissionableMatterCount > 0) {
       nextStage = "commission_complete";
     } else if (completedCases.length > 0) {
       nextStage = "matter_completed";
@@ -655,140 +784,128 @@ async function refreshDirectorRecords({ directorUserId = null } = {}) {
     record.firstMatterPostedAt = postedCase?.createdAt || record.firstMatterPostedAt || null;
     record.firstMatterCompletedAt =
       completedCases[0]?.completedAt || completedCases[0]?.payoutFinalizedAt || record.firstMatterCompletedAt || null;
-    record.commissionableMatterCount = commissionableCases.length;
-    record.commissionEarnedCents = commissionEarnedCents;
-    record.commissionStatus =
-      commissionableCases.length >= commissionCap ? "cap_reached" : commissionableCases.length > 0 ? "accruing" : "none";
+    for (const key of ["commissionableMatterCount", "commissionEarnedCents", "commissionStatus", "commissionState", "commissionCurrency", "commissionStripeMode", "commissionCurrencies", "commissionReviewCount"]) record.set(key, projection[key]);
+    record.commissionEvidenceVersion = 1;
     record.stage = nextStage;
-    await record.save();
+    await record.save({ session });
     updated += 1;
   }
 
-  return { updated };
+  if (!deferVerify) await financial.verify();
+  return { updated, commissionAllocation: financial.allocation.byRecord, commissionTotals: financial.allocation.totals, financial };
+}
+
+const FOLLOW_UP_REVIEW = 'Delivery could not be confirmed. Samantha must check the provider before another attempt.';
+const FOLLOW_UP_FAILED = 'The intended recipient did not accept this follow-up. Samantha must review before another attempt.';
+const activeFollowUpUser = (user, role) => user && user.role === role && user.status === 'approved' && user.emailVerified && !user.disabled && !user.deleted && !user.suspended;
+const recipientMatches = (values, recipient) => Array.isArray(values) && values.some(value => normalizeEmail(value?.address || value) === recipient);
+
+async function followUpParticipants(record, session = null) {
+  const profile = await DirectorProfile.findOne({ userId: record.directorUserId, status: 'active' }).session(session).lean();
+  const director = await User.findById(record.directorUserId).session(session).lean();
+  const attorney = await User.findById(record.registeredUserId).session(session).lean();
+  if (!profile || !activeFollowUpUser(director, 'director') || !activeFollowUpUser(attorney, 'attorney') || normalizeEmail(attorney.email) !== normalizeEmail(record.attorneyEmail)) return null;
+  return { profile, director, attorney };
+}
+
+// Acceptance is durable before event history is written. Repairs never send mail
+// and must match the exact accepted claim, not merely an existing message ID.
+async function retainFollowUpEvent(record, now) {
+  const intent = record.metadata?.automaticFollowUp;
+  if (intent?.status !== 'accepted' || intent.eventRecorded || !record.followUpSentAt || (intent.eventAttempts || 0) >= 3 || intent.nextEventAttemptAt && new Date(intent.nextEventAttemptAt) > now) return;
+  const match = { _id: record._id, 'metadata.automaticFollowUp.claimId': intent.claimId, 'metadata.automaticFollowUp.status': 'accepted', 'metadata.automaticFollowUp.eventRecorded': false, 'metadata.automaticFollowUp.eventAttempts': intent.eventAttempts || 0 };
+  const reserved = await DirectorOutreachRecord.updateOne(match, { $inc: { 'metadata.automaticFollowUp.eventAttempts': 1 }, $set: { 'metadata.automaticFollowUp.nextEventAttemptAt': new Date(now.getTime() + 60000) } });
+  if (!reserved.modifiedCount) return;
+  const event = {
+    recordId: record._id, directorUserId: record.directorUserId, directorEmail: intent.directorEmail,
+    attorneyEmail: intent.recipient, eventType: 'follow_up_sent', subject: DIRECTOR_FOLLOW_UP_SUBJECT,
+    summary: 'Automatic 8-day follow-up accepted by the mail transport for the intended attorney.',
+    provider: 'smtp', providerMessageId: `auto-follow-up:${record._id}`, occurredAt: new Date(intent.acceptedAt),
+    metadata: { automated: true, dueAt: new Date(intent.dueAt), claimId: intent.claimId },
+  };
+  let recorded = false;
+  try {
+    await DirectorOutreachEvent.create(event); recorded = true;
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existing = await DirectorOutreachEvent.findOne({ directorUserId: record.directorUserId, providerMessageId: event.providerMessageId, eventType: 'follow_up_sent' }).lean();
+      recorded = Boolean(existing && String(existing.recordId) === String(record._id) && existing.metadata?.claimId === intent.claimId && normalizeEmail(existing.attorneyEmail) === intent.recipient && new Date(existing.occurredAt).getTime() === new Date(intent.acceptedAt).getTime());
+    }
+  }
+  await DirectorOutreachRecord.updateOne({ _id: record._id, 'metadata.automaticFollowUp.claimId': intent.claimId, 'metadata.automaticFollowUp.status': 'accepted' }, { $set: { 'metadata.automaticFollowUp.eventRecorded': recorded, 'metadata.automaticFollowUp.eventFailure': recorded ? '' : 'Accepted email history needs repair. No additional email will be sent.' } });
 }
 
 async function sendAutomaticFollowUp({ record, profile, now = new Date() } = {}) {
-  if (!record || !profile) return { sent: false, reason: "missing_record_or_profile" };
-  if (record.followUpSentAt) return { sent: false, reason: "already_sent" };
-  if (record.stage === "follow_up_failed") return { sent: false, reason: "failed_needs_admin_review" };
-  if (record.founderAttentionAt) return { sent: false, reason: "founder_attention" };
-  if (record.firstMatterPostedAt) return { sent: false, reason: "matter_posted" };
-  if (!record.registeredAt) return { sent: false, reason: "not_registered" };
-
-  const dueAt = new Date(new Date(record.registeredAt).getTime() + 8 * 24 * 60 * 60 * 1000);
-  if (dueAt > now) return { sent: false, reason: "not_due" };
-
-  const claim = await DirectorOutreachRecord.findOneAndUpdate(
-    {
-      _id: record._id,
-      followUpSentAt: null,
-      firstMatterPostedAt: null,
-      founderAttentionAt: null,
-      registeredAt: { $ne: null, $lte: new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000) },
-    },
-    {
-      $set: {
-        followUpSentAt: now,
-        lastOutboundAt: now,
-        stage: "follow_up_sent",
-      },
-    },
-    { new: true }
-  );
-  if (!claim) return { sent: false, reason: "not_claimed" };
-
-  const attorneyName = claim.attorneyName || "there";
+  if (!record || !profile) return { sent: false, reason: 'missing_record_or_profile' };
+  const dueAt = new Date(new Date(record.registeredAt).getTime() + 8 * 86400000);
+  if (record.followUpSentAt || record.metadata?.automaticFollowUp || ['follow_up_failed', 'suppressed'].includes(record.stage) || record.founderAttentionAt || record.firstMatterPostedAt || !record.registeredAt || dueAt > now) return { sent: false, reason: 'not_eligible' };
+  const claimId = randomUUID(), session = await mongoose.startSession(); let claim, participants;
   try {
-    await sendDirectorEmail(profile, claim.attorneyEmail, DIRECTOR_FOLLOW_UP_SUBJECT, buildDirectorFollowUpHtml(attorneyName), {
-      text: buildDirectorFollowUpText(attorneyName),
-      throwOnError: true,
-      messageIdPrefix: `director-follow-up.${String(claim._id)}`,
-    });
+    await session.withTransaction(async () => {
+      claim = null; participants = null;
+      const current = await DirectorOutreachRecord.findById(record._id).session(session).lean();
+      if (!current || current.metadata?.automaticFollowUp || current.followUpSentAt || current.firstMatterPostedAt || current.founderAttentionAt || ['follow_up_failed', 'suppressed'].includes(current.stage) || String(current.registeredUserId || '') !== String(record.registeredUserId || '') || normalizeEmail(current.attorneyEmail) !== normalizeEmail(record.attorneyEmail) || new Date(current.registeredAt).getTime() !== new Date(record.registeredAt).getTime()) return;
+      participants = await followUpParticipants(current, session); if (!participants) return;
+      await lockActiveAccounts([current.directorUserId, current.registeredUserId], session);
+      // Serialize the claim against an owner pause of this existing profile.
+      const activeProfile = await DirectorProfile.collection.updateOne({ _id: participants.profile._id, status: 'active', updatedAt: participants.profile.updatedAt }, { $inc: { __v: 1 } }, { session });
+      if (!activeProfile.modifiedCount) throw new Error('The Director profile changed.');
+      claim = await DirectorOutreachRecord.findOneAndUpdate({ _id: current._id, updatedAt: current.updatedAt, 'metadata.automaticFollowUp': { $exists: false }, followUpSentAt: null }, { $set: { 'metadata.automaticFollowUp': { claimId, status: 'sending', claimedAt: now, dueAt, recipient: normalizeEmail(current.attorneyEmail), directorEmail: current.directorEmail, eventRecorded: false, eventAttempts: 0 } } }, { session, returnDocument: 'after' });
+    }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, maxCommitTimeMS: 10000 });
+  } finally { await session.endSession(); }
+  if (!claim) return { sent: false, reason: 'not_claimed' };
 
-    try {
-      await DirectorOutreachEvent.create({
-        recordId: claim._id,
-        directorUserId: claim.directorUserId,
-        directorEmail: claim.directorEmail,
-        attorneyEmail: claim.attorneyEmail,
-        eventType: "follow_up_sent",
-        subject: DIRECTOR_FOLLOW_UP_SUBJECT,
-        summary: "Automatic 8-day follow-up sent after attorney registration without a posted matter.",
-        provider: "smtp",
-        providerMessageId: `auto-follow-up:${claim._id}`,
-        occurredAt: now,
-        metadata: {
-          automated: true,
-          dueAt,
-        },
-      });
-    } catch (err) {
-      if (err?.code !== 11000) throw err;
+  let status = 'unknown', attempted = false;
+  const claimMatch = { _id: claim._id, 'metadata.automaticFollowUp.claimId': claimId };
+  try {
+    const current = await DirectorOutreachRecord.findById(claim._id).lean();
+    const currentParticipants = current && await followUpParticipants(current);
+    if (!currentParticipants || current.metadata?.automaticFollowUp?.claimId !== claimId || current.metadata.automaticFollowUp.status !== 'sending' || current.followUpSentAt || current.firstMatterPostedAt || current.founderAttentionAt || ['suppressed', 'follow_up_failed'].includes(current.stage) || String(current.registeredUserId) !== String(claim.registeredUserId) || normalizeEmail(current.attorneyEmail) !== normalizeEmail(claim.attorneyEmail) || new Date(current.registeredAt).getTime() !== new Date(claim.registeredAt).getTime()) status = 'skipped';
+    else {
+      attempted = true;
+      const result = await sendDirectorEmail(currentParticipants.profile, claim.attorneyEmail, DIRECTOR_FOLLOW_UP_SUBJECT, buildDirectorFollowUpHtml(claim.attorneyName || 'there'), { text: buildDirectorFollowUpText(claim.attorneyName || 'there'), throwOnError: true, messageIdPrefix: `director-follow-up.${claim._id}` });
+      const recipient = normalizeEmail(claim.attorneyEmail);
+      status = result?.disabled ? 'disabled' : recipientMatches(result?.accepted, recipient) && !recipientMatches(result?.rejected, recipient) ? 'accepted' : recipientMatches(result?.rejected, recipient) ? 'failed' : 'unknown';
     }
-
-    return { sent: true, recordId: String(claim._id), attorneyEmail: claim.attorneyEmail };
-  } catch (err) {
-    await DirectorOutreachRecord.updateOne(
-      { _id: claim._id, followUpSentAt: now },
-      {
-        $set: {
-          followUpSentAt: null,
-          stage: "follow_up_failed",
-          "metadata.lastFollowUpError": err?.message || String(err),
-          "metadata.lastFollowUpFailedAt": new Date(),
-        },
-      }
-    );
-    throw err;
-  }
+  } catch (error) { status = isDefiniteSmtpFailure(error, attempted) ? 'failed' : 'unknown'; }
+  const failure = status === 'accepted' ? '' : status === 'unknown' ? FOLLOW_UP_REVIEW : status === 'skipped' ? 'The account, profile or record changed. Samantha must review before another attempt.' : FOLLOW_UP_FAILED;
+  const changes = { 'metadata.automaticFollowUp.status': status, 'metadata.automaticFollowUp.failure': failure };
+  if (status === 'accepted') Object.assign(changes, { followUpSentAt: now, lastOutboundAt: now, 'metadata.automaticFollowUp.acceptedAt': now });
+  else Object.assign(changes, { 'metadata.lastFollowUpError': failure, 'metadata.lastFollowUpFailedAt': now });
+  // A late known acceptance may clarify an abandoned same-claim attempt. It
+  // cannot replace another intent or overwrite current owner/source fields.
+  const completed = await DirectorOutreachRecord.findOneAndUpdate({ ...claimMatch, 'metadata.automaticFollowUp.status': { $in: status === 'accepted' ? ['sending', 'unknown'] : ['sending'] } }, { $set: changes }, { returnDocument: 'after' });
+  if (!completed) return { sent: false, reason: 'claim_changed' };
+  await DirectorOutreachRecord.updateOne({ ...claimMatch, stage: { $nin: ['suppressed', 'founder_attention', 'matter_posted', 'matter_completed', 'commission_complete'] }, founderAttentionAt: null, firstMatterPostedAt: null }, { $set: { stage: status === 'accepted' ? 'follow_up_sent' : 'follow_up_failed' } });
+  if (status === 'accepted') await retainFollowUpEvent(completed.toObject(), now);
+  return { sent: status === 'accepted', failed: status !== 'accepted', reason: failure, recordId: String(claim._id) };
 }
 
 async function processAutomaticDirectorFollowUps({ directorUserId = null, now = new Date(), limit = 25 } = {}) {
+  now = new Date(now); const scope = directorUserId ? { directorUserId } : {};
+  // Recovery also runs while paused: it records uncertainty, never another send.
+  const abandoned = await DirectorOutreachRecord.find({ ...scope, 'metadata.automaticFollowUp.status': 'sending', 'metadata.automaticFollowUp.claimedAt': { $lt: new Date(now.getTime() - 10 * 60000) } }).limit(Math.min(100, Math.max(1, Number(limit) || 25))).lean();
+  for (const row of abandoned) {
+    const match = { _id: row._id, 'metadata.automaticFollowUp.claimId': row.metadata.automaticFollowUp.claimId, 'metadata.automaticFollowUp.status': 'sending' };
+    await DirectorOutreachRecord.updateOne(match, { $set: { 'metadata.automaticFollowUp.status': 'unknown', 'metadata.automaticFollowUp.failure': FOLLOW_UP_REVIEW, 'metadata.lastFollowUpError': FOLLOW_UP_REVIEW, 'metadata.lastFollowUpFailedAt': now } });
+    await DirectorOutreachRecord.updateOne({ ...match, 'metadata.automaticFollowUp.status': 'unknown', stage: { $nin: ['suppressed', 'founder_attention', 'matter_posted', 'matter_completed', 'commission_complete'] }, founderAttentionAt: null, firstMatterPostedAt: null }, { $set: { stage: 'follow_up_failed' } });
+  }
+  const repairs = await DirectorOutreachRecord.find({ ...scope, 'metadata.automaticFollowUp.status': 'accepted', 'metadata.automaticFollowUp.eventRecorded': false, 'metadata.automaticFollowUp.eventAttempts': { $lt: 3 } }).limit(Math.min(100, Math.max(1, Number(limit) || 25))).lean();
+  for (const row of repairs) await retainFollowUpEvent(row, now);
   await refreshDirectorRecords({ directorUserId });
-  const dueBefore = new Date(new Date(now).getTime() - 8 * 24 * 60 * 60 * 1000);
-  const filter = {
-    followUpSentAt: null,
-    firstMatterPostedAt: null,
-    founderAttentionAt: null,
-    stage: { $ne: "follow_up_failed" },
-    registeredAt: { $ne: null, $lte: dueBefore },
-  };
-  if (directorUserId) filter.directorUserId = directorUserId;
-
-  const records = await DirectorOutreachRecord.find(filter)
-    .sort({ registeredAt: 1, updatedAt: 1 })
-    .limit(Math.min(100, Math.max(1, Number(limit) || 25)));
-  if (!records.length) return { scanned: 0, sent: 0, failed: 0, failures: [] };
-
-  const profileIds = Array.from(new Set(records.map((record) => String(record.directorUserId))));
-  const profiles = await DirectorProfile.find({ userId: { $in: profileIds } }).lean();
-  const profileByUserId = new Map(profiles.map((profile) => [String(profile.userId), profile]));
-
-  let sent = 0;
-  let failed = 0;
-  const failures = [];
+  const records = await DirectorOutreachRecord.find({ ...scope, followUpSentAt: null, firstMatterPostedAt: null, founderAttentionAt: null, stage: { $nin: ['follow_up_failed', 'suppressed'] }, 'metadata.automaticFollowUp': { $exists: false }, registeredAt: { $ne: null, $lte: new Date(now.getTime() - 8 * 86400000) } }).sort({ registeredAt: 1, updatedAt: 1 }).limit(Math.min(100, Math.max(1, Number(limit) || 25)));
+  let sent = 0, failed = 0; const failures = [];
   for (const record of records) {
-    let profile = profileByUserId.get(String(record.directorUserId));
+    let profile = await DirectorProfile.findOne({ userId: record.directorUserId }).lean();
     if (!profile) {
-      const directorUser = await User.findById(record.directorUserId).lean();
-      if (directorUser) {
-        const createdProfile = await ensureDirectorProfile({ ...directorUser, id: directorUser._id });
-        profile = createdProfile.toObject ? createdProfile.toObject() : createdProfile;
-        profileByUserId.set(String(record.directorUserId), profile);
-      }
-      if (!profile) {
-        failed += 1;
-        failures.push({ recordId: String(record._id), reason: "missing_director_profile" });
-        continue;
-      }
+      const director = await User.findById(record.directorUserId).lean();
+      if (activeFollowUpUser(director, 'director')) profile = (await ensureDirectorProfile({ ...director, id: director._id })).toObject();
     }
     try {
-      const result = await sendAutomaticFollowUp({ record, profile, now: new Date(now) });
-      if (result.sent) sent += 1;
-    } catch (err) {
-      failed += 1;
-      failures.push({ recordId: String(record._id), reason: err?.message || String(err) });
-    }
+      const result = await sendAutomaticFollowUp({ record, profile, now });
+      if (result.sent) sent++;
+      if (result.failed) { failed++; failures.push({ recordId: String(record._id), reason: result.reason }); }
+    } catch (_error) { failed++; failures.push({ recordId: String(record._id), reason: 'The follow-up state could not be confirmed. Refresh and review before another attempt.' }); }
   }
   return { scanned: records.length, sent, failed, failures };
 }
@@ -803,7 +920,7 @@ function serializeRecord(record = {}) {
     firmName: record.firmName || "",
     state: record.state || "",
     stage: record.stage || "",
-    stageLabel: DIRECTOR_STAGE_LABELS[record.stage] || record.stage || "",
+    stageLabel: directorStageLabel(record),
     firstOutreachSentAt: record.firstOutreachSentAt || null,
     followUpSentAt: record.followUpSentAt || null,
     lastReplyAt: record.lastReplyAt || null,
@@ -811,10 +928,16 @@ function serializeRecord(record = {}) {
     registeredAt: record.registeredAt || null,
     firstMatterPostedAt: record.firstMatterPostedAt || null,
     firstMatterCompletedAt: record.firstMatterCompletedAt || null,
-    commissionableMatterCount: record.commissionableMatterCount || 0,
-    commissionEarnedCents: record.commissionEarnedCents || 0,
+    commissionableMatterCount: record.commissionableMatterCount ?? null,
+    commissionEarnedCents: record.commissionEarnedCents ?? null,
+    commissionState: record.commissionState || "needs_review",
+    commissionCurrency: record.commissionCurrency || null,
+    commissionStripeMode: record.commissionStripeMode || null,
+    commissionCurrencies: record.commissionCurrencies || [],
+    commissionReviewCount: record.commissionReviewCount || 0,
     commissionStatus: record.commissionStatus || "none",
     commissionPayoutStatus: record.commissionPayoutStatus || "unpaid",
+    commissionPayments: require('./commissionPayments').present(record.commissionPayments),
     commissionPaidAt: record.commissionPaidAt || null,
     updatedAt: record.updatedAt || null,
   };
@@ -830,17 +953,18 @@ async function listDirectorRecords({ user = {}, state = "", stage = "", rangeDay
   Object.assign(filter, range.filter);
   const normalizedState = normalizeState(state);
   if (normalizedState) filter.state = normalizedState;
-  if (stage) filter.stage = stage;
+  if (stage) filter.stage = String(stage);
 
-  await refreshDirectorRecords({ directorUserId: role === "director" ? user.id || user._id : null });
+  const refreshed = await refreshDirectorRecords({ directorUserId: role === "director" ? user.id || user._id : null, deferVerify: true });
   const records = await DirectorOutreachRecord.find(filter)
     .sort({ founderAttentionAt: -1, updatedAt: -1 })
     .limit(Math.min(250, Math.max(1, Number(limit) || 100)))
     .lean();
-  return records.map(serializeRecord);
+  await refreshed.financial.verify();
+  return records.map(record => serializeRecord(commissionEvidence.attach(record, refreshed.financial)));
 }
 
-async function updateDirectorRecordState({ user = {}, recordId = "", state = "" } = {}) {
+async function updateDirectorRecordState({ user = {}, recordId = "", state = "", session = null } = {}) {
   if (String(user.role || "").toLowerCase() !== "director") {
     const error = new Error("Only director accounts can update outreach record state.");
     error.statusCode = 403;
@@ -863,7 +987,7 @@ async function updateDirectorRecordState({ user = {}, recordId = "", state = "" 
       directorUserId: new mongoose.Types.ObjectId(user.id || user._id),
     },
     { $set: { state: normalizedState, updatedAt: new Date() } },
-    { new: true }
+    { returnDocument: "after", ...(session ? { session } : {}) }
   ).lean();
   if (!record) {
     const error = new Error("Outreach record not found.");
@@ -878,8 +1002,8 @@ async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
   const filter = profile ? { directorUserId: profile.userId } : {};
   const range = buildRecordDateRangeFilter(rangeDays);
   Object.assign(filter, range.filter);
-  await refreshDirectorRecords({ directorUserId: profile?.userId || null });
-  const records = await DirectorOutreachRecord.find(filter).lean();
+  const refreshed = await refreshDirectorRecords({ directorUserId: profile?.userId || null, deferVerify: true });
+  const records = (await DirectorOutreachRecord.find(filter).lean()).map(record => commissionEvidence.attach(record, refreshed.financial));
   const counts = records.reduce(
     (acc, record) => {
       acc.total += 1;
@@ -891,6 +1015,9 @@ async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
     },
     { total: 0, byState: {}, commissionEarnedCents: 0, commissionableMatterCount: 0 }
   );
+  Object.assign(counts, commissionEvidence.summarize(records));
+  const lifetime = commissionEvidence.summarize([...refreshed.financial.records.values()]);
+  await refreshed.financial.verify();
   const lastSyncedAt = records.reduce((latest, record) => {
     const values = [
       record.updatedAt,
@@ -915,6 +1042,11 @@ async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
   return {
     profile: profile ? serializeProfile(profile) : null,
     counts,
+    commissionLifetime: {
+      ...lifetime,
+      commissionCapMatterCount: COMMISSION_CAP,
+      remainingMatterCount: profile && lifetime.commissionState !== "needs_review" ? Math.max(0, COMMISSION_CAP - lifetime.commissionableMatterCount) : null,
+    },
     attention,
     lastSyncedAt: lastSyncedAt ? new Date(lastSyncedAt) : null,
     range: {
@@ -930,7 +1062,7 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
   const role = String(user.role || "").toLowerCase();
   const profile = role === "director" ? await ensureDirectorProfile(user) : null;
   const filter = profile ? { directorUserId: profile.userId } : {};
-  await refreshDirectorRecords({ directorUserId: profile?.userId || null });
+  const refreshed = await refreshDirectorRecords({ directorUserId: profile?.userId || null, deferVerify: true });
 
   const { start, end, buckets } = buildDateBuckets({ days });
   const bucketByKey = new Map(buckets.map((bucket) => [bucket.dateKey, bucket]));
@@ -958,10 +1090,10 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
     increment(record.registeredAt, "registrations");
     increment(record.firstMatterPostedAt, "mattersPosted");
     increment(record.firstMatterCompletedAt, "mattersCompleted");
-    if (record.firstMatterCompletedAt) {
-      increment(record.firstMatterCompletedAt, "commissionableMatters", Number(record.commissionableMatterCount || 0));
-    }
   });
+  for (const entries of refreshed.commissionAllocation.values()) {
+    for (const entry of entries) if (!refreshed.financial.reviewDirectors.has(String(entry.directorUserId))) increment(entry.completedAt, "commissionableMatters");
+  }
 
   const totals = buckets.reduce(
     (acc, bucket) => {
@@ -989,6 +1121,8 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
   totals.conversionRatePct = totals.emailsSent ? Math.round((totals.registrations / totals.emailsSent) * 100) : 0;
   totals.replyRatePct = totals.emailsSent ? Math.round((totals.replies / totals.emailsSent) * 100) : 0;
 
+  const lifetime = commissionEvidence.summarize([...refreshed.financial.records.values()]);
+  await refreshed.financial.verify();
   return {
     range: {
       start: buckets[0]?.dateKey || "",
@@ -996,6 +1130,11 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
       days: buckets.length,
     },
     totals,
+    commissionLifetime: {
+      ...lifetime,
+      commissionCapMatterCount: COMMISSION_CAP,
+      remainingMatterCount: profile && lifetime.commissionState !== "needs_review" ? Math.max(0, COMMISSION_CAP - lifetime.commissionableMatterCount) : null,
+    },
     series: buckets.map((bucket) => ({
       date: bucket.dateKey,
       emailsSent: bucket.emailsSent,

@@ -25,6 +25,21 @@ const {
 } = require("../ai/supportManagerAgent");
 const SupportMessage = require("../models/SupportMessage");
 const { normalizeAttorneyToolEvidence } = require("../ai/attorneyEvidenceContract");
+const { bindAccountOverviewToActor } = require("../ai/aggregateOverviewGrounding");
+const OVERVIEW_OWNER = "507f1f77bcf86cd799439011";
+
+function overviewResult({ activeCount = 5, completedCount = 4, ...overrides } = {}) {
+  const result = { ok: true, available: true, role: "attorney", totalCount: activeCount + completedCount, activeCount, completedCount, byStatus: {}, requestedScope: "completed", recentCases: [], matchingCaseCount: completedCount, returnedCaseCount: 0, truncated: false, ...overrides };
+  const observedAt = new Date().toISOString();
+  return { ...result, evidenceState: "verified", evidence: {
+    ...normalizeAttorneyToolEvidence({ toolName: "get_my_case_overview", result, retrievedAt: observedAt }),
+    state: "verified", source: "get_my_case_overview", observedAt,
+  } };
+}
+
+function overviewTrace(options) {
+  return bindAccountOverviewToActor({ name: "get_my_case_overview", result: overviewResult(options) }, { id: OVERVIEW_OWNER, role: "attorney" });
+}
 
 const originalManagerRoles = process.env.OPENAI_SUPPORT_MANAGER_ROLES;
 const originalAttorneyManagerEnabled = process.env.OPENAI_ATTORNEY_MANAGER_ENABLED;
@@ -84,13 +99,26 @@ describe("support manager agent", () => {
     else process.env.OPENAI_ATTORNEY_MANAGER_ALLOWLIST = originalAttorneyAllowlist;
   });
 
-  test("lets the model select a live tool, continues the Responses loop, and grounds the final answer", async () => {
-    mockExecuteSupportManagerTool.mockResolvedValue({
-      ok: true,
-      totalCount: 9,
-      completedCount: 4,
-      activeCount: 5,
+  test("separates known two-factor configuration from feature availability and blocked profile assessment", () => {
+    const instructions = buildManagerInstructions("attorney");
+    expect(instructions).toContain("false does not mean the configured value is unavailable");
+    expect(instructions).toContain("A missing or null configured value still requires a truthful limitation");
+    expect(instructions).toContain("blocked profile-completion assessment does not make security");
+  });
+
+  test.each([false, true])("verified two-factor configured=%s remains answerable while profile assessment is blocked and the feature is unavailable", configured => {
+    const trace = { name: "get_attorney_account_snapshot", result: { ok: true, available: true,
+      profileComplete: null, profileAssessment: { evidenceState: "blocked_policy", reason: "profile_completion_definitions_conflict" },
+      twoFactor: { featureAvailable: false, configured, method: "" },
+    } };
+    const result = auditManagerReply(managerReply({ reply: configured ? "Yes, two-factor authentication is configured." : "No, two-factor authentication is not configured.", suggestions: [], primaryAsk: "two_factor_configuration" }), {
+      messageText: "Is two-factor configured?", toolOutputs: [trace],
     });
+    expect(result.valid).toBe(true); expect(result.errors).toEqual([]);
+  });
+
+  test("lets the model select a live tool, continues the Responses loop, and grounds the final answer", async () => {
+    mockExecuteSupportManagerTool.mockResolvedValue(overviewResult());
     const parse = jest
       .fn()
       .mockResolvedValueOnce({
@@ -259,19 +287,7 @@ describe("support manager agent", () => {
                     {
                       name: "get_my_case_overview",
                       args: { status_scope: "completed" },
-                      result: {
-                        ok: true,
-                        available: true,
-                        totalCount: 4,
-                        evidenceState: "verified",
-                        evidence: {
-                          authorized: true,
-                          state: "verified",
-                          observedAt: new Date().toISOString(),
-                          facts: [{ key: "totalCount", value: 4 }],
-                          missingFacts: [],
-                        },
-                      },
+                      result: overviewResult({ activeCount: 0, completedCount: 4 }),
                     },
                   ],
                 },
@@ -422,7 +438,7 @@ describe("support manager agent", () => {
       available: true,
       evidenceState: "verified",
       authoritativeWorkflow: true,
-      requirements: { paymentMethodRequiredBeforePosting: true },
+      requirements: { paymentMethodRequiredBeforePosting: false },
     });
     const parse = jest
       .fn()
@@ -443,7 +459,7 @@ describe("support manager agent", () => {
         id: "workflow_answer",
         output: [],
         output_parsed: managerReply({
-          reply: "A saved payment method is required before posting.",
+          reply: "A saved payment method is not required before posting; it is required when hiring.",
           suggestions: [],
           primaryAsk: "posting_readiness",
           activeTask: "EXPLAIN",
@@ -468,8 +484,8 @@ describe("support manager agent", () => {
         result: {
           ok: true,
           available: true,
-          ctaLabel: "Billing & payments",
-          ctaHref: "dashboard-attorney.html#billing",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
         },
       },
     ];
@@ -477,8 +493,8 @@ describe("support manager agent", () => {
       managerReply({
         reply: "Open billing here.",
         navigation: {
-          ctaLabel: "Billing & payments",
-          ctaHref: "dashboard-attorney.html#billing",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
           inlineLinkText: "here",
         },
         activeTask: "NAVIGATION",
@@ -500,7 +516,7 @@ describe("support manager agent", () => {
       { messageText: "where is billing?", toolOutputs: evidence }
     );
 
-    expect(accepted.navigation?.ctaHref).toBe("dashboard-attorney.html#billing");
+    expect(accepted.navigation?.ctaHref).toBe("dashboard-attorney.html#funds");
     expect(stripped.navigation).toBeNull();
   });
 
@@ -508,7 +524,8 @@ describe("support manager agent", () => {
     expect(
       validateManagerReply(managerReply({ reply: "You have 7 completed cases." }), {
         messageText: "how many did i finish?",
-        toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, completedCount: 4 } }],
+        accountOwnerId: OVERVIEW_OWNER,
+        toolOutputs: [overviewTrace()],
       })
     ).toBeNull();
   });
@@ -516,15 +533,8 @@ describe("support manager agent", () => {
   test("does not ground a numeric claim from digits embedded in record identifiers", () => {
     const audit = auditManagerReply(managerReply({ reply: "You completed 99 cases.", suggestions: [] }), {
       messageText: "How many cases did I complete?",
-      toolOutputs: [{
-        name: "get_my_case_overview",
-        result: {
-          ok: true,
-          available: true,
-          completedCount: 3,
-          recentCases: [{ caseId: "6a6140113892535f99d8139e", title: "Synthetic Matter" }],
-        },
-      }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace({ completedCount: 3, recentCases: [{ caseId: "6a6140113892535f99d8139e", title: "Synthetic Matter" }] })],
     });
     expect(audit.errors).toContain("numeric_claim_absent_from_evidence");
   });
@@ -532,7 +542,8 @@ describe("support manager agent", () => {
   test("never treats a number supplied by the user as verified evidence", () => {
     const audit = auditManagerReply(managerReply({ reply: "Yes, you completed 99 cases." }), {
       messageText: "Did I complete 99 cases?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.errors).toContain("numeric_claim_absent_from_evidence");
   });
@@ -549,6 +560,88 @@ describe("support manager agent", () => {
     );
     expect(audit.valid).toBe(false);
     expect(audit.errors).toContain("claimed_data_unavailable_despite_available_evidence");
+  });
+
+  describe("profile completion blocked by policy", () => {
+    const profileTrace = (overrides = {}) => ({
+      name: "get_attorney_account_snapshot",
+      result: {
+        ok: true, available: true, profileComplete: null,
+        missingProfileFields: ["law firm", "state", "practice areas", "bio"],
+        profileAssessment: { evidenceState: "blocked_policy", reason: "profile_completion_definitions_conflict", assistantMinimumFieldsPresent: false },
+        ...overrides,
+      },
+    });
+    const auditProfile = (reply, options = {}) => auditManagerReply(managerReply({
+      reply, suggestions: [], primaryAsk: "profile_completion",
+    }), { messageText: "Is my profile complete?", toolOutputs: [profileTrace()], ...options });
+
+    test.each([
+      "I cannot confirm whether your profile is complete. Your law firm, state, practice areas, and bio are missing.",
+      "Your overall profile completion status is not available. Your law firm is missing.",
+      "I can’t verify your overall profile completion status. Your bio is missing.",
+    ])("accepts an honest field limitation without calling the available account data unavailable: %s", reply => {
+      expect(auditProfile(reply)).toEqual(expect.objectContaining({ valid: true, errors: [] }));
+    });
+
+    test.each([
+      "No, your profile isn’t complete. Add your law firm, state, practice areas, and bio to finish the missing profile details.",
+      "Your profile is complete.",
+      "Your profile is incomplete.",
+      "Your profile is ready.",
+      "Yes, your profile is finished.",
+      "Your profile is not yet complete.",
+      "Your profile remains incomplete.",
+      "Your profile has not been completed.",
+      "You haven’t completed your profile.",
+      "Add your law firm to complete your profile.",
+    ])("rejects an overall completion claim while that field is blocked: %s", reply => {
+      expect(auditProfile(reply).errors).toContain("unverified_evidence_presented_as_verified");
+    });
+
+    test.each([
+      "I cannot confirm whether your profile is complete. Your billing data is not available.",
+      "I cannot verify your notification settings.",
+      "I don't have your account information available.",
+    ])("keeps unrelated available evidence protected: %s", reply => {
+      expect(auditProfile(reply).errors).toContain("claimed_data_unavailable_despite_available_evidence");
+    });
+
+    test("does not infer a policy block from a null or absent field alone", () => {
+      for (const result of [{ profileComplete: null }, { profileComplete: false }, { profileComplete: true }]) {
+        const trace = profileTrace({ ...result, profileAssessment: undefined });
+        expect(auditProfile("I cannot confirm whether your profile is complete.", { toolOutputs: [trace] }).errors)
+          .toContain("claimed_data_unavailable_despite_available_evidence");
+      }
+    });
+
+    test("does not apply a profile exception to a settings question", () => {
+      expect(auditProfile("I cannot verify your notification settings.", { messageText: "What are my notification settings?" }).errors)
+        .toContain("claimed_data_unavailable_despite_available_evidence");
+    });
+
+    test("keeps an unrelated unavailable claim in the same sentence visible", () => {
+      expect(auditProfile("I cannot confirm whether your profile is complete, and your billing data is not available.").errors)
+        .toContain("claimed_data_unavailable_despite_available_evidence");
+    });
+
+    test("a truthful limitation cannot hide a later definitive completion claim", () => {
+      expect(auditProfile("I cannot confirm whether your profile is complete. Your profile is incomplete.").errors)
+        .toContain("unverified_evidence_presented_as_verified");
+    });
+
+    test("returns the truthful blocked-field answer through the manager without a validation retry", async () => {
+      mockGetSupportManagerToolDefinitions.mockReturnValueOnce([{ type: "function", name: "get_attorney_account_snapshot", description: "Account fields", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true }]);
+      mockExecuteSupportManagerTool.mockResolvedValue(profileTrace().result);
+      const reply = "I cannot confirm whether your profile is complete. Your law firm, state, practice areas, and bio are missing.";
+      const parse = jest.fn().mockResolvedValueOnce({
+        id: "resp_profile_tool", output: [{ type: "function_call", call_id: "profile_tool", name: "get_attorney_account_snapshot", arguments: "{}", parsed_arguments: {} }],
+      }).mockResolvedValueOnce({ id: "resp_profile_answer", output: [], output_parsed: managerReply({ reply, suggestions: [], primaryAsk: "profile_completion" }) });
+      const result = await generateSupportManagerReply({ messageText: "Is my profile complete?", user: { _id: OVERVIEW_OWNER, role: "attorney" }, client: { responses: { parse } } });
+      expect(result.reply).toBe(reply);
+      expect(result.telemetry).toEqual(expect.objectContaining({ managerAvailable: true, validationFailures: [], validationRetries: 0, validationExhausted: false, retryOutcome: "not_needed" }));
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
   });
 
   test("requires the authoritative workflow tool for payment prerequisites", () => {
@@ -574,7 +667,7 @@ describe("support manager agent", () => {
 
   test("rejects a workflow answer that contradicts the executable payment policy", () => {
     const audit = auditManagerReply(
-      managerReply({ reply: "No—you don’t need a payment method before posting." }),
+      managerReply({ reply: "Yes—you need a payment method before posting." }),
       {
         messageText: "do i need a payment method first?",
         toolOutputs: [
@@ -584,7 +677,7 @@ describe("support manager agent", () => {
               ok: true,
               available: true,
               authoritativeWorkflow: true,
-              requirements: { paymentMethodRequiredBeforePosting: true },
+              requirements: { paymentMethodRequiredBeforePosting: false },
             },
           },
         ],
@@ -599,7 +692,7 @@ describe("support manager agent", () => {
     const answer = validateManagerReply(
       managerReply({
         reply:
-          "Yes. You need a saved payment method before you can post a matter; LPC charges it when you confirm a hire.",
+          "No. You do not need a saved payment method before you can post a matter; one is required when you confirm a hire.",
         suggestions: [],
       }),
       {
@@ -612,7 +705,7 @@ describe("support manager agent", () => {
               available: true,
               authoritativeWorkflow: true,
               requirements: {
-                paymentMethodRequiredBeforePosting: true,
+                paymentMethodRequiredBeforePosting: false,
                 chargeTiming: "charged_when_hire_is_confirmed",
               },
             },
@@ -621,7 +714,7 @@ describe("support manager agent", () => {
       }
     );
 
-    expect(answer?.reply).toMatch(/^Yes\./);
+    expect(answer?.reply).toMatch(/^No\./);
   });
 
   test("derives durable matter memory from verified tool output", () => {
@@ -641,11 +734,7 @@ describe("support manager agent", () => {
   });
 
   test("retries an internally invalid answer and returns the corrected grounded response", async () => {
-    mockExecuteSupportManagerTool.mockResolvedValue({
-      ok: true,
-      available: true,
-      completedCount: 4,
-    });
+    mockExecuteSupportManagerTool.mockResolvedValue(overviewResult({ activeCount: 0 }));
     const parse = jest
       .fn()
       .mockResolvedValueOnce({
@@ -814,15 +903,19 @@ describe("support manager agent", () => {
               allScopeTasksCompleteRequired: true,
               verifiedFundingRequired: true,
               paralegalPayoutSetupRequired: true,
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-              bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         },
       },
     ];
     expect(validateManagerReply(managerReply({
-      reply: "The paralegal’s payout is released when you complete the matter, after all scope tasks, funding, and payout setup are ready. Bank deposit typically takes 3–5 business days after release, depending on Stripe and the bank.",
+      reply: "The paralegal’s payout is released when you complete the matter, after all scope tasks, funding, and payout setup are ready. Stripe provides the current payout status and estimated arrival based on the connected account’s payout schedule and financial institution.",
       suggestions: [],
     }), {
       messageText: "When does the paralegal get paid?",
@@ -841,7 +934,12 @@ describe("support manager agent", () => {
           requirements: {
             paralegalPayoutTiming: {
               releaseTrigger: "when_attorney_completes_matter",
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         },
@@ -871,8 +969,12 @@ describe("support manager agent", () => {
                 allScopeTasksCompleteRequired: true,
                 verifiedFundingRequired: true,
                 paralegalPayoutSetupRequired: true,
-                bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-                bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+                bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+                bankDepositTimingDependsOn: [
+                  "stripe_account_country",
+                  "stripe_payout_schedule",
+                  "financial_institution",
+                ],
               },
             },
           }),
@@ -881,7 +983,7 @@ describe("support manager agent", () => {
       validationFailures: ["generation_unsupported_claim"],
     });
     expect(result).toEqual(expect.objectContaining({
-      reply: expect.stringMatching(/matter complete[\s\S]*3–5 business days/i),
+      reply: expect.stringMatching(/matter complete[\s\S]*Stripe provides the current payout status and estimated arrival/i),
       provider: "openai_manager_safe_fallback",
       grounded: true,
       confidence: "high",
@@ -908,8 +1010,12 @@ describe("support manager agent", () => {
               allScopeTasksCompleteRequired: true,
               verifiedFundingRequired: true,
               paralegalPayoutSetupRequired: true,
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-              bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         }),
@@ -923,8 +1029,12 @@ describe("support manager agent", () => {
               allScopeTasksCompleteRequired: true,
               verifiedFundingRequired: true,
               paralegalPayoutSetupRequired: true,
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-              bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         }),
@@ -933,7 +1043,7 @@ describe("support manager agent", () => {
       validationFailures: ["repeated_tool_call_without_new_information"],
     });
     expect(result).toEqual(expect.objectContaining({
-      reply: expect.stringMatching(/3–5 business days/i),
+      reply: expect.stringMatching(/Stripe provides the current payout status and estimated arrival/i),
       primaryAsk: "deposit_timing",
       evidenceCapability: "deposit_timing",
       provider: "openai_manager_safe_fallback",
@@ -991,12 +1101,17 @@ describe("support manager agent", () => {
       requirements: {
         paralegalPayoutTiming: {
           releaseTrigger: "when_attorney_completes_matter",
-          bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
+          bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+          bankDepositTimingDependsOn: [
+            "stripe_account_country",
+            "stripe_payout_schedule",
+            "financial_institution",
+          ],
         },
       },
     });
     const audit = auditManagerReply(managerReply({
-      reply: "Bank deposit usually takes 3–5 business days.",
+      reply: "Stripe provides the current payout status and estimated arrival.",
       evidenceCapability: "deposit_timing",
       suggestions: [],
     }), {
@@ -1056,7 +1171,7 @@ describe("support manager agent", () => {
           available: true,
           authoritativeWorkflow: true,
           paymentMethod: { saved: true },
-          requirements: { paymentMethodRequiredBeforePosting: true },
+          requirements: { paymentMethodRequiredBeforePosting: false },
         }),
         {
           name: "get_billing_snapshot",
@@ -1075,7 +1190,7 @@ describe("support manager agent", () => {
       validationRetries: 2,
       validationFailures: ["platform_requirement_not_distinguished"],
     });
-    expect(result.reply).toMatch(/^Yes\.[\s\S]*required[\s\S]*post a matter[\s\S]*already have one saved/i);
+    expect(result.reply).toMatch(/^No\.[\s\S]*not required[\s\S]*post a matter[\s\S]*already have one saved/i);
   });
 
   test("uses a natural verified fallback for a general hiring-process question", () => {
@@ -1143,7 +1258,7 @@ describe("support manager agent", () => {
 
     const complete = validateManagerReply(
       managerReply({
-        reply: "No—you don’t have a payment method saved. One is required before you can post a matter.",
+        reply: "No—you don’t have a payment method saved. One is not required before you post a matter, but it is required when you hire.",
         suggestions: [],
       }),
       {
@@ -1156,7 +1271,7 @@ describe("support manager agent", () => {
               ok: true,
               available: true,
               authoritativeWorkflow: true,
-              requirements: { paymentMethodRequiredBeforePosting: true },
+              requirements: { paymentMethodRequiredBeforePosting: false },
             },
           },
         ],
@@ -1244,19 +1359,22 @@ describe("support manager agent", () => {
   });
 
   test("blocks generic manual-review language, internal tool names, and overlong simple facts", () => {
-    const evidence = [{ name: "get_my_case_overview", result: { ok: true, completedCount: 4 } }];
+    const evidence = [overviewTrace()];
     expect(auditManagerReply(managerReply({ reply: "I’m sending this to the team for review now." }), {
       messageText: "How many cases did I complete?",
+      accountOwnerId: OVERVIEW_OWNER,
       toolOutputs: evidence,
     }).errors).toContain("forbidden_support_meta_claim");
     expect(auditManagerReply(managerReply({ reply: "The get_my_case_overview tool says 4." }), {
       messageText: "How many cases did I complete?",
+      accountOwnerId: OVERVIEW_OWNER,
       toolOutputs: evidence,
     }).errors).toContain("forbidden_support_meta_claim");
     const repaired = auditManagerReply(managerReply({
       reply: "You completed 4 cases. That is the current count. You can ask about them.",
     }), {
       messageText: "How many cases did I complete?",
+      accountOwnerId: OVERVIEW_OWNER,
       toolOutputs: evidence,
     });
     expect(repaired.valid).toBe(true);
@@ -1324,7 +1442,7 @@ describe("support manager agent", () => {
             ok: true,
             available: true,
             authoritativeWorkflow: true,
-            requirements: { paymentMethodRequiredBeforePosting: true },
+            requirements: { paymentMethodRequiredBeforePosting: false },
           }
     );
     const parse = jest
@@ -1341,7 +1459,7 @@ describe("support manager agent", () => {
         id: "compound_final",
         output: [],
         output_parsed: managerReply({
-          reply: "No—you don’t have a payment method saved. One is required before posting.",
+          reply: "No—you don’t have a payment method saved. You do not need one before posting, but one is required when hiring.",
           suggestions: [],
         }),
         usage: {},

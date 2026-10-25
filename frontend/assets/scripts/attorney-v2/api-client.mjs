@@ -6,7 +6,7 @@ import { assertDocumentActive } from "../utils/document-navigation.mjs";
 export class ApiError extends Error {
   constructor(kind, status = 0, code) {
     super("The workspace request could not be completed.");
-    this.code = typeof code === "string" && /^(?:POSTING|PUBLICATION|DRAFT|NOTE|SAVED_VIEW|SAVED_PARALEGAL|MODERATION|INVITATION|ARCHIVE|DOWNLOAD|RECEIPT|EXPORT|APPLICATION_(?:REVIEW|ACCOUNT|SOURCE)|PRE_ENGAGEMENT|PAYMENT_SETUP|HIRING|HIRE|WORKSPACE|DOCUMENT|FILE|FINANCIAL)_[A-Z_]{1,60}$/.test(code) ? code : undefined;
+    this.code = typeof code === "string" && (code === "MATTER_FINANCIAL_CHANGED" || /^(?:POSTING|PUBLICATION|DRAFT|NOTE|SAVED_VIEW|SAVED_PARALEGAL|MODERATION|INVITATION|ARCHIVE|DOWNLOAD|RECEIPT|EXPORT|APPLICATION_(?:REVIEW|ACCOUNT|SOURCE)|PRE_ENGAGEMENT|PAYMENT_SETUP|HIRING|HIRE|WORKSPACE|DOCUMENT|FILE|FINANCIAL)_[A-Z_]{1,60}$/.test(code)) ? code : undefined;
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
@@ -274,10 +274,15 @@ export function createApiClient({ fetchImpl = window.fetch.bind(window), onAuthe
       const value = await request(`/api/cases/${caseId}/files/${fileId}/history/${index}/download?${new URLSearchParams({expectedOwnerId: options.ownerId, revision})}`, {signal: options.signal, binary: true});
       await verifyDownloadOwner(options); return value;
     },
+    readWorkspaceFileSecurity: (caseId, fileId, options = {}) => {
+      if (!validDraftId(caseId) || !validDraftId(fileId)) throw new TypeError("Invalid Matter document.");
+      return request(`/api/uploads/case/${caseId}/${fileId}/security-status`, { signal: options.signal });
+    },
     readWorkspaceFiles: (caseId, options) => {
       if (!validDraftId(caseId)) throw new TypeError("Invalid Matter files.");
       const query = new URLSearchParams({ expectedOwnerId: options.ownerId });
       for (const key of ["cursor", "fileId"]) if (options[key]) { if (!validDraftId(options[key])) throw new TypeError("Invalid file selection."); query.set(key, options[key]); }
+      for (const key of ['q','status','sort']) if (options[key]) query.set(key,options[key]);
       return workspaceRead(`/api/cases/${caseId}/files/review?${query}`, options);
     },
     updateWorkspaceFile: (caseId, fileId, selection, options) => {
@@ -290,12 +295,14 @@ export function createApiClient({ fetchImpl = window.fetch.bind(window), onAuthe
     },
     readWorkspaceHistory: (caseId, options) => {
       if (!validDraftId(caseId)) throw new TypeError("Invalid Matter history.");
-      return workspaceRead(`/api/cases/${caseId}/status-history`, options);
+      const query = new URLSearchParams({reviewFeed:'1',expectedOwnerId:options.ownerId});
+      if (options.cursor) query.set('cursor',options.cursor);
+      return workspaceRead(`/api/cases/${caseId}/status-history?${query}`, options);
     },
     readWorkspaceDates: (caseId, options) => {
       if (!validDraftId(caseId)) throw new TypeError("Invalid Matter calendar.");
       const query = new URLSearchParams({ expectedOwnerId: options.ownerId });
-      for (const key of ["cursor", "eventId", "from", "to", "requestId"]) if (options[key]) query.set(key, options[key]);
+      for (const key of ["cursor", "eventId", "from", "to", "allDayFrom", "allDayTo", "requestId"]) if (options[key]) query.set(key, options[key]);
       return workspaceRead(`/api/events/matters/${caseId}/review?${query}`, options);
     },
     saveWorkspaceDate: (caseId, review, options) => {
@@ -340,8 +347,8 @@ export function createApiClient({ fetchImpl = window.fetch.bind(window), onAuthe
       return `/api/cases/${caseId}/message-attachments/${messageId}?${new URLSearchParams({ expectedOwnerId: options.ownerId, revision, play: "true", ...(options.retained ? { retained: "true" } : {}), ...(options.attachmentId ? { attachmentId: options.attachmentId } : {}) })}`;
     },
     sendWorkspaceMessage: (caseId, text, clientMessageId, options) => {
-      if (!validDraftId(caseId)) throw new TypeError("Invalid Matter.");
-      return workspaceWrite(`/api/messages/${caseId}`, "POST", { text, clientMessageId }, options);
+      if (!validDraftId(caseId) || options.replyTo != null && !validDraftId(options.replyTo)) throw new TypeError("Invalid Matter message.");
+      return workspaceWrite(`/api/messages/${caseId}`, "POST", { text, clientMessageId, ...(options.replyTo ? { replyTo: options.replyTo } : {}) }, options);
     },
     sendWorkspaceFileMessage: (caseId, file, clientMessageId, options) => {
       if (!validDraftId(caseId) || !validDraftId(file.id) || !Number.isSafeInteger(file.version) || file.version<1) throw new TypeError('Invalid message document.');
@@ -651,7 +658,7 @@ export function createApiClient({ fetchImpl = window.fetch.bind(window), onAuthe
     saveMatterDraft: (id, fields, revision, options) => privateWrite(draftPath(id), "PUT", { ...draftValues(fields), revision, expectedOwnerId: options?.ownerId }, options),
     deleteMatterDraft: (id, revision, options) => privateWrite(draftPath(id), "DELETE", { revision, expectedOwnerId: options?.ownerId }, options),
     createPrivateTask: ({ title, notes, due, caseId }, options) => privateWrite("/api/checklist", "POST", { title, notes, due, caseId }, options),
-    togglePrivateTask: (id, options) => privateWrite(`${taskPath(id)}/toggle`, "POST", {}, options),
+    togglePrivateTask: (id, { done, revision, ...options } = {}) => privateWrite(`${taskPath(id)}/toggle`, "POST", { done, revision, expectedOwnerId: options.ownerId }, options),
     deletePrivateTask: (id, options) => privateWrite(taskPath(id), "DELETE", {}, options),
     saveWeeklyNotes: ({ weekStart, notes, revision }, options) => privateWrite("/api/users/me/weekly-notes", "PUT", { weekStart, notes, revision }, options),
     async completeAttorneyTour({ signal } = {}) {

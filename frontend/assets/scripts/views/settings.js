@@ -32,7 +32,6 @@ export async function loadSettingsView(root, { escapeHTML } = {}) {
 }
 
 export const render = loadSettingsView;
-export { loadSettingsView };
 
 /* ----------------------------- render ----------------------------- */
 

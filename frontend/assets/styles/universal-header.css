@@ -283,36 +283,36 @@ body.lpc-product-clean .lpc-universal-header-controls .support-launcher {
   }
 
   body.lpc-product-clean .lpc-universal-header-controls:not(:has(> .support-launcher))::after {
-    width: 42px;
-    height: 42px;
-    flex-basis: 42px;
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
   }
 
-  body.lpc-product-clean .lpc-universal-header-controls :where(
+  body.lpc-product-clean .lpc-universal-header-controls :is(
     .notification-icon,
     .support-launcher,
     .lpc-quick-create,
     .lpc-global-search-host
   ) {
-    width: 42px;
-    min-width: 42px;
-    max-width: 42px;
-    height: 42px;
-    flex-basis: 42px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 44px;
+    flex-basis: 44px;
   }
 
   body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) {
-    flex-basis: 42px !important;
-    width: 42px !important;
-    min-width: 42px !important;
-    max-width: 42px !important;
-    height: 42px !important;
-    min-height: 42px !important;
+    flex-basis: 44px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
   }
 
   body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) .lpc-global-search-trigger {
-    height: 42px !important;
-    min-height: 42px !important;
+    height: 44px !important;
+    min-height: 44px !important;
     padding-inline: 11px !important;
   }
 }

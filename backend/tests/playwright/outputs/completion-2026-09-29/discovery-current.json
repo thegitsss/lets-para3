@@ -1,0 +1,448 @@
+{
+  "config": {
+    "argv": [
+      "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/samanthasider/Desktop/lets-para3/backend/node_modules/playwright/cli.js",
+      "test",
+      "-c",
+      "tests/playwright/attorney-v2/playwright.config.js",
+      "private-discovery.spec.js",
+      "saved-paralegals.spec.js",
+      "--project=chromium",
+      "--grep",
+      "directory filters|directory and authorized|authorized profile meets|completion save persists|failed list reads",
+      "--reporter=line,json",
+      "--output=../outputs/completion-2026-09-29/discovery-current-artifacts"
+    ],
+    "configFile": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/playwright.config.js",
+    "rootDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/support/global.setup.js",
+    "globalTeardown": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/global.teardown.js",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node \"/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/control-room/webServer.js\"",
+      "cwd": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T",
+      "port": 5051,
+      "reuseExistingServer": false,
+      "timeout": 240000,
+      "env": {
+        "CODEX_CI": "1",
+        "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
+        "CODEX_PERMISSION_PROFILE": ":workspace",
+        "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+        "CODEX_SESSION_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_THREAD_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_VERSION": "0.155.0-alpha.16.3",
+        "COLORTERM": "",
+        "COMMAND_MODE": "unix2003",
+        "DEBUG": "release",
+        "ELECTRON_RUN_AS_NODE": "1",
+        "GH_PAGER": "cat",
+        "GIT_PAGER": "cat",
+        "HOME": "/Users/samanthasider",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.UTF-8",
+        "LOGNAME": "samanthasider",
+        "MACH_PORT_RENDEZVOUS_PEER_VALDATION": "1",
+        "MallocNanoZone": "0",
+        "NVM_CD_FLAGS": "-q",
+        "NVM_DIR": "/Users/samanthasider/.nvm",
+        "OLDPWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "PAGER": "cat",
+        "PATH": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Users/samanthasider/.codex/tmp/arg0/codex-arg0tbDf52:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/Users/samanthasider/.vscode/extensions/openai.chatgpt-26.5917.62051-darwin-x64/bin/macos-x86_64",
+        "PWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "RUST_LOG": "warn",
+        "SHELL": "/bin/zsh",
+        "SHLVL": "0",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.bG4A0cldCu/Listeners",
+        "TERM": "dumb",
+        "TMPDIR": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T/",
+        "USER": "samanthasider",
+        "VSCODE_CODE_CACHE_PATH": "/Users/samanthasider/Library/Application Support/Code/CachedData/04c0d99f4fb0d8afe6ce4f0c58e31e183ac3e4b1",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE": "extensionHost",
+        "VSCODE_CWD": "/",
+        "VSCODE_ESM_ENTRYPOINT": "vs/workbench/api/node/extensionHostProcess",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS": "true",
+        "VSCODE_IPC_HOOK": "/Users/samanthasider/Library/Application Support/Code/1.13-main.sock",
+        "VSCODE_NLS_CONFIG": "{\"userLocale\":\"en-us\",\"osLocale\":\"en-us\",\"resolvedLanguage\":\"en\",\"defaultMessagesFile\":\"/Applications/Visual Studio Code.app/Contents/Resources/app/out/nls.messages.json\",\"locale\":\"en-us\",\"availableLanguages\":{}}",
+        "VSCODE_PID": "31738",
+        "XPC_FLAGS": "0x0",
+        "XPC_SERVICE_NAME": "application.com.microsoft.VSCode.177954642.177954648",
+        "__CFBundleIdentifier": "com.microsoft.VSCode",
+        "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+        "PLAYWRIGHT_JSON_OUTPUT_NAME": "../outputs/completion-2026-09-29/discovery-current.json",
+        "_": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+        "PLAYWRIGHT_BASE_URL": "http://127.0.0.1:5051",
+        "EMAIL_DISABLE": "true",
+        "OPENAI_API_KEY": "",
+        "DATA_ENCRYPTION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "PLAYWRIGHT_MONGO_REPLICA_SET": "true",
+        "PLAYWRIGHT_INITIALIZE_ATTORNEY_MODELS": "true",
+        "PLAYWRIGHT_MONGO_PORT": "5889",
+        "PORT": "5051",
+        "NODE_ENV": "test"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "private-discovery.spec.js",
+      "file": "private-discovery.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "directory filters, paging, profiles and Back preserve context without business writes",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 11695,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('link', { name: 'Clear filters', exact: true })\nExpected: \u001b[32m\"#/paralegals?caseId=000000000000000000000064&applicantId=0000000000000000000000c8\"\u001b[39m\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('link', { name: 'Clear filters', exact: true })\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('link', { name: 'Clear filters', exact: true })\nExpected: \u001b[32m\"#/paralegals?caseId=000000000000000000000064&applicantId=0000000000000000000000c8\"\u001b[39m\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('link', { name: 'Clear filters', exact: true })\u001b[22m\n\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/private-discovery.spec.js:201:80",
+                    "location": {
+                      "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/private-discovery.spec.js",
+                      "column": 80,
+                      "line": 201
+                    },
+                    "snippet": "  199 |   page.on(\"request\", (request) => { if (request.url().includes(\"/api/\") && request.method() !== \"GET\") writes.push(request.url()); });\n  200 |   await page.goto(`${entry}#/paralegals?caseId=${id(100)}&applicantId=${id(200)}`); await loaded(page, \"directory\");\n> 201 |   await expect(page.getByRole(\"link\", { name: \"Clear filters\", exact: true })).toHaveAttribute(\"href\", `#/paralegals?caseId=${id(100)}&applicantId=${id(200)}`);\n      |                                                                                ^\n  202 |   await expect(page.locator(\"[data-av2-candidate]\")).toHaveCount(10);\n  203 |   await page.getByRole(\"link\", { name: \"Next profile page\" }).click(); await loaded(page, \"directory\");\n  204 |   await expect(page.locator(\"[data-av2-candidate]\")).toHaveCount(2);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/private-discovery.spec.js",
+                        "column": 80,
+                        "line": 201
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('link', { name: 'Clear filters', exact: true })\nExpected: \u001b[32m\"#/paralegals?caseId=000000000000000000000064&applicantId=0000000000000000000000c8\"\u001b[39m\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('link', { name: 'Clear filters', exact: true })\u001b[22m\n\n\n  199 |   page.on(\"request\", (request) => { if (request.url().includes(\"/api/\") && request.method() !== \"GET\") writes.push(request.url()); });\n  200 |   await page.goto(`${entry}#/paralegals?caseId=${id(100)}&applicantId=${id(200)}`); await loaded(page, \"directory\");\n> 201 |   await expect(page.getByRole(\"link\", { name: \"Clear filters\", exact: true })).toHaveAttribute(\"href\", `#/paralegals?caseId=${id(100)}&applicantId=${id(200)}`);\n      |                                                                                ^\n  202 |   await expect(page.locator(\"[data-av2-candidate]\")).toHaveCount(10);\n  203 |   await page.getByRole(\"link\", { name: \"Next profile page\" }).click(); await loaded(page, \"directory\");\n  204 |   await expect(page.locator(\"[data-av2-candidate]\")).toHaveCount(2);\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/private-discovery.spec.js:201:80"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:06:46.800Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts/private-discovery-director-1a7cd-ext-without-business-writes-chromium/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts/private-discovery-director-1a7cd-ext-without-business-writes-chromium/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts/private-discovery-director-1a7cd-ext-without-business-writes-chromium/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/private-discovery.spec.js",
+                    "column": 80,
+                    "line": 201
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-8fbb5679ee79a2884bc3",
+          "file": "private-discovery.spec.js",
+          "line": 197,
+          "column": 1
+        },
+        {
+          "title": "directory and authorized profile meet automated AA with long content and narrow layout",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2784,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:07:00.550Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-a843e64bea1a4ada6ab9",
+          "file": "private-discovery.spec.js",
+          "line": 277,
+          "column": 1
+        },
+        {
+          "title": "authorized profile meets dark-theme automated AA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2427,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:07:03.615Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-05a37128a50697f6deea",
+          "file": "private-discovery.spec.js",
+          "line": 288,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "saved-paralegals.spec.js",
+      "file": "saved-paralegals.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "completion save persists, opens the profile, and supports removal on desktop and mobile",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3927,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 50\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[31m+     \"description\": \"Ensure the order of headings is semantically correct\",\u001b[39m\n\u001b[31m+     \"help\": \"Heading levels should only increase by one\",\u001b[39m\n\u001b[31m+     \"helpUrl\": \"https://dequeuniversity.com/rules/axe/4.13/heading-order?application=playwright\",\u001b[39m\n\u001b[31m+     \"id\": \"heading-order\",\u001b[39m\n\u001b[31m+     \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+     \"nodes\": Array [\u001b[39m\n\u001b[31m+       Object {\u001b[39m\n\u001b[31m+         \"all\": Array [],\u001b[39m\n\u001b[31m+         \"any\": Array [\u001b[39m\n\u001b[31m+           Object {\u001b[39m\n\u001b[31m+             \"data\": Object {\u001b[39m\n\u001b[31m+               \"headingOrder\": Array [\u001b[39m\n\u001b[31m+                 Object {\u001b[39m\n\u001b[31m+                   \"ancestry\": Array [\u001b[39m\n\u001b[31m+                     \"html > body > div:nth-child(2) > div:nth-child(1) > main:nth-child(2) > section > header:nth-child(1) > h1\",\u001b[39m\n\u001b[31m+                   ],\u001b[39m\n\u001b[31m+                   \"level\": 1,\u001b[39m\n\u001b[31m+                 },\u001b[39m\n\u001b[31m+                 Object {\u001b[39m\n\u001b[31m+                   \"ancestry\": Array [\u001b[39m\n\u001b[31m+                     \"html > body > div:nth-child(2) > div:nth-child(1) > main:nth-child(2) > section > section:nth-child(3) > div:nth-child(2) > article > div:nth-child(2) > h3:nth-child(1)\",\u001b[39m\n\u001b[31m+                   ],\u001b[39m\n\u001b[31m+                   \"level\": 3,\u001b[39m\n\u001b[31m+                 },\u001b[39m\n\u001b[31m+               ],\u001b[39m\n\u001b[31m+             },\u001b[39m\n\u001b[31m+             \"id\": \"heading-order\",\u001b[39m\n\u001b[31m+             \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+             \"message\": \"Heading order invalid\",\u001b[39m\n\u001b[31m+             \"relatedNodes\": Array [],\u001b[39m\n\u001b[31m+           },\u001b[39m\n\u001b[31m+         ],\u001b[39m\n\u001b[31m+         \"failureSummary\": \"Fix any of the following:\u001b[39m\n\u001b[31m+   Heading order invalid\",\u001b[39m\n\u001b[31m+         \"html\": \"<h3>\",\u001b[39m\n\u001b[31m+         \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+         \"none\": Array [],\u001b[39m\n\u001b[31m+         \"target\": Array [\u001b[39m\n\u001b[31m+           \".lpc-saved-info > h3\",\u001b[39m\n\u001b[31m+         ],\u001b[39m\n\u001b[31m+       },\u001b[39m\n\u001b[31m+     ],\u001b[39m\n\u001b[31m+     \"tags\": Array [\u001b[39m\n\u001b[31m+       \"cat.semantics\",\u001b[39m\n\u001b[31m+       \"best-practice\",\u001b[39m\n\u001b[31m+     ],\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 50\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[31m+     \"description\": \"Ensure the order of headings is semantically correct\",\u001b[39m\n\u001b[31m+     \"help\": \"Heading levels should only increase by one\",\u001b[39m\n\u001b[31m+     \"helpUrl\": \"https://dequeuniversity.com/rules/axe/4.13/heading-order?application=playwright\",\u001b[39m\n\u001b[31m+     \"id\": \"heading-order\",\u001b[39m\n\u001b[31m+     \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+     \"nodes\": Array [\u001b[39m\n\u001b[31m+       Object {\u001b[39m\n\u001b[31m+         \"all\": Array [],\u001b[39m\n\u001b[31m+         \"any\": Array [\u001b[39m\n\u001b[31m+           Object {\u001b[39m\n\u001b[31m+             \"data\": Object {\u001b[39m\n\u001b[31m+               \"headingOrder\": Array [\u001b[39m\n\u001b[31m+                 Object {\u001b[39m\n\u001b[31m+                   \"ancestry\": Array [\u001b[39m\n\u001b[31m+                     \"html > body > div:nth-child(2) > div:nth-child(1) > main:nth-child(2) > section > header:nth-child(1) > h1\",\u001b[39m\n\u001b[31m+                   ],\u001b[39m\n\u001b[31m+                   \"level\": 1,\u001b[39m\n\u001b[31m+                 },\u001b[39m\n\u001b[31m+                 Object {\u001b[39m\n\u001b[31m+                   \"ancestry\": Array [\u001b[39m\n\u001b[31m+                     \"html > body > div:nth-child(2) > div:nth-child(1) > main:nth-child(2) > section > section:nth-child(3) > div:nth-child(2) > article > div:nth-child(2) > h3:nth-child(1)\",\u001b[39m\n\u001b[31m+                   ],\u001b[39m\n\u001b[31m+                   \"level\": 3,\u001b[39m\n\u001b[31m+                 },\u001b[39m\n\u001b[31m+               ],\u001b[39m\n\u001b[31m+             },\u001b[39m\n\u001b[31m+             \"id\": \"heading-order\",\u001b[39m\n\u001b[31m+             \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+             \"message\": \"Heading order invalid\",\u001b[39m\n\u001b[31m+             \"relatedNodes\": Array [],\u001b[39m\n\u001b[31m+           },\u001b[39m\n\u001b[31m+         ],\u001b[39m\n\u001b[31m+         \"failureSummary\": \"Fix any of the following:\u001b[39m\n\u001b[31m+   Heading order invalid\",\u001b[39m\n\u001b[31m+         \"html\": \"<h3>\",\u001b[39m\n\u001b[31m+         \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+         \"none\": Array [],\u001b[39m\n\u001b[31m+         \"target\": Array [\u001b[39m\n\u001b[31m+           \".lpc-saved-info > h3\",\u001b[39m\n\u001b[31m+         ],\u001b[39m\n\u001b[31m+       },\u001b[39m\n\u001b[31m+     ],\u001b[39m\n\u001b[31m+     \"tags\": Array [\u001b[39m\n\u001b[31m+       \"cat.semantics\",\u001b[39m\n\u001b[31m+       \"best-practice\",\u001b[39m\n\u001b[31m+     ],\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/saved-paralegals.spec.js:39:102",
+                    "location": {
+                      "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/saved-paralegals.spec.js",
+                      "column": 102,
+                      "line": 39
+                    },
+                    "snippet": "  37 |     await page.setViewportSize({ width, height: 900 });\n  38 |     expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);\n> 39 |     expect((await new AxeBuilder({ page }).include('[data-saved-paralegals]').analyze()).violations).toEqual([]);\n     |                                                                                                      ^\n  40 |     await page.screenshot({ path: testInfo.outputPath(`saved-${width}.png`), fullPage: true });\n  41 |   }\n  42 |   await card.getByRole('link', { name: 'Priya Morgan', exact: true }).click();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/saved-paralegals.spec.js",
+                        "column": 102,
+                        "line": 39
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 50\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[31m+     \"description\": \"Ensure the order of headings is semantically correct\",\u001b[39m\n\u001b[31m+     \"help\": \"Heading levels should only increase by one\",\u001b[39m\n\u001b[31m+     \"helpUrl\": \"https://dequeuniversity.com/rules/axe/4.13/heading-order?application=playwright\",\u001b[39m\n\u001b[31m+     \"id\": \"heading-order\",\u001b[39m\n\u001b[31m+     \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+     \"nodes\": Array [\u001b[39m\n\u001b[31m+       Object {\u001b[39m\n\u001b[31m+         \"all\": Array [],\u001b[39m\n\u001b[31m+         \"any\": Array [\u001b[39m\n\u001b[31m+           Object {\u001b[39m\n\u001b[31m+             \"data\": Object {\u001b[39m\n\u001b[31m+               \"headingOrder\": Array [\u001b[39m\n\u001b[31m+                 Object {\u001b[39m\n\u001b[31m+                   \"ancestry\": Array [\u001b[39m\n\u001b[31m+                     \"html > body > div:nth-child(2) > div:nth-child(1) > main:nth-child(2) > section > header:nth-child(1) > h1\",\u001b[39m\n\u001b[31m+                   ],\u001b[39m\n\u001b[31m+                   \"level\": 1,\u001b[39m\n\u001b[31m+                 },\u001b[39m\n\u001b[31m+                 Object {\u001b[39m\n\u001b[31m+                   \"ancestry\": Array [\u001b[39m\n\u001b[31m+                     \"html > body > div:nth-child(2) > div:nth-child(1) > main:nth-child(2) > section > section:nth-child(3) > div:nth-child(2) > article > div:nth-child(2) > h3:nth-child(1)\",\u001b[39m\n\u001b[31m+                   ],\u001b[39m\n\u001b[31m+                   \"level\": 3,\u001b[39m\n\u001b[31m+                 },\u001b[39m\n\u001b[31m+               ],\u001b[39m\n\u001b[31m+             },\u001b[39m\n\u001b[31m+             \"id\": \"heading-order\",\u001b[39m\n\u001b[31m+             \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+             \"message\": \"Heading order invalid\",\u001b[39m\n\u001b[31m+             \"relatedNodes\": Array [],\u001b[39m\n\u001b[31m+           },\u001b[39m\n\u001b[31m+         ],\u001b[39m\n\u001b[31m+         \"failureSummary\": \"Fix any of the following:\u001b[39m\n\u001b[31m+   Heading order invalid\",\u001b[39m\n\u001b[31m+         \"html\": \"<h3>\",\u001b[39m\n\u001b[31m+         \"impact\": \"moderate\",\u001b[39m\n\u001b[31m+         \"none\": Array [],\u001b[39m\n\u001b[31m+         \"target\": Array [\u001b[39m\n\u001b[31m+           \".lpc-saved-info > h3\",\u001b[39m\n\u001b[31m+         ],\u001b[39m\n\u001b[31m+       },\u001b[39m\n\u001b[31m+     ],\u001b[39m\n\u001b[31m+     \"tags\": Array [\u001b[39m\n\u001b[31m+       \"cat.semantics\",\u001b[39m\n\u001b[31m+       \"best-practice\",\u001b[39m\n\u001b[31m+     ],\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  37 |     await page.setViewportSize({ width, height: 900 });\n  38 |     expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);\n> 39 |     expect((await new AxeBuilder({ page }).include('[data-saved-paralegals]').analyze()).violations).toEqual([]);\n     |                                                                                                      ^\n  40 |     await page.screenshot({ path: testInfo.outputPath(`saved-${width}.png`), fullPage: true });\n  41 |   }\n  42 |   await card.getByRole('link', { name: 'Priya Morgan', exact: true }).click();\n    at /Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/saved-paralegals.spec.js:39:102"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:07:06.065Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts/saved-paralegals-completio-94a51-moval-on-desktop-and-mobile-chromium/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts/saved-paralegals-completio-94a51-moval-on-desktop-and-mobile-chromium/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-current-artifacts/saved-paralegals-completio-94a51-moval-on-desktop-and-mobile-chromium/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/saved-paralegals.spec.js",
+                    "column": 102,
+                    "line": 39
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-3ed68ce17b963044eb50",
+          "file": "saved-paralegals.spec.js",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "failed list reads show Retry rather than an empty saved list",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2284,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:07:11.589Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-34cdab347a5462aa5543",
+          "file": "saved-paralegals.spec.js",
+          "line": 54,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T19:05:42.864Z",
+    "duration": 91393.782,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

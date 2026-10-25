@@ -1,0 +1,228 @@
+{
+  "config": {
+    "argv": [
+      "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/samanthasider/Desktop/lets-para3/backend/node_modules/.bin/playwright",
+      "test",
+      "--config=tests/playwright/paralegal-payouts/messages.config.js",
+      "conversations-approved.spec.js",
+      "--grep",
+      "remote reaction|action menu",
+      "--reporter=line,json",
+      "--output=../outputs/completion-2026-09-29/paralegal-remote-reactions-artifacts"
+    ],
+    "configFile": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/paralegal-payouts/messages.config.js",
+    "rootDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/paralegal-remote-reactions-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright",
+        "testIgnore": [],
+        "testMatch": [
+          "**/conversations-approved.spec.js",
+          "**/conversations-inbox.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/paralegal-remote-reactions-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/conversations-approved.spec.js",
+          "**/conversations-inbox.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/paralegal-remote-reactions-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/conversations-approved.spec.js",
+          "**/conversations-inbox.spec.js"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "paralegal-support/conversations-approved.spec.js",
+      "file": "paralegal-support/conversations-approved.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "remote reaction additions and removals refresh without another message or a write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2156,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T17:38:36.213Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4131cb235be658d7fe80-46aeafa8b7639647a772",
+          "file": "paralegal-support/conversations-approved.spec.js",
+          "line": 50,
+          "column": 1
+        },
+        {
+          "title": "remote reaction additions and removals refresh without another message or a write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6495,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T17:38:39.618Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4131cb235be658d7fe80-6d04f086e661887ecc6a",
+          "file": "paralegal-support/conversations-approved.spec.js",
+          "line": 50,
+          "column": 1
+        },
+        {
+          "title": "remote reaction additions and removals refresh without another message or a write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2903,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T17:38:48.542Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4131cb235be658d7fe80-dcfcfac62271efb52c02",
+          "file": "paralegal-support/conversations-approved.spec.js",
+          "line": 50,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T17:38:35.302Z",
+    "duration": 16975.878,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

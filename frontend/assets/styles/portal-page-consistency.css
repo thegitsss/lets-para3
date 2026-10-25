@@ -1,0 +1,105 @@
+/* Within-portal consistency. These rules do not change role permissions or the
+   approved shell, profile editing behavior, or List/Board/message architecture. */
+body.av2 {--lpc-section-size:calc(19 * var(--lpc-reading-unit,1px));}
+body.lpc-v2:not(.av2) {--lpc-section-size:calc(17 * var(--lpc-reading-unit,1px));}
+:root body.av2 .av2-main > .av2-view:not(.av2-home) > .av2-view-header,
+:root body.av2 .av2-task-title {align-items:flex-start;}
+/* Home's date is vertically centered beside Today, per the alignment review. */
+:root body.av2 .av2-home > .av2-view-header > .av2-home-today {align-self:center;}
+:root body.av2 :is(.av2-home h2,.av2-help .v2-help-article-section h2,.av2-blocked-title,.av2-security-section > h2,.av2-account-section > h2,[data-payments-page] h2,[data-payment-setup] > section > h2) {font:500 var(--lpc-section-size)/1.4 var(--av2-font-sans,"Sarabun",sans-serif);letter-spacing:0;}
+:root body.av2 .av2-account-nav {gap:18px;padding-bottom:0;}
+:root body.av2 .av2-account-nav a {padding:8px 2px;min-height:44px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;font-size:calc(14 * var(--lpc-reading-unit,1px));font-weight:500;}
+:root body.av2 .av2-account-nav a[aria-current=page] {background:transparent;border-bottom-color:var(--av2-accent);font-weight:500;}
+:root body.av2 :is(.av2-file-filters,.av2-payment-filters,.matter-application-filters,.av2-discovery-search) button[type=submit],
+:root body.av2 .av2-compact-filters > button[type=submit] {min-height:44px;height:auto;padding:10px 13px;border-radius:5px;font:400 calc(14 * var(--lpc-reading-unit,1px))/1.5 "Sarabun",sans-serif;}
+:root body.av2 .portal-icon-select {position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;min-width:36px;height:36px;flex:0 0 36px;border:0;border-radius:5px;background:transparent;color:var(--av2-muted);}
+:root body.av2 .portal-icon-select > select {position:absolute;inset:0;width:100%;height:100%;min-height:0;min-width:0;padding:0;margin:0;opacity:0;cursor:pointer;z-index:1;}
+:root body.av2 .portal-icon-select > .portal-icon {width:16px;height:16px;pointer-events:none;}
+:root body.av2 .portal-icon-select:hover {background:var(--av2-soft);}
+:root body.av2 .portal-icon-select:focus-within {outline:2px solid var(--av2-accent);outline-offset:2px;}
+:root body.av2 .av2-filter-disclosure > summary {display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:5px;list-style:none;color:var(--av2-muted);}
+:root body.av2 .av2-filter-disclosure > summary::-webkit-details-marker {display:none;}
+:root body.av2 .av2-filter-disclosure > summary::after {display:none;}
+:root body.av2 .av2-filter-disclosure > summary svg {width:16px;height:16px;}
+:root body.av2 [data-payment-setup] > .av2-card {padding-inline:0;border-inline:0;border-radius:0;}
+:root body.av2 .av2-payment-lookup > summary {list-style:none;}
+:root body.av2 .av2-payment-lookup > summary::-webkit-details-marker {display:none;}
+:root body.av2 .av2-payment-lookup > summary h2::after {content:'⌄';margin-left:10px;color:var(--av2-muted);}
+/* Mirror the original return owner into the header; its handler/URL stays intact. */
+:root body.av2 [data-v2-header-return-source] {display:none!important;}
+:root body.av2 .v2-header-back {min-width:0;max-width:240px;margin-right:12px;}
+:root body.av2 .v2-header-back[hidden] {display:none;}
+:root body.av2 .v2-header-back-action {display:flex;align-items:center;gap:6px;min-height:32px;padding:4px 0;border:0;background:transparent;color:var(--av2-accent);font:400 calc(13 * var(--lpc-reading-unit,1px))/20px "Sarabun",sans-serif;text-decoration:none;}
+:root body.av2 .v2-header-back-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+:root body.av2 .v2-header-back-action:focus-visible {outline:2px solid var(--av2-accent);outline-offset:3px;}
+/* Paralegal primary and secondary views share the same content origin. */
+:root body.lpc-v2:not(.av2) .v2-view:has(> .v2-home) {padding-inline:var(--v2-gutter);}
+:root body.lpc-v2:not(.av2) .v2-home {--original-gutter:0px;}
+:root body.lpc-v2:not(.av2) .pv2-overview-page {padding-inline:0;}
+:root body.lpc-v2:not(.av2) .pv2-overview-header {margin-inline:0;}
+:root body.lpc-v2:not(.av2) :is(.lc-heading,.ld-desktop .ld-heading,.lpc-summary-page-heading) {display:flex;align-items:baseline;gap:12px;min-height:35px;height:auto;padding:0;margin:0 0 24px;border:0;}
+:root body.lpc-v2:not(.av2) :is(.lc-heading,.ld-heading,.lpc-summary-page-heading) h1 {margin:0;font:600 calc(28 * var(--lpc-reading-unit,1px))/1.25 var(--v2-font-sans);letter-spacing:-.025em;}
+:root body.lpc-v2:not(.av2) .lpc-summary-stage .lpc-matter-summary {padding:24px 0 32px;}
+:root body.lpc-v2:not(.av2) .v2-settings:has(> .v2-profile-approved:not([hidden])) > .v2-settings-header h1 {font-weight:600!important;}
+:root body.lpc-v2:not(.av2) :is(.pv2-overview-section-heading h2,.pv2-overview-matches-heading h2,.v2-help-article-section > h2,.v2-matter-panel-heading h2,.pv2-security-section > h2,.v2-settings-section-heading h2,.pv2-blocked-header h2,.pv2-closure-header h2),
+:root body.lpc-v2:not(.av2) .v2-profile-approved :is(.v2-profile-section-top h2,.v2-profile-group--documents > h2) {font:500 var(--lpc-section-size)/1.4 var(--v2-font-sans);font-weight:500!important;letter-spacing:0;}
+/* Keep all three approved Settings compositions within one centered frame. */
+:root body.lpc-v2:not(.av2) .v2-settings :is(#v2-settings-profile.v2-profile-approved,#v2-settings-preferences,#v2-settings-security) {width:100%;max-width:880px;margin-inline:auto;}
+:root body.lpc-v2:not(.av2) .v2-profile-approved .v2-profile-group {padding-inline:16px;}
+:root body.lpc-v2:not(.av2) .v2-profile-approved :is(.v2-profile-group--documents,.v2-profile-group--account) {padding-inline:0;}
+:root body.lpc-v2:not(.av2) .v2-profile-approved .v2-profile-group--documents > h2 {margin-left:17px;}
+:root body.lpc-v2:not(.av2) #v2-settings-preferences .v2-settings-section-heading {padding-left:17px;}
+:root body.lpc-v2:not(.av2) .pv2-security-section > h2 {padding-left:17px;}
+:root body.lpc-v2:not(.av2) .pv2-security-password-section > h2 {padding-left:0;}
+:root body.lpc-v2:not(.av2) :is(.v2-work-empty,.v2-browse-empty) button {min-height:36px;padding:7px 12px;border:1px solid var(--v2-line);border-radius:5px;background:var(--v2-white);color:var(--v2-blue-hover);font:400 calc(13 * var(--lpc-reading-unit,1px))/1.5 var(--v2-font-sans);}
+:root body.lpc-v2:not(.av2) .lc-workspace .portal-toolbar-control,
+:root body.lpc-v2:not(.av2) :is(.lpc-filter-icon,.portal-icon-select) {display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:32px;min-height:32px;flex:0 0 32px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--v2-muted);}
+:root body.lpc-v2:not(.av2) .lc-workspace .portal-toolbar-control:hover {background:var(--v2-soft);}
+@media(pointer:coarse){
+ :root body.av2 :is(.portal-icon-select,.av2-filter-disclosure > summary),
+ :root body.lpc-v2:not(.av2) .lc-workspace .portal-toolbar-control,
+ :root body.lpc-v2:not(.av2) :is(.lpc-filter-icon,.portal-icon-select) {width:44px;min-width:44px;height:44px;min-height:44px;flex-basis:44px;}
+}
+@media(max-width:600px){
+ :root body.av2 .v2-header-back {flex:0 0 32px;margin-right:4px;}
+ :root body.av2 .v2-header-back-action {justify-content:center;min-width:32px;min-height:44px;font-size:18px;}
+ :root body.av2 .v2-header-back-label {display:none;}
+}
+/* Use the primary-page gutter rather than Home's historical inner gutter. */
+:root body.lpc-v2:not(.av2) .v2-view:has(> .v2-home) {padding-inline:32px;}
+@media(max-width:900px){:root body.lpc-v2:not(.av2) .v2-view:has(> .v2-home) {padding-inline:16px;}}
+:root body.av2 form[aria-label="Paralegal filters"] button[type=submit] {min-height:44px;padding:10px 13px;font:400 calc(14 * var(--lpc-reading-unit,1px))/1.5 "Sarabun",sans-serif;}
+:root body.av2 .av2-blocked-title {margin-left:0;}
+:root body.lpc-v2:not(.av2) .v2-settings :is(.v2-settings-section-heading h2,.v2-settings-security-card h2),
+:root body.lpc-v2:not(.av2) .lpc-summary-overview-heading h2 {font:500 var(--lpc-section-size)/1.4 var(--v2-font-sans);font-weight:500!important;letter-spacing:0;}
+@media(max-width:900px){
+ :root body.lpc-v2:not(.av2) :is(.lc-heading,.ld-desktop .ld-heading) {padding:0!important;}
+}
+@media(pointer:coarse){:root body.lpc-v2:not(.av2) :is(.v2-work-empty,.v2-browse-empty) button {min-height:44px;}}
+:root body.av2 [data-payment-setup] > .av2-card {border:0;border-top:1px solid var(--av2-line);}
+:root body.lpc-v2:not(.av2) .v2-settings #v2-settings-security .v2-settings-section-heading h2 {font:500 var(--lpc-section-size)/1.4 var(--v2-font-sans);font-weight:500!important;}
+:root body.av2 .av2-categories {gap:18px;}
+:root body.av2 :is(.av2-category,.av2-account-nav a) {display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 2px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;color:var(--av2-muted);font:500 calc(14 * var(--lpc-reading-unit,1px))/1.5 "Sarabun",sans-serif;}
+:root body.av2 :is(.av2-category,.av2-account-nav a)[aria-current=page] {border-bottom-color:var(--av2-accent);background:transparent;color:var(--av2-ink);font-weight:500;box-shadow:none;}
+:root body.av2 .av2-filter-disclosure[open] > summary {background:var(--av2-soft);color:var(--av2-accent);}
+:root body.av2 .av2-filter-disclosure > summary:focus-visible {outline:2px solid var(--av2-accent);outline-offset:2px;}
+:root body.lpc-v2:not(.av2) :is(.lpc-filter-icon,.lc-workspace .portal-toolbar-control)[aria-expanded=true],
+:root body.lpc-v2:not(.av2) details[open] > .lpc-filter-icon {background:var(--v2-soft);color:var(--v2-blue-hover);}
+
+/* Keep column labels on the same reading edge as their values. */
+:root body.lpc-v2:not(.av2) .pv2-overview-columns > :last-child {text-align:right;}
+/* Calendar date stays on the title baseline; its controls share the row center. */
+:root body.lpc-v2:not(.av2) .pv2-calendar-header {align-items:center;}
+/* A text action shares the heading baseline without adding hidden row height. */
+:root body.lpc-v2:not(.av2) .lc-heading > .lc-history {
+ display:inline-flex;align-items:center;padding-block:0;
+ min-height:24px;line-height:calc(24 * var(--lpc-reading-unit,1px));
+}
+@media(pointer:coarse){
+ :root body.lpc-v2:not(.av2) .lc-heading > .lc-history {min-height:44px;}
+}
+/* Center settled empty-result messages within their own inventory, not notices. */
+:root body.av2 .av2-directory [data-av2-region="directory"][data-state="ready"] .av2-region-body:has(> .av2-candidate-grid:empty):not(:has(> .av2-notice)) > .av2-actions {justify-content:center;}
+:root body.av2 .av2-directory [data-av2-region="directory"][data-state="ready"] .av2-region-body:has(> .av2-candidate-grid:empty):not(:has(> .av2-notice)) > .av2-actions > .av2-muted,
+:root body.av2 [data-av2-region="private-tasks"][data-state="ready"] > p[role="status"],
+:root body.lpc-v2:not(.av2) .lc-list > .lc-empty:only-child {text-align:center;}

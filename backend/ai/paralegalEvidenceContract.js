@@ -115,6 +115,16 @@ function factValue(evidence = {}, suffix = "") {
   return match?.value;
 }
 
+function factArrayValues(evidence = {}, suffix = "") {
+  const normalized = String(suffix || "").toLowerCase();
+  return (evidence.facts || [])
+    .filter((fact) => {
+      const key = String(fact.key || "").toLowerCase();
+      return key.startsWith(`${normalized}[`) || key.includes(`.${normalized}[`);
+    })
+    .map((fact) => fact.value);
+}
+
 function renderParalegalEvidenceAnswer(capabilityId = "", evidence = {}) {
   if (!evidence.authorized || evidence.state === "unauthorized") {
     return {
@@ -205,8 +215,8 @@ function renderParalegalEvidenceAnswer(capabilityId = "", evidence = {}) {
     const released = factValue(evidence, "paymentReleased");
     const completed = factValue(evidence, "matterCompleted");
     const nextActor = factValue(evidence, "nextActor");
-    const minimum = factValue(evidence, "bankDepositEstimateBusinessDays.minimum");
-    const maximum = factValue(evidence, "bankDepositEstimateBusinessDays.maximum");
+    const timingSource = factValue(evidence, "bankDepositTimingSource");
+    const timingDependencies = factArrayValues(evidence, "bankDepositTimingDependsOn");
     reply = released === true
       ? "LPC records the funds as released. That does not by itself confirm they reached your bank."
       : released === false
@@ -221,9 +231,13 @@ function renderParalegalEvidenceAnswer(capabilityId = "", evidence = {}) {
     } else if (nextActor === "stripe") {
       nextParts.push("Stripe processing is the next recorded stage");
     }
-    if (Number.isFinite(Number(minimum)) && Number.isFinite(Number(maximum))) {
+    if (
+      timingSource === "stripe_payout_status_and_estimated_arrival" &&
+      Array.isArray(timingDependencies) &&
+      timingDependencies.length
+    ) {
       nextParts.push(
-        `bank deposit is generally estimated at ${Number(minimum)}–${Number(maximum)} business days after release, depending on Stripe and your bank`
+        "Stripe shows the current payout status and estimated arrival; timing depends on your account country, payout schedule, and financial institution"
       );
     }
     if (nextParts.length) {

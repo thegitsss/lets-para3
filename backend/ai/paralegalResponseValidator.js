@@ -407,12 +407,26 @@ function auditParalegalSemanticResponse({
     });
     if (!supported) errors.push("unsupported_monetary_claim");
   }
+  // Approved product knowledge exposes policy as prose, while Matter tools
+  // expose typed fee fields. A quoted policy rate must not replace a Matter's
+  // actual financial snapshot or come from a title, URL or unavailable result.
+  const policyOnly = !(evidencePlan.requirements || []).some(item => item.key === "matter_financials") &&
+    !evidenceEntries.some(entry => entry.name === "get_paralegal_case_financials");
+  const approvedPolicyPercents = new Set(policyOnly ? evidenceEntries
+    .filter(entry => entry.name === "search_lpc_knowledge" && entry.result.ok === true &&
+      entry.result.available === true && entry.evidence.authorized === true &&
+      entry.evidence.state === "verified" && entry.evidence.policyOrLiveState === "policy" &&
+      entry.evidence.capabilityId === "P31_product_knowledge")
+    .flatMap(entry => entry.evidence.facts
+      .filter(fact => /^results\[\d+\]\.answer$/.test(fact.key) &&
+        typeof fact.value === "string" && /\bfees?\b/i.test(fact.value))
+      .flatMap(fact => extractPercentClaims(fact.value).map(value => Number(value.replace("%", ""))))) : []);
   for (const claim of extractPercentClaims(text)) {
     const number = Number(claim.replace("%", ""));
     if (!facts.some((fact) =>
       /(?:fee|percent|percentage|rate)/.test(fact.normalizedKey) &&
       Number(fact.value) === number
-    )) {
+    ) && !approvedPolicyPercents.has(number)) {
       errors.push("unsupported_fee_claim");
     }
   }

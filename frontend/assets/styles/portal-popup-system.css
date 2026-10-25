@@ -1,0 +1,182 @@
+/* Approved LPC popup system: Stripe structure, Linear density, cornflower blue.
+   Only the presentation adapter's native dialogs are in scope. */
+:root body.lpc-v2 dialog[data-lpc-popup] {
+ --popup-bg:#fff; --popup-ink:#29364b; --popup-muted:#616e82; --popup-line:#e2e6ed;
+ --popup-soft:#f7f9fc; --popup-input:#fff; --popup-primary:#4774c7; --popup-hover:#3e69b9;
+ --popup-danger:#b83242; --popup-focus:#3465b6; --popup-width:480px;
+ --v2-white:var(--popup-bg); --v2-ink:var(--popup-ink); --v2-muted:var(--popup-muted); --v2-line:var(--popup-line); --v2-soft:var(--popup-soft);
+ --av2-bg:var(--popup-bg); --av2-surface:var(--popup-bg); --av2-ink:var(--popup-ink); --av2-muted:var(--popup-muted); --av2-line:var(--popup-line); --av2-soft:var(--popup-soft);
+ --ref-surface:var(--popup-bg); --ref-ink:var(--popup-ink); --ref-muted:var(--popup-muted); --ref-line:var(--popup-line); --ref-accent:var(--popup-focus); --ref-primary:var(--popup-primary); --ref-on-primary:#fff;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) {
+ box-sizing:border-box; width:min(var(--popup-width),calc(100vw - 32px)); max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px);
+ height:fit-content; min-height:0; padding:20px; border:1px solid var(--popup-line); border-radius:8px;
+ background:var(--popup-bg); color:var(--popup-ink); overflow:auto; overscroll-behavior:contain;
+ box-shadow:0 12px 38px #192b481f,0 1px 4px #192b480a;
+ font:400 calc(12 * var(--lpc-reading-unit,1px))/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+ text-align:left;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]):not([data-lpc-popup-anchored]) { inset:0; margin:auto; transform:none; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer])[data-lpc-popup-size=confirm] { --popup-width:400px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer])[data-lpc-popup-size=review] { --popup-width:440px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]):not([open]),
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [hidden] { display:none!important; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer])::backdrop { background:#17212f70; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-card] { display:block; padding:0; margin:0; border:0; border-radius:0; background:transparent; color:inherit; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-body] { padding:0; margin:0; border:0; background:transparent; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header] {
+ box-sizing:border-box; margin:-20px -20px 16px; padding:17px 20px 16px;
+ min-height:0; border:0; border-bottom:1px solid var(--popup-line); border-radius:0;
+ background:var(--popup-bg); color:var(--popup-ink); box-shadow:none;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header=row] { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-title] {
+ font:600 calc(18 * var(--lpc-reading-unit,1px))/1.25 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+ letter-spacing:-.025em; color:var(--popup-ink); overflow-wrap:anywhere;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header=row] [data-lpc-popup-title] { flex:1; min-width:0; margin:0; padding:0; border:0; background:none; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(p,dl,fieldset,form) { max-width:100%; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) > p,
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-body] > p,
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .lpc-dialog__description {
+ margin:0 0 12px; padding:0; color:var(--popup-muted); line-height:1.6;
+ font-size:calc(12 * var(--lpc-reading-unit,1px)); overflow-wrap:anywhere;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(form,.av2-account-field,.pv2-account-field,.v2-settings-field,.v2-browse-dialog-field,.lpc-dialog__label) { gap:12px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-account-field,.pv2-account-field,.v2-settings-field,.v2-browse-dialog-field,.lpc-dialog__label) {
+ display:grid; gap:5px; margin:0 0 12px; padding:0;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) label { color:var(--popup-ink); font-size:calc(12 * var(--lpc-reading-unit,1px)); font-weight:500; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=hidden]),textarea,select) {
+ box-sizing:border-box; width:100%; max-width:100%; min-width:0; height:auto; min-height:32px;
+ padding:6px 9px; border:1px solid var(--popup-line); border-radius:4px; background:var(--popup-input); color:var(--popup-ink);
+ font:400 calc(12 * var(--lpc-reading-unit,1px))/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+ box-shadow:0 1px 2px #192b4804;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) textarea:not([hidden]) { min-height:60px; resize:vertical; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(input,textarea,select):focus-visible { outline:2px solid var(--popup-focus); outline-offset:1px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-security-password,.pv2-security-password) { display:flex; align-items:stretch; gap:0; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-security-password,.pv2-security-password) input { border-right:0; border-radius:4px 0 0 4px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-security-reveal,.pv2-security-reveal) {
+ flex:0 0 44px; width:44px; min-width:44px; min-height:32px; padding:4px 6px; border:1px solid var(--popup-line);
+ border-radius:0 4px 4px 0; background:var(--popup-soft); color:var(--popup-muted); font:400 calc(11 * var(--lpc-reading-unit,1px))/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-footer] {
+ box-sizing:border-box; display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:7px; min-height:0;
+ margin:18px -20px -20px; padding:11px 20px; border:0; border-top:1px solid var(--popup-line); border-radius:0;
+ background:var(--popup-soft); color:var(--popup-muted); box-shadow:none;
+}
+:root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action] {
+ box-sizing:border-box; width:auto; min-width:0; height:auto; min-height:28px; margin:0; padding:4px 11px;
+ border:1px solid var(--popup-line); border-radius:4px; background:var(--popup-bg); color:var(--popup-muted);
+ font:500 calc(12 * var(--lpc-reading-unit,1px))/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+ text-decoration:none; box-shadow:0 1px 2px #192b4804; cursor:pointer; white-space:normal; overflow-wrap:anywhere;
+}
+:root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action=primary] { background:var(--popup-primary); border-color:var(--popup-primary); color:#fff!important; }
+:root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action=primary]:not(:disabled):hover { background:var(--popup-hover); border-color:var(--popup-hover); }
+:root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action=danger] { background:var(--popup-danger); border-color:var(--popup-danger); color:#fff!important; }
+:root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action=danger]:not(:disabled):hover { background:#a62c3a; border-color:#a62c3a; }
+:root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action]:disabled { opacity:.55; cursor:default; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button:focus-visible { outline:2px solid var(--popup-focus); outline-offset:2px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close] {
+ position:static; flex:none; display:grid; place-items:center; width:28px; min-width:28px; height:28px; min-height:28px;
+ padding:0; margin:-5px -7px -5px 0; border:0; border-radius:4px; background:transparent; color:var(--popup-muted); box-shadow:none;
+ font-size:20px; line-height:1; text-decoration:none;
+}
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close]:hover { background:transparent; color:var(--popup-muted); }
+:root body.lpc-v2 dialog button[data-lpc-popup-x],
+:root body.lpc-v2 dialog button[data-lpc-popup-x]:is(:hover,:active) {
+ background:transparent!important; color:var(--popup-muted,var(--v2-muted,#616e82))!important; box-shadow:none!important;
+ text-decoration:none!important; transform:none!important; filter:none!important; transition:none!important; animation:none!important;
+}
+:root body.lpc-v2 dialog button[data-lpc-popup-x]::before,
+:root body.lpc-v2 dialog button[data-lpc-popup-x]::after { display:none!important; }
+:root body.lpc-v2 dialog button[data-lpc-popup-x] .av2-close-glyph { transform:none!important; transition:none!important; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close=""] { border-radius:50%; }
+:root body.lpc-v2:not([data-lpc-popup-keyboard]) dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close]:focus { outline:none; box-shadow:none; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close] svg { width:15px; height:15px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-account-feedback,.pv2-account-feedback,.lpc-dialog__status):empty { display:none; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .av2-date-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .lpc-popup-calendar-field { display:grid; gap:5px; min-width:0; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .lpc-popup-calendar-field:has(> input[hidden]) { display:none; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .lpc-popup-calendar-field:is([data-calendar-field=title],[data-calendar-field=type],[data-calendar-field=timezone],[data-calendar-field=where],[data-calendar-field=notes],[data-calendar-field=name],[data-calendar-field=email]) { grid-column:1/-1; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .lpc-popup-calendar-field:has(> input[type=checkbox]) { grid-column:1/-1; display:flex; flex-direction:row-reverse; align-items:center; justify-content:flex-end; gap:8px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .lpc-popup-calendar-field input[type=checkbox] { margin:0; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .av2-date-occurrence { grid-column:1/-1; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .av2-date-occurrence:empty { display:none; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.v2-work-dialog-facts,.v2-settings-dialog-copy) { margin:0 0 16px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .v2-work-dialog-facts { gap:10px 16px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .v2-work-dialog-facts dt { font-size:calc(11 * var(--lpc-reading-unit,1px)); color:var(--popup-muted); }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .v2-work-dialog-facts dd { font-size:calc(12 * var(--lpc-reading-unit,1px)); color:var(--popup-ink); }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.v2-work-dialog-section,.v2-browse-dialog-help) { margin-block:0 16px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .v2-work-dialog-section h3 { font-size:calc(12 * var(--lpc-reading-unit,1px)); margin:0 0 5px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-delete-preview,.av2-message-delete-preview) { padding:11px 12px; background:var(--popup-soft); border:1px solid var(--popup-line); border-radius:5px; }
+/* Layered authoring and guided tours keep their placement and available space. */
+:root body.lpc-v2 dialog[data-lpc-popup-layer] :is(.av2-creation-surface,.lpc-tour-card) { border-color:var(--popup-line); border-radius:8px; background:var(--popup-bg); color:var(--popup-ink); }
+:root body.lpc-v2 dialog[data-lpc-popup-layer] [data-lpc-popup-action] { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; }
+:root :is(html.theme-dark,body.theme-dark) dialog[data-lpc-popup],
+:root.theme-dark body.lpc-v2 dialog[data-lpc-popup] {
+ --popup-bg:#1b222d; --popup-ink:#edf2f9; --popup-muted:#b5c0d1; --popup-line:#414e62; --popup-soft:#171e28; --popup-input:#202a38;
+}
+@media(max-width:600px) {
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) { padding:18px; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header] { margin:-18px -18px 16px; padding:17px 18px 15px; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header=row] [data-lpc-popup-title] { margin:0; padding:0; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-footer] { margin:18px -18px -18px; padding:11px 18px; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=hidden]),textarea,select) { min-height:40px; font-size:calc(16 * var(--lpc-reading-unit,1px)); }
+ :root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action] { min-height:44px; padding:8px 12px; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close] { width:44px; min-width:44px; height:44px; min-height:44px; margin:-10px -12px -10px 0; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.av2-security-reveal,.pv2-security-reveal) { min-height:44px; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .av2-date-grid { grid-template-columns:minmax(0,1fr); }
+}
+@media(pointer:coarse) {
+ :root body.lpc-v2 dialog[data-lpc-popup] button[data-lpc-popup-action],
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close] { min-height:44px; }
+}
+@media(prefers-reduced-motion:no-preference) {
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer])[open]:not([data-lpc-popup-layer],[data-lpc-popup-anchored]) { animation:lpc-popup-enter 120ms ease-out; }
+ @keyframes lpc-popup-enter { from { opacity:0; translate:0 3px; } to { opacity:1; translate:0 0; } }
+}
+@media(prefers-reduced-motion:reduce) { :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) { animation:none; transition:none; } }
+
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) form > :is(.av2-account-field,.pv2-account-field,.v2-settings-field,.v2-browse-dialog-field,.lpc-dialog__label) { margin:0; }
+/* Browse forms used to add a second padded card inside the popup. A single
+   inset owns the content; grid gaps must not stack with header/helper margins. */
+:root body.lpc-v2 dialog.v2-browse-dialog[data-lpc-popup] > form { padding:0; gap:12px; }
+:root body.lpc-v2 dialog.v2-browse-dialog[data-lpc-popup] > form > [data-lpc-popup-header] { margin-bottom:4px; }
+:root body.lpc-v2 dialog.v2-browse-dialog[data-lpc-popup] > form > .v2-browse-dialog-help { margin:0; }
+:root body.lpc-v2 dialog.v2-browse-dialog[data-lpc-popup] > form > [data-lpc-popup-footer] { margin-top:4px; }
+:root body.lpc-v2 dialog.v2-browse-dialog[data-lpc-popup] .v2-browse-dialog-status:empty { display:none; }
+/* Shared page header rules must not offset popup headers into their content. */
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header] { position:sticky; top:-20px; z-index:1; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.v2-work-dialog-copy,.v2-work-dialog-section) { padding:14px 0; margin:0; border-color:var(--popup-line); }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.v2-work-dialog-copy,.v2-work-dialog-section) h3 { margin:0 0 5px; color:var(--popup-ink); font:600 calc(12 * var(--lpc-reading-unit,1px))/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.v2-work-dialog-copy,.v2-work-dialog-section) p { margin:0 0 8px; color:var(--popup-muted); font:400 calc(12 * var(--lpc-reading-unit,1px))/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) :is(.v2-work-dialog-copy,.v2-work-dialog-section) p:last-child { margin-bottom:0; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-body] > :is(.v2-work-dialog-copy,.v2-work-dialog-section):last-child { padding-bottom:0; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .v2-work-dialog-facts { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px; margin:0 0 4px; border:1px solid var(--popup-line); border-radius:5px; background:var(--popup-soft); }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) textarea:not([hidden]) { height:60px; }
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) .v2-matter-dialog-body:has([data-lpc-popup-title]) > .v2-matter-kicker { display:none; }
+@media(max-width:600px) {
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) [data-lpc-popup-header] { top:-18px; }
+ :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) textarea:not([hidden]) { min-height:76px; }
+}
+
+:root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close=text] { width:auto; min-width:28px; padding-inline:5px; font-size:calc(12 * var(--lpc-reading-unit,1px)); }
+@media(max-width:600px) { :root body.lpc-v2 dialog[data-lpc-popup]:not([data-lpc-popup-layer]) button[data-lpc-popup-close=text] { min-width:44px; } }
+
+/* Requested résumé button sizing; keep the original dialog and animation. */
+:root body.lpc-v2 .ri-dialog button:not(.ri-close,.ri-dropzone),
+:root body.lpc-v2 .ri-entry {
+ width:auto; min-height:28px; padding:4px 11px; border-radius:4px;
+ font:500 calc(12 * var(--lpc-reading-unit,1px))/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+}
+:root body.lpc-v2 .ri-dialog .ri-different,
+:root body.lpc-v2 .ri-entry { padding-inline:0; }
+:root body.lpc-v2 .ri-actions { gap:7px; }
+@media(max-width:600px), (pointer:coarse) {
+ :root body.lpc-v2 .ri-dialog button:not(.ri-close,.ri-dropzone),
+ :root body.lpc-v2 .ri-entry { min-height:44px; padding-block:8px; font-size:calc(13 * var(--lpc-reading-unit,1px)); }
+ :root body.lpc-v2 .ri-actions { flex-direction:row; flex-wrap:wrap; }
+ :root body.lpc-v2 .ri-actions button { width:auto; }
+}

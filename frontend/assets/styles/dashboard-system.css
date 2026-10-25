@@ -1,0 +1,1140 @@
+:root {
+  --lpc-surface-canvas: var(--bg, #ffffff);
+  --lpc-surface-panel: var(--panel, #ffffff);
+  --lpc-surface-subtle: rgba(248, 250, 252, 0.88);
+  --lpc-text-primary: var(--ink, #1a2230);
+  --lpc-text-secondary: var(--muted, #667085);
+  --lpc-border-subtle: var(--line, rgba(15, 23, 42, 0.12));
+  --lpc-accent-primary: var(--accent, #b6a47a);
+  --lpc-accent-soft: rgba(182, 164, 122, 0.14);
+  --lpc-danger: #a53d3d;
+  --lpc-success: #247451;
+  --lpc-radius-control: 8px;
+  --lpc-radius-panel: 14px;
+  --lpc-space-1: 0.35rem;
+  --lpc-space-2: 0.6rem;
+  --lpc-space-3: 0.9rem;
+  --lpc-space-4: 1.25rem;
+  --lpc-shadow-panel: 0 18px 44px rgba(15, 23, 42, 0.1);
+  --lpc-shadow-floating: 0 15px 35px rgba(60, 66, 87, 0.12), 0 5px 15px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --lpc-control-height: 42px;
+}
+
+/* One floating-surface system for menus, filters, drawers, and dialogs. */
+body.lpc-role-dashboard :where(
+  [data-notification-panel],
+  .profile-dropdown,
+  .view-cases .case-menu,
+  .view-cases .matter-filter-panel
+) {
+  border: 1px solid rgba(60, 66, 87, 0.14) !important;
+  border-radius: 9px !important;
+  background: var(--lpc-surface-panel) !important;
+  box-shadow: var(--lpc-shadow-floating) !important;
+}
+
+body.lpc-role-dashboard :where(
+  .note-modal-card,
+  .payment-modal .modal-card,
+  .tour-modal,
+  .lpc-saved-view-dialog
+) {
+  border: 1px solid rgba(60, 66, 87, 0.14) !important;
+  border-radius: 12px !important;
+  background: var(--lpc-surface-panel) !important;
+  box-shadow: var(--lpc-shadow-floating) !important;
+}
+
+body.lpc-role-dashboard .lpc-context-sheet {
+  box-shadow: -18px 0 50px rgba(31, 35, 40, 0.14) !important;
+}
+
+body.lpc-role-dashboard :where(.profile-dropdown, .view-cases .case-menu) {
+  padding: 5px !important;
+  overflow: hidden;
+}
+
+body.lpc-role-dashboard :where(.profile-dropdown a, .profile-dropdown button, .view-cases .case-menu button) {
+  min-height: 36px;
+  margin: 0 !important;
+  padding: 0.5rem 0.65rem !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+}
+
+/* Shared button hierarchy: LPC gold primary, bordered secondary, text-forward quiet. */
+body.lpc-role-dashboard :where(
+  .btn,
+  .add-btn,
+  .primary-btn,
+  .ghost-btn,
+  .page-btn,
+  .tour-btn,
+  .quick-actions button,
+  .lpc-saved-view-button,
+  .cases-onboarding-skip
+) {
+  min-height: 38px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: var(--lpc-radius-control) !important;
+  background: var(--lpc-surface-panel) !important;
+  color: var(--lpc-text-primary) !important;
+  box-shadow: none !important;
+  font-size: 0.88rem !important;
+  font-weight:300 !important;
+  line-height: 1.2;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  transform: none !important;
+}
+
+body.lpc-role-dashboard :where(
+  .btn.primary,
+  .tour-btn.primary,
+  .view-billing .primary-btn,
+  .payment-modal .primary-btn,
+  .view-cases .add-btn:first-child,
+  .quick-actions button:first-of-type
+) {
+  border-color: var(--lpc-accent-primary) !important;
+  background: var(--lpc-accent-primary) !important;
+  color: #202124 !important;
+}
+
+body.lpc-role-dashboard :where(
+  .btn.primary,
+  .tour-btn.primary,
+  .view-billing .primary-btn,
+  .payment-modal .primary-btn,
+  .view-cases .add-btn:first-child,
+  .quick-actions button:first-of-type
+):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--lpc-accent-primary) 82%, #000) !important;
+  background: color-mix(in srgb, var(--lpc-accent-primary) 88%, #000) !important;
+}
+
+body.lpc-role-dashboard :where(
+  .btn.secondary,
+  .tour-btn.ghost,
+  .ghost-btn,
+  .view-cases .add-btn:not(:first-child),
+  .quick-actions button:not(:first-of-type),
+  .lpc-saved-view-button
+):hover:not(:disabled) {
+  border-color: rgba(60, 66, 87, 0.32) !important;
+  background: var(--lpc-surface-subtle) !important;
+  color: var(--lpc-text-primary) !important;
+}
+
+body.lpc-role-dashboard .lpc-saved-view-button.is-primary {
+  border-color: var(--lpc-border-subtle) !important;
+  background: var(--lpc-surface-panel) !important;
+  color: var(--lpc-text-primary) !important;
+}
+
+body.lpc-role-dashboard :where(
+  .page-btn,
+  .weekly-notes-btn,
+  .cases-onboarding-skip,
+  .onboarding-attention-skip
+) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.lpc-role-dashboard :where(button, .btn, [role="button"]):disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+/* Shared resource-page rhythm: heading, actions, views, controls, data. */
+body.lpc-role-dashboard :where(
+  .view-cases .cases-shell,
+  #paralegalCasesView,
+  .view-billing
+) {
+  max-width: none;
+}
+
+body.lpc-role-dashboard .view-cases .cases-shell {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.lpc-role-dashboard :where(
+  .view-cases .cases-header,
+  #paralegalCasesView > .cases-page-header,
+  .view-billing > header.page-header
+) {
+  min-height: 76px;
+  margin: 0 0 1.25rem !important;
+  padding: 0 0 1.1rem;
+  align-items: flex-end !important;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.lpc-role-dashboard :where(
+  .view-cases .cases-header h1,
+  #paralegalCasesView > .cases-page-header h1,
+  .view-billing > header.page-header h1
+) {
+  margin: 0 !important;
+  font-size: clamp(1.8rem, 3vw, 2.25rem) !important;
+  line-height: 1.15;
+}
+
+body.lpc-role-dashboard :where(
+  .view-cases .cases-header p,
+  #paralegalCasesView > .cases-page-header p,
+  .view-billing > header.page-header p
+) {
+  margin: 0.25rem 0 0 !important;
+  color: var(--lpc-text-secondary);
+  font-size: 0.92rem;
+}
+
+body.lpc-role-dashboard .view-cases .page-header {
+  margin: 0 0 1rem !important;
+}
+
+body.lpc-role-dashboard :where(.lpc-saved-view-bar, .view-cases .filter-tabs) {
+  margin-bottom: 0.75rem !important;
+}
+
+body.lpc-role-dashboard #paralegalCasesView > .cases-hairline {
+  display: none;
+}
+
+/* Pills are semantic: statuses/tags only. Ordinary controls use the control radius. */
+body.lpc-role-dashboard :where(
+  .completed-page-btn,
+  .applied-page-btn,
+  .pill-btn,
+  .applicant-toggle,
+  .applicant-detail-chip,
+  .invite-dialog .actions button,
+  .case-modal .actions button,
+  .lpc-context-action,
+  .lpc-context-retry,
+  .lpc-context-inline-action,
+  .lpc-context-close
+) {
+  border-radius: var(--lpc-radius-control) !important;
+}
+
+body.lpc-role-dashboard :where(
+  .view-billing .primary-btn,
+  .view-billing .ghost-btn,
+  .payment-modal .primary-btn,
+  .payment-modal .ghost-btn,
+  .cases-onboarding-skip,
+  .btn
+) {
+  border-radius: var(--lpc-radius-control) !important;
+}
+
+/* One utility-icon grid in the dashboard header. */
+body.lpc-role-dashboard :where(
+  .lpc-global-search-host,
+  .lpc-global-search-trigger,
+  .lpc-quick-create,
+  .notification-wrapper,
+  .notification-icon,
+  .support-launcher
+) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+body.lpc-role-dashboard :where(
+  .lpc-global-search-trigger svg,
+  .lpc-quick-create-icon,
+  .notification-icon svg,
+  .support-launcher svg
+) {
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 1.7;
+}
+
+/* Sentence case is the product default; tracking is reserved for compact metadata. */
+body.lpc-role-dashboard :where(
+  .ledger-title,
+  .status-label,
+  .status-link,
+  .mini-deadlines .section-title,
+  .weekly-notes .ledger-title,
+  .weekly-notes-range,
+  .weekly-notes-btn,
+  .onboarding-attention-label,
+  .onboarding-attention-cta,
+  .onboarding-attention-skip,
+  .completed-page-btn,
+  .application-detail .detail-label,
+  .case-title-preview .label
+) {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+body.lpc-role-dashboard :where(
+  .view-cases th,
+  .view-cases .applicant-table th,
+  .view-billing .escrow-table th
+) {
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* Shared empty-state presentation for lists, tables, cards, and summaries. */
+body.lpc-role-dashboard :where(
+  .empty-row,
+  .empty-state,
+  .case-files-empty,
+  .empty-card,
+  .payment-method-summary.is-empty,
+  td.empty-state
+) {
+  color: var(--lpc-text-secondary) !important;
+  font-style: normal !important;
+}
+
+body.lpc-role-dashboard :where(.empty-row, td.empty-state) {
+  height: 88px;
+  padding: 1.25rem !important;
+  text-align: center;
+  background: transparent !important;
+}
+
+body.lpc-role-dashboard :where(.case-card.empty-state, .applicant-card.empty-card) {
+  min-height: 104px !important;
+  padding: 1rem 1.1rem !important;
+  border: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: var(--lpc-radius-panel) !important;
+  background: var(--lpc-surface-panel) !important;
+}
+
+body.lpc-role-dashboard :where(.case-card.empty-state h2, .applicant-card.empty-card h2) {
+  color: var(--lpc-text-primary) !important;
+}
+
+body.lpc-role-dashboard .case-files-empty {
+  min-height: 88px;
+  display: grid;
+  align-items: center;
+  margin: 0;
+  padding: 1rem !important;
+}
+
+body.lpc-role-dashboard .payment-method-summary.is-empty {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+}
+
+body.lpc-role-dashboard .lpc-empty-title {
+  margin: 0;
+  color: var(--lpc-text-primary);
+  font-weight:300;
+}
+
+body.lpc-role-dashboard .lpc-empty-copy {
+  margin: 0.2rem 0 0;
+  color: var(--lpc-text-secondary);
+  font-size: 0.86rem;
+}
+
+/* Stripe-like page rhythm: compact navigation, generous content whitespace,
+   and quiet hairlines between the major bands of work. */
+body.lpc-role-dashboard .main {
+  padding: 28px clamp(40px, 4.25vw, 72px) 88px;
+}
+
+body.lpc-role-dashboard .topbar {
+  min-height: 56px;
+  margin-bottom: 2rem;
+}
+
+body.lpc-role-dashboard :where(.command-header, #paralegalHomeView > header) {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.lpc-role-dashboard .home-layout {
+  gap: 2.5rem;
+}
+
+body.lpc-role-dashboard .home-main {
+  gap: 2rem;
+}
+
+body.lpc-role-dashboard .view-home.home-compact .home-layout {
+  gap: 2.5rem;
+}
+
+body.lpc-role-dashboard .view-home.home-compact .command-header {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.25rem;
+}
+
+body.lpc-role-dashboard .view-home.home-compact .home-main {
+  gap: 2rem;
+}
+
+body.lpc-role-dashboard :where(.summary, .side-by-side-panels) {
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
+}
+
+body.lpc-role-dashboard :where(.ledger-shell, .status-rail-shell, .view-billing .panel) {
+  padding: 1.25rem 1.4rem;
+}
+
+body.lpc-role-dashboard .view-billing .panel {
+  margin-bottom: 1.5rem;
+}
+
+body.lpc-role-dashboard :where(.info-box, .lpc-priority-item) {
+  min-height: auto;
+  padding: 1.1rem 1.25rem;
+}
+
+body.lpc-role-dashboard .cases-apps-grid {
+  gap: 2.5rem;
+}
+
+body.lpc-role-dashboard .cases-column {
+  padding-right: 2.5rem;
+}
+
+@media (max-width: 720px) {
+  body.lpc-role-dashboard .main {
+    padding: 20px 16px 36px;
+  }
+}
+
+/* Create Matter uses the same form and control system as dashboard workflows. */
+body.lpc-role-dashboard .step-panel > header {
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.lpc-role-dashboard .step-panel > header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.25rem);
+}
+
+body.lpc-role-dashboard .steps {
+  max-width: 700px;
+  margin-bottom: 1.5rem;
+}
+
+body.lpc-role-dashboard .steps::before {
+  top: 12px;
+  height: 1px;
+}
+
+body.lpc-role-dashboard .circle {
+  width: 24px;
+  height: 24px;
+  border-width: 1px;
+  font-size: 0.74rem;
+}
+
+body.lpc-role-dashboard .step span {
+  font-size: 0.78rem;
+}
+
+body.lpc-role-dashboard .step-panel form {
+  max-width: 900px;
+  padding: 1.5rem;
+  border-radius: var(--lpc-radius-panel);
+  box-shadow: none;
+}
+
+body.lpc-role-dashboard .field {
+  margin-bottom: 1rem;
+}
+
+body.lpc-role-dashboard .field label {
+  margin-bottom: 0.35rem;
+  font-size: 0.86rem;
+  font-weight:300 !important;
+}
+
+body.lpc-role-dashboard .field-requirement {
+  margin-left: 0.35rem;
+  color: var(--lpc-text-secondary);
+  font-size: 0.72rem;
+  font-weight:300 !important;
+}
+
+body.lpc-role-dashboard :where(.field input, .field select, .field textarea) {
+  min-height: var(--lpc-control-height);
+  border-radius: var(--lpc-radius-control) !important;
+  font-size: 0.9rem;
+  font-weight:300 !important;
+}
+
+body.lpc-role-dashboard .select-field select {
+  border-radius: var(--lpc-radius-control) !important;
+}
+
+body.lpc-role-dashboard #comp {
+  width: min(260px, 100%);
+  min-height: var(--lpc-control-height);
+  padding-left: 1.55rem;
+  border-radius: var(--lpc-radius-control);
+}
+
+body.lpc-role-dashboard .step-panel .actions {
+  max-width: 900px;
+  margin-top: 1.25rem;
+  padding: 0;
+}
+
+/* Shared home-component family; content remains role-specific. */
+body.lpc-role-dashboard :where(
+  .action-queue,
+  .ledger-shell,
+  .status-rail-shell,
+  .lpc-priority-shell,
+  .info-box,
+  .case-panels .case-card,
+  .case-panels .dashboard-card
+) {
+  border: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: var(--lpc-radius-panel) !important;
+  background: var(--lpc-surface-panel) !important;
+  box-shadow: none !important;
+}
+
+body.lpc-role-dashboard .action-queue {
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+body.lpc-role-dashboard :where(.action-queue .ledger-header, .lpc-priority-header) {
+  min-height: 56px;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.lpc-role-dashboard .queue-list {
+  gap: 0;
+}
+
+body.lpc-role-dashboard .queue-item {
+  min-height: 76px;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.lpc-role-dashboard .queue-item:last-child {
+  padding-bottom: 1rem;
+}
+
+body.lpc-role-dashboard :where(.queue-title, .lpc-priority-item strong) {
+  font-size: 0.92rem;
+  font-weight:300 !important;
+}
+
+body.lpc-role-dashboard :where(.queue-meta, .lpc-priority-item span) {
+  font-size: 0.82rem;
+}
+
+body.lpc-role-dashboard .queue-action {
+  min-height: 34px;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--lpc-radius-control);
+}
+
+body.lpc-role-dashboard .summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+body.lpc-role-dashboard .summary .info-box {
+  min-width: 0;
+  min-height: 120px;
+  aspect-ratio: auto;
+  align-items: flex-start;
+  text-align: left;
+}
+
+body.lpc-role-dashboard .info-value {
+  font-size: 1.35rem;
+  font-weight:300 !important;
+}
+
+body.lpc-role-dashboard .info-label {
+  font-size: 0.82rem;
+}
+
+body.lpc-role-dashboard .case-panels > section {
+  display: flex;
+}
+
+body.lpc-role-dashboard .case-panels :where(.case-card, .dashboard-card) {
+  width: 100%;
+  min-height: 140px;
+  padding: 1.25rem !important;
+}
+
+body.lpc-role-dashboard :where(.case-panels h2, .case-panels .card-title) {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+  font-weight:300 !important;
+}
+
+body.lpc-role-dashboard .status-rail {
+  gap: 1.25rem;
+}
+
+/* Attorney overview is a compact summary, not a full-height rail. */
+body.lpc-role-dashboard .view-home .home-layout {
+  align-items: start;
+}
+
+body.lpc-role-dashboard .view-home .home-sidebar {
+  height: auto;
+  min-height: 0;
+  align-self: start;
+}
+
+body.lpc-role-dashboard .view-home .status-rail-shell {
+  height: auto;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+body.lpc-role-dashboard .view-home .status-rail {
+  gap: 0 !important;
+}
+
+body.lpc-role-dashboard .view-home .status-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 64px;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.lpc-role-dashboard .view-home :where(.status-label, .status-link) {
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+body.lpc-role-dashboard .view-home .status-value {
+  font-size: 1rem;
+  text-align: right;
+}
+
+body.lpc-role-dashboard .view-home .message-box .status-subtext {
+  margin: 0;
+  font-size: 0.82rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body.lpc-role-dashboard .view-home .mini-deadlines {
+  margin: 0 !important;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+body.lpc-role-dashboard .view-home .mini-deadlines .section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+}
+
+body.lpc-role-dashboard .view-home .mini-deadlines .info-line {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  body.lpc-role-dashboard .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  body.lpc-role-dashboard .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+body.theme-dark,
+html.theme-dark {
+  --lpc-surface-subtle: rgba(255, 255, 255, 0.055);
+  --lpc-accent-soft: rgba(207, 188, 142, 0.16);
+  --lpc-danger: #ef9a9a;
+  --lpc-success: #85d7ad;
+  --lpc-shadow-panel: 0 22px 50px rgba(0, 0, 0, 0.32);
+}
+
+body.lpc-role-dashboard .sidebar nav a,
+body.lpc-role-dashboard .sidebar .sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+body.lpc-role-dashboard .sidebar #logoutBtn {
+  width: 100%;
+  min-height: 38px;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 9px 14px;
+  color: var(--sidebar-text, var(--ink, #1a1a1a));
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  font-family: var(--font-sans, 'Sarabun', sans-serif);
+  font-size: 0.9rem !important;
+  font-weight: 300 !important;
+  line-height: 1.3;
+  text-align: left;
+}
+
+body.lpc-role-dashboard .sidebar > #logoutBtn {
+  margin-top: auto;
+}
+
+body.lpc-role-dashboard .sidebar > #logoutBtn + .sidebar-footer {
+  margin-top: 12px;
+}
+
+body.lpc-role-dashboard .sidebar #logoutBtn:hover,
+body.lpc-role-dashboard .sidebar #logoutBtn:focus-visible {
+  color: var(--accent, #b6a47a);
+  background: rgba(182, 164, 122, 0.08);
+  outline: none;
+}
+
+body.lpc-role-dashboard .sidebar .sidebar-nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.78;
+}
+
+body.lpc-role-dashboard .sidebar :where(nav a.active, nav a:hover, nav a:focus, .sidebar-link:hover, .sidebar-link:focus) .sidebar-nav-icon {
+  opacity: 1;
+}
+
+.lpc-saved-view-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--lpc-space-2);
+  flex-wrap: wrap;
+  padding: var(--lpc-space-3);
+  border: 1px solid var(--lpc-border-subtle);
+  border-radius: var(--lpc-radius-panel);
+  background: var(--lpc-surface-subtle);
+}
+
+.lpc-saved-view-field {
+  display: grid;
+  gap: var(--lpc-space-1);
+  min-width: min(260px, 100%);
+}
+
+.lpc-saved-view-field label,
+.lpc-saved-view-status {
+  color: var(--lpc-text-secondary);
+  font-size: 0.78rem;
+}
+
+.lpc-saved-view-field select,
+.lpc-saved-view-button {
+  min-height: var(--lpc-control-height);
+  border: 1px solid var(--lpc-border-subtle);
+  border-radius: var(--lpc-radius-control);
+  background: var(--lpc-surface-panel);
+  color: var(--lpc-text-primary);
+  font: inherit;
+}
+
+.lpc-saved-view-field select { padding: 0.55rem 2rem 0.55rem 0.75rem; }
+.lpc-saved-view-button { padding: 0.55rem 0.85rem; cursor: pointer; }
+.lpc-saved-view-button:hover,
+.lpc-saved-view-button:focus-visible { border-color: var(--lpc-accent-primary); outline: none; }
+.lpc-saved-view-button.is-primary { background: var(--lpc-text-primary); color: var(--lpc-surface-canvas); }
+.lpc-saved-view-button[hidden] { display: none; }
+.lpc-saved-view-status { margin-left: auto; align-self: center; }
+.lpc-saved-view-status[data-tone="error"] { color: var(--lpc-danger); }
+.lpc-saved-view-status[data-tone="success"] { color: var(--lpc-success); }
+
+.lpc-saved-view-dialog {
+  width: min(460px, calc(100vw - 2rem));
+  border: 0;
+  border-radius: var(--lpc-radius-panel);
+  padding: 0;
+  color: var(--lpc-text-primary);
+  background: var(--lpc-surface-panel);
+  box-shadow: var(--lpc-shadow-panel);
+}
+.lpc-saved-view-dialog::backdrop { background: rgba(15, 23, 42, 0.48); }
+.lpc-saved-view-dialog-card { display: grid; gap: var(--lpc-space-4); padding: 1.4rem; }
+.lpc-saved-view-dialog-card h2,
+.lpc-saved-view-dialog-card p { margin: 0; }
+.lpc-saved-view-dialog-card > div > p:not(.lpc-saved-view-eyebrow) { color: var(--lpc-text-secondary); margin-top: 0.45rem; }
+.lpc-saved-view-eyebrow { color: var(--lpc-accent-primary); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem; }
+.lpc-saved-view-dialog-card label { display: grid; gap: 0.4rem; }
+.lpc-saved-view-dialog-card input { min-height: var(--lpc-control-height); border: 1px solid var(--lpc-border-subtle); border-radius: var(--lpc-radius-control); padding: 0.55rem 0.7rem; font: inherit; }
+.lpc-saved-view-dialog-actions { display: flex; justify-content: flex-end; gap: var(--lpc-space-2); }
+.lpc-saved-view-dialog-actions button { min-height: var(--lpc-control-height); padding: 0.55rem 0.9rem; border: 1px solid var(--lpc-border-subtle); border-radius: var(--lpc-radius-control); background: var(--lpc-surface-panel); color: var(--lpc-text-primary); cursor: pointer; }
+.lpc-saved-view-dialog-actions .is-primary { background: var(--lpc-text-primary); color: var(--lpc-surface-canvas); }
+.lpc-saved-view-dialog-status { min-height: 1.2em; color: var(--lpc-danger); }
+
+.lpc-priority-shell {
+  margin: var(--lpc-space-4) 0;
+  border: 1px solid var(--lpc-border-subtle);
+  border-radius: var(--lpc-radius-panel);
+  background: var(--lpc-surface-panel);
+  overflow: hidden;
+}
+.lpc-priority-header { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem 1.1rem; border-bottom: 1px solid var(--lpc-border-subtle); }
+.lpc-priority-header h2 { margin: 0; font-size: 1.05rem; }
+.lpc-priority-header p { margin: 0.2rem 0 0; color: var(--lpc-text-secondary); font-size: 0.84rem; }
+.lpc-priority-count { color: var(--lpc-text-secondary); font-size: 0.8rem; }
+.lpc-priority-list { display: grid; }
+.lpc-priority-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--lpc-border-subtle); }
+.lpc-priority-item:last-child { border-bottom: 0; }
+.lpc-priority-item strong { display: block; }
+.lpc-priority-item span { display: block; margin-top: 0.2rem; color: var(--lpc-text-secondary); font-size: 0.84rem; }
+.lpc-priority-action { color: var(--lpc-text-primary); font-weight:300; text-decoration: none; white-space: nowrap; }
+.lpc-priority-action:hover { color: var(--lpc-accent-primary); }
+
+@media (max-width: 720px) {
+  .lpc-saved-view-field { width: 100%; }
+  .lpc-saved-view-field select { width: 100%; }
+  .lpc-saved-view-status { width: 100%; margin-left: 0; }
+  .lpc-priority-item { grid-template-columns: 1fr; }
+}
+
+/* Attorney home: an operational brief built from rows and dividers instead of
+   a wall of cards. All existing data hooks and actions remain in place. */
+body.attorney-dashboard .view-home .command-header {
+  align-items: flex-start;
+}
+
+body.attorney-dashboard .view-home .command-title h1 {
+  font-size: clamp(1.9rem, 2.5vw, 2.2rem);
+}
+
+body.attorney-dashboard .view-home .command-summary {
+  margin: 0.35rem 0 0;
+  color: var(--lpc-text-secondary);
+  font-size: 0.9rem;
+}
+
+body.attorney-dashboard .view-home .command-summary #user-name-heading {
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+body.attorney-dashboard .view-home .command-create-matter {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--lpc-text-primary);
+  border-radius: var(--lpc-radius-control);
+  background: var(--lpc-text-primary);
+  color: #fff;
+  font-size: 0.86rem;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+body.attorney-dashboard .view-home .command-create-matter:hover,
+body.attorney-dashboard .view-home .command-create-matter:focus-visible {
+  background: #30384f;
+  outline: 2px solid rgba(26, 31, 54, 0.2);
+  outline-offset: 2px;
+}
+
+body.attorney-dashboard .view-home .home-main > .action-queue { order: 1; }
+body.attorney-dashboard .view-home .home-main > .ledger-shell:not(.weekly-notes) { order: 2; }
+body.attorney-dashboard .view-home .home-main > .onboarding-attention-card { order: 3; }
+body.attorney-dashboard .view-home .home-main > .weekly-notes { order: 4; }
+
+body.attorney-dashboard .view-home :where(.action-queue, .ledger-shell) {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible;
+}
+
+body.attorney-dashboard .view-home :where(.action-queue, .ledger-shell) > .ledger-header {
+  min-height: auto;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.attorney-dashboard .view-home .ledger-title {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body.attorney-dashboard .view-home .queue-item {
+  min-height: 76px;
+  padding: 1rem 0;
+}
+
+body.attorney-dashboard .view-home .queue-action {
+  border: 0;
+  border-radius: 0;
+  padding: 0.4rem 0;
+  color: var(--lpc-text-primary);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+body.attorney-dashboard .view-home .queue-action:hover,
+body.attorney-dashboard .view-home .queue-action:focus-visible {
+  color: var(--lpc-text-primary);
+  text-decoration-color: currentColor;
+  outline: none;
+}
+
+body.attorney-dashboard .view-home .case-ledger {
+  gap: 0;
+  padding: 0;
+}
+
+body.attorney-dashboard .view-home .matter-row {
+  min-height: 72px;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.attorney-dashboard .view-home .matter-row::before {
+  inset: 0 -0.75rem;
+  border-radius: 6px;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-card {
+  margin: 0;
+  padding: 1.25rem 0;
+  border: 0 !important;
+  border-top: 1px solid var(--lpc-border-subtle) !important;
+  border-bottom: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-checklist {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-check {
+  min-height: 36px;
+  padding: 0;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-check:hover,
+body.attorney-dashboard .view-home .onboarding-attention-check:focus-visible {
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-skip {
+  border: 0;
+  border-radius: 0;
+  padding-inline: 0.35rem;
+}
+
+body.attorney-dashboard .view-home .status-rail-shell {
+  padding: 0 0 0 1.5rem !important;
+  border: 0 !important;
+  border-left: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.attorney-dashboard .view-home .status-item {
+  min-height: 64px;
+  padding: 1rem 0;
+}
+
+body.attorney-dashboard .view-home .mini-deadlines {
+  padding: 1.25rem 0 !important;
+}
+
+body.attorney-dashboard .view-home .weekly-notes {
+  margin-top: 0;
+  padding-top: 0.5rem !important;
+}
+
+body.attorney-dashboard .view-home .weekly-notes-grid:not(.month-view) {
+  gap: 0;
+}
+
+body.attorney-dashboard .view-home .weekly-notes-grid:not(.month-view) .weekly-note-day {
+  padding: 0.75rem;
+  border: 0;
+  border-left: 1px solid var(--lpc-border-subtle);
+  border-radius: 0;
+}
+
+body.attorney-dashboard .view-home .weekly-notes-grid:not(.month-view) .weekly-note-day:first-child {
+  border-left: 0;
+}
+
+/* A balanced middle ground: a few purposeful surfaces, varied information
+   shapes, and no repeated stack of full-width ruled rows. */
+body.attorney-dashboard .view-home .home-panel > .action-queue {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.24fr) minmax(0, 1fr);
+  align-items: stretch;
+  margin: 0 0 2.75rem !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--lpc-surface-subtle) !important;
+}
+
+body.attorney-dashboard .view-home .home-panel > .action-queue > .ledger-header {
+  min-height: 100%;
+  align-items: flex-start;
+  padding: 1.25rem;
+  border: 0;
+  border-right: 1px solid var(--lpc-border-subtle);
+}
+
+body.attorney-dashboard .view-home .home-panel > .action-queue .queue-item {
+  min-height: 82px;
+  padding: 1.15rem 1.25rem;
+}
+
+body.attorney-dashboard .view-home .case-ledger {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 2rem;
+  padding-top: 1.25rem;
+}
+
+body.attorney-dashboard .view-home .matter-row {
+  min-height: 112px;
+  align-content: start;
+  padding: 1rem 0;
+  border-top: 2px solid var(--lpc-border-subtle);
+  border-bottom: 0;
+}
+
+body.attorney-dashboard .view-home .matter-row::before {
+  inset: 0 -0.65rem;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-card {
+  padding: 1.25rem !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--lpc-surface-subtle) !important;
+}
+
+body.attorney-dashboard .view-home .status-rail-shell {
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+body.attorney-dashboard .view-home .status-overview-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+body.attorney-dashboard .view-home .status-rail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem 1rem !important;
+}
+
+body.attorney-dashboard .view-home .status-item {
+  display: flex;
+  min-height: 88px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 0.9rem 0 0;
+  border-top: 2px solid var(--lpc-border-subtle);
+  border-bottom: 0;
+}
+
+body.attorney-dashboard .view-home .status-item .status-value {
+  order: -1;
+  font-size: 1.2rem;
+  text-align: left;
+}
+
+body.attorney-dashboard .view-home .status-item .status-subtext {
+  order: -1;
+  text-align: left;
+}
+
+body.attorney-dashboard .view-home .mini-deadlines {
+  margin-top: 1.5rem !important;
+  padding: 1.25rem 0 0 !important;
+  border-top: 1px solid var(--lpc-border-subtle);
+}
+
+@media (max-width: 900px) {
+  body.attorney-dashboard .view-home .status-rail-shell {
+    padding: 1.5rem 0 0 !important;
+    border-left: 0 !important;
+    border-top: 1px solid var(--lpc-border-subtle) !important;
+  }
+
+  body.attorney-dashboard .view-home .onboarding-attention-checklist {
+    grid-template-columns: 1fr;
+  }
+
+  body.attorney-dashboard .view-home .case-ledger {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  body.attorney-dashboard .view-home .home-panel > .action-queue {
+    grid-template-columns: 1fr;
+  }
+
+  body.attorney-dashboard .view-home .home-panel > .action-queue > .ledger-header {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--lpc-border-subtle);
+  }
+}

@@ -100,7 +100,9 @@ export function adaptLegacyDestination(value, { caseId = "" } = {}) {
     const hash = String(url.hash || "");
     if (!hash.startsWith("#/")) return null;
     const parsed = parseRouteHash(hash);
-    if (!parsed.found || Object.values(parsed.params).some(value => !objectId(value))) return null;
+    if (!parsed.found || Object.entries(parsed.params).some(([name, value]) =>
+      !(parsed.name === "profile" && name === "profileId" && value === "me") && !objectId(value)
+    )) return null;
     return { href: `${url.pathname}${hash}`, internal: true };
   }
   if (url.pathname === "/case-detail.html") {

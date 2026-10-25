@@ -1,4 +1,4 @@
-const { publishEventSafe } = require("../lpcEvents/publishEventService");
+const { publishEventSafe, publishEvent } = require("../lpcEvents/publishEventService");
 
 function compactText(value = "", max = 240) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -22,13 +22,13 @@ async function publishApprovalDecisionEvent({
   publicFacing = true,
   priority = "normal",
   metadata = {},
-} = {}) {
+} = {}, options = {}) {
   const normalizedDecision = String(decision || "").trim().toLowerCase();
   if (!["approved", "rejected"].includes(normalizedDecision)) return null;
   if (!approvalRecordId || !approvalTargetType || !approvalTargetId) return null;
 
   const eventType = normalizedDecision === "approved" ? "approval.approved" : "approval.rejected";
-  return publishEventSafe({
+  return (options.session ? publishEvent : publishEventSafe)({
     eventType,
     eventFamily: "approval",
     idempotencyKey: `${approvalRecordType}:${approvalRecordId}:${normalizedDecision}`,
@@ -65,7 +65,7 @@ async function publishApprovalDecisionEvent({
       founderVisible,
       publicFacing,
     },
-  });
+  }, options);
 }
 
 module.exports = {

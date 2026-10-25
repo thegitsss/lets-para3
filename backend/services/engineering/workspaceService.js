@@ -456,7 +456,7 @@ function buildRecommendedNextAction({
   };
 }
 
-function buildRecommendation({ status = "", incident = {}, linkedSupportTickets = [], latestCtoRun = null } = {}) {
+function buildRecommendation({ status = "", linkedSupportTickets = [], latestCtoRun = null } = {}) {
   if (status === "Needs Diagnosis") {
     return linkedSupportTickets.length
       ? "This issue reached Engineering from user-facing support, but a founder-readable CTO diagnosis packet is not attached yet."
@@ -620,7 +620,7 @@ async function buildEngineeringItemFromIncident(incident = {}, options = {}) {
     summary: compactText(incident.summary || incident.originalReportText || "", 200),
     engineeringStatus: status,
     tone: statusTone(status),
-    recommendation: buildRecommendation({ status, incident, linkedSupportTickets, latestCtoRun }),
+    recommendation: buildRecommendation({ status, linkedSupportTickets, latestCtoRun }),
     recommendedNextAction,
     resolveAction,
     urgency,

@@ -1,0 +1,50 @@
+const { test, expect } = require('playwright/test');
+const path = require('node:path'), fs = require('node:fs/promises');
+const startServer = require('./real-server.cjs');
+let server, startupCleanup;
+test.beforeEach(async ({ context }) => {
+  server = await startServer({ frontendRoot: path.join(process.env.LPC_HELP_SOURCE_ROOT || path.resolve(__dirname, '../../../..'), 'frontend'), onStartupCleanup: close => { startupCleanup = close; } });
+  await context.route('**/*', route => new URL(route.request().url()).origin === server.origin ? route.continue() : route.abort('blockedbyclient'));
+});
+test.afterEach(async ({ page }) => { await page.close(); await (server?.close || startupCleanup)?.(); server = null; startupCleanup = null; });
+
+for (const role of ['attorney', 'paralegal']) test(`${role}: actual signed-in Assistant recovers committed send and restart without a second write`, async ({ page, context }, testInfo) => {
+  const owner = await server.createUser(role); await context.addCookies([owner.cookie]);
+  const writes = []; let receipt, restarted;
+  await page.route('**/api/support/conversation/*/messages', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    writes.push(route.request().postDataJSON()); const committed = await route.fetch(); expect(committed.status()).toBe(201); receipt = await committed.json(); await route.abort('failed');
+  });
+  const open = async () => { await page.locator(role === 'attorney' ? '[data-av2-assistant]' : '[data-v2-assistant-trigger]').click(); await expect(page.locator('#supportDrawer')).toHaveAttribute('aria-hidden', 'false'); };
+  await page.goto(`${server.origin}/${role}-v2.html#/help`);
+  await expect(page.locator(role === 'attorney' ? 'html' : 'body')).toHaveAttribute(role === 'attorney' ? 'data-attorney-state' : 'data-v2-session', 'ready');
+  await open(); const composer = page.locator('[data-support-textarea]'), thread = page.locator('[data-support-thread]');
+  await composer.fill('Where can I update my notification preferences?'); await page.locator('[data-support-submit]').click();
+  await expect(page.getByRole('button', { name: 'Check result', exact: true })).toBeVisible();
+  const before = await server.evidence(owner.id); expect(before.receipts).toEqual([{ requestId: writes[0].requestId, action: 'send', state: 'succeeded', active: false }]);
+  expect(before.messages.filter(row => row.sender === 'user')).toHaveLength(1);
+  await page.reload(); await open();
+  await expect(thread).toContainText('Open Settings, then Preferences to update your notification choices.');
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('lpc_support_pending_request'))).toBeNull();
+  expect(writes).toHaveLength(1); expect(await server.evidence(owner.id)).toEqual(before);
+  const answer = thread.locator(`[data-support-message-id="${receipt.assistantMessage.id}"]`);
+  await answer.getByRole('button', { name: 'Helpful', exact: true }).click();
+  await expect.poll(async () => (await server.evidence(owner.id)).messages.find(row => row.id === receipt.assistantMessage.id)?.metadata?.feedback?.rating).toBe('helpful');
+  const forbidden = await page.request.post(`${server.origin}/api/support/conversation/${receipt.conversation.id}/messages`, { data: { ...writes[0], requestId: '3a112788-135d-4cf4-9833-1f85ac08f6fb' } });
+  expect(forbidden.status()).toBe(403); expect((await forbidden.json()).code).toBe('CSRF_INVALID');
+  let restarts = 0;
+  await page.route('**/api/support/conversation/*/restart', async route => { restarts++; const committed = await route.fetch(); expect(committed.status()).toBe(201); restarted = await committed.json(); await route.abort('failed'); });
+  await page.getByRole('button', { name: 'Open assistant options', exact: true }).click(); await page.getByRole('menuitem', { name: 'Start new conversation', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Check result', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Check result', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('lpc_support_pending_request'))).toBeNull();
+  await expect(thread).not.toContainText('Where can I update my notification preferences?');
+  const after = await server.evidence(owner.id); expect(after.conversations).toHaveLength(2); expect(after.conversations.filter(row => row.status === 'open').map(row => row.id)).toEqual([restarted.conversation.id]);
+  expect(after.messages.filter(row => row.sender === 'user')).toHaveLength(1); expect(after.receipts).toHaveLength(2); expect(after.receipts.every(row => row.state === 'succeeded' && !row.active)).toBe(true); expect(restarts).toBe(1);
+  const replacement = await server.createUser(role); await context.addCookies([replacement.cookie]);
+  const privateReceipt = await page.request.get(`${server.origin}/api/support/conversation/${receipt.conversation.id}/requests/${writes[0].requestId}?expectedOwnerId=${replacement.id}&expectedRole=${role}`);
+  expect(privateReceipt.status()).toBe(404);
+  await composer.fill('Private unsent draft for the original owner'); await page.locator('[data-support-submit]').click(); await expect(page).toHaveURL(/\/login.html/);
+  expect(writes).toHaveLength(1); expect(await server.evidence(owner.id)).toEqual(after);
+  await fs.writeFile(testInfo.outputPath('actual-persistence.json'), JSON.stringify({ role, sendPosts: writes.length, restartPosts: restarts, csrfRefused: forbidden.status(), replacementReceiptRefused: privateReceipt.status(), before, after }, null, 2));
+});

@@ -13,6 +13,7 @@ const {
   getStripeConnectSnapshot,
 } = require("../services/support/contextResolverService");
 const { getAccountDeactivationEligibility } = require("../services/userDeletion");
+const { dateOnlyFromZonedInstant, resolveMatterDeadlineDate } = require("../utils/businessDate");
 const {
   evaluateApplicationEligibility,
   evaluateArchiveAccess,
@@ -173,12 +174,12 @@ const PARALEGAL_TOOL_DEFINITIONS = Object.freeze({
 const PARALEGAL_TOOL_NAMES = Object.freeze(Object.keys(PARALEGAL_TOOL_DEFINITIONS));
 
 const PARALEGAL_NAVIGATION = Object.freeze({
-  cases: { ctaLabel: "My cases", ctaHref: "dashboard-paralegal.html#cases" },
-  completed_cases: { ctaLabel: "Completed cases", ctaHref: "dashboard-paralegal.html#cases-completed" },
+  cases: { ctaLabel: "My Matters & Applications", ctaHref: "dashboard-paralegal.html#cases" },
+  completed_cases: { ctaLabel: "Completed Matters", ctaHref: "dashboard-paralegal.html#cases-completed" },
   applications: { ctaLabel: "My applications", ctaHref: "dashboard-paralegal.html#cases" },
-  browse_cases: { ctaLabel: "Browse cases", ctaHref: "browse-jobs.html" },
+  browse_cases: { ctaLabel: "Browse Matters", ctaHref: "browse-jobs.html" },
   payouts: { ctaLabel: "Payout settings", ctaHref: "profile-settings.html" },
-  messages: { ctaLabel: "My cases", ctaHref: "dashboard-paralegal.html#cases" },
+  messages: { ctaLabel: "My Matters & Applications", ctaHref: "dashboard-paralegal.html#cases" },
   profile: { ctaLabel: "Profile settings", ctaHref: "profile-settings.html" },
   support: { ctaLabel: "Help center", ctaHref: "help.html" },
   contact: { ctaLabel: "Contact Us", ctaHref: "contact.html" },
@@ -190,6 +191,7 @@ const WORKSPACE_FIELDS = [
   "practiceArea",
   "status",
   "deadline",
+  "deadlineDate",
   "tasks",
   "tasksLocked",
   "files",
@@ -378,14 +380,14 @@ async function loadParalegalPayoutUser(user = {}) {
   const userId = user._id || user.id;
   if (!userId) return null;
   return User.findOne({ _id: userId, role: "paralegal" })
-    .select("_id role status stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled")
+    .select("_id role status profileImage avatarURL stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled")
     .lean();
 }
 
 async function getParalegalCaseOverview(user = {}, statusScope = "all") {
   const userId = user._id || user.id;
   const docs = await Case.find(buildParalegalParticipationFilter(userId))
-    .select("_id title status deadline paralegal paralegalId withdrawnParalegalId archived readOnly paymentReleased completedAt updatedAt")
+    .select("_id title status deadline deadlineDate paralegal paralegalId withdrawnParalegalId archived readOnly paymentReleased completedAt updatedAt")
     .sort({ updatedAt: -1 })
     .lean();
   const completed = (doc) => ["completed", "closed"].includes(normalizeStatus(doc.status)) || doc.paymentReleased === true;
@@ -396,7 +398,7 @@ async function getParalegalCaseOverview(user = {}, statusScope = "all") {
     caseId: String(doc._id),
     title: String(doc.title || "Untitled matter"),
     status: normalizeStatus(doc.status),
-    deadline: serializeDate(doc.deadline),
+    deadline: resolveMatterDeadlineDate(doc) || null,
     relationship: normalizeId(doc.withdrawnParalegalId) === normalizeId(userId) ? "withdrawn" : "assigned",
     archived: doc.archived === true,
     readOnly: doc.readOnly === true,
@@ -452,7 +454,7 @@ async function getParalegalCaseWorkspace(user = {}, caseReference = "") {
     matterId: String(caseDoc._id),
     title: String(caseDoc.title || ""),
     status: normalizeStatus(caseDoc.status),
-    deadline: serializeDate(caseDoc.deadline),
+    deadline: resolveMatterDeadlineDate(caseDoc) || null,
     attorneyName: safeAttorneyName(caseDoc),
     relationship: workspace.facts.relationship,
     readOnly: workspace.facts.readOnly,
@@ -542,7 +544,7 @@ async function getParalegalCaseWorkspace(user = {}, caseReference = "") {
 async function getParalegalApplicationActivity(user = {}) {
   const userId = user._id || user.id;
   const [applications, relatedCases] = await Promise.all([
-    Application.find({ paralegalId: userId })
+    Application.find({ paralegalId: userId, status: { $ne: "withdrawn" } })
       .select("_id jobId status createdAt")
       .sort({ createdAt: -1 })
       .lean(),
@@ -828,7 +830,6 @@ async function getParalegalAccountSnapshot(user = {}) {
       notifications: userDoc.notificationPrefs || userDoc.notifications || {},
     },
     onboarding: {
-      welcomeDismissed: userDoc.onboarding?.paralegalWelcomeDismissed === true,
       tourCompleted: userDoc.onboarding?.paralegalTourCompleted === true,
       profileTourCompleted: userDoc.onboarding?.paralegalProfileTourCompleted === true,
       termsAccepted: userDoc.termsAccepted === true,
@@ -889,9 +890,13 @@ async function getParalegalWorkflowReadiness(user = {}, caseReference = "") {
   const ownApplicant = (caseDoc.applicants || []).find((item) => normalizeId(item.paralegalId) === normalizeId(userId));
   const evaluations = {
     application: evaluateApplicationEligibility({
-      user,
+      user: { ...user, ...payoutUser },
       caseDoc,
       alreadyApplied: Boolean(ownApplicant),
+      payoutReadiness: {
+        ready: stripeState.connected === true,
+        ...stripeState,
+      },
     }),
     invitation: evaluateInvitationEligibility({
       user,
@@ -917,7 +922,8 @@ async function getParalegalWorkflowReadiness(user = {}, caseReference = "") {
       blockers: stripeState.blockers || [],
     },
     evaluations,
-    bankDepositEstimateBusinessDays: evaluations.payout.facts.bankDepositEstimateBusinessDays,
+    bankDepositTimingSource: evaluations.payout.facts.bankDepositTimingSource,
+    bankDepositTimingDependsOn: evaluations.payout.facts.bankDepositTimingDependsOn,
   };
   return {
     ok: true,
@@ -986,9 +992,10 @@ async function getParalegalAttentionSummary(user = {}) {
     getParalegalInvitationActivity(user),
     getParalegalPayoutSetup(user),
   ]);
+  const today = dateOnlyFromZonedInstant(new Date());
   const upcoming = (overview.items || [])
-    .filter((item) => item.deadline && new Date(item.deadline).getTime() > Date.now())
-    .sort((left, right) => new Date(left.deadline) - new Date(right.deadline))[0] || null;
+    .filter((item) => item.deadline && item.deadline >= today)
+    .sort((left, right) => left.deadline.localeCompare(right.deadline))[0] || null;
   const facts = {
     activeMatterCount: Number(overview.activeCount || 0),
     pendingApplicationCount: Number(applications.counts?.submitted || 0) +

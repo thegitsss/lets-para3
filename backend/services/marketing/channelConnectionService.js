@@ -3,14 +3,15 @@ const axios = require("axios");
 const { URLSearchParams } = require("url");
 
 const MarketingChannelConnection = require("../../models/MarketingChannelConnection");
+const User = require("../../models/User");
+const { accountChanged, withActiveAccountWrite } = require("../../utils/activeAccountWrite");
 const {
-  MARKETING_CHANNEL_CONNECTION_STATUSES,
-  MARKETING_PUBLISHING_CHANNELS,
+  MARKETING_ACTIVE_PUBLISHING_CHANNELS,
 } = require("./constants");
 const { decryptString, encryptString } = require("../../utils/dataEncryption");
+const { LINKEDIN_API_VERSION } = require("./linkedinApiPolicy");
 
 const LINKEDIN_CONTENT_AUTHORIZATION_ACTION = "ORGANIC_SHARE_CREATE";
-const LINKEDIN_DEFAULT_API_VERSION = "202503";
 const LINKEDIN_REQUIRED_SCOPES = Object.freeze(["w_organization_social", "rw_organization_admin"]);
 
 function toActor(actor = {}) {
@@ -19,6 +20,29 @@ function toActor(actor = {}) {
     userId: actor.userId || actor._id || actor.id || null,
     label: actor.label || actor.email || "System",
   };
+}
+
+function connectionOwnerAuthority(actor = {}) {
+  const userId = actor.userId || actor._id || actor.id;
+  const authVersion = actor.authVersion;
+  if (!userId || !Number.isSafeInteger(authVersion) || authVersion < 0) throw accountChanged();
+  return { userId, authVersion };
+}
+
+async function withConnectionOwnerWrite(authority, work) {
+  return withActiveAccountWrite([authority.userId], async (session) => {
+    // Account closure, reclassification and this write arbitrate on the same
+    // User document. A status read before a provider await is insufficient.
+    const owner = await User.findOne({ _id: authority.userId, role: "admin" })
+      .select("_id").session(session).lean();
+    if (!owner) throw accountChanged();
+    return work(session);
+  }, { ownerId: authority.userId, authVersion: authority.authVersion });
+}
+
+function isOwnerAuthorityFailure(error) {
+  return ["ACCOUNT_CHANGED", "ACCOUNT_WRITE_CHANGED", "ACCOUNT_WRITE_UNCONFIRMED"]
+    .includes(error.code || error.publicCode);
 }
 
 function uniqueStrings(values = []) {
@@ -34,14 +58,12 @@ function uniqueStrings(values = []) {
 
 function normalizeChannelKey(value = "") {
   const channelKey = String(value || "").trim();
-  if (!MARKETING_PUBLISHING_CHANNELS.includes(channelKey)) {
-    throw new Error("Unsupported marketing channel.");
+  if (!MARKETING_ACTIVE_PUBLISHING_CHANNELS.includes(channelKey)) {
+    const error = new Error("Unsupported active marketing channel.");
+    error.statusCode = 400;
+    throw error;
   }
   return channelKey;
-}
-
-function normalizeApiVersion(value = "") {
-  return String(value || "").trim().slice(0, 40) || LINKEDIN_DEFAULT_API_VERSION;
 }
 
 function getLinkedInOAuthConfig() {
@@ -151,7 +173,7 @@ function serializeConnection(connection = null, { includeSecret = false } = {}) 
       accessTokenLast4: "",
       tokenExpiresAt: null,
       scopeSnapshot: [],
-      apiVersion: LINKEDIN_DEFAULT_API_VERSION,
+      apiVersion: LINKEDIN_API_VERSION,
       lastValidatedAt: null,
       lastValidationStatus: "not_connected",
       lastValidationNote: "LinkedIn company posting is not connected.",
@@ -186,7 +208,7 @@ function serializeConnection(connection = null, { includeSecret = false } = {}) 
     accessTokenLast4: connection.accessTokenLast4 || "",
     tokenExpiresAt: connection.tokenExpiresAt || null,
     scopeSnapshot: Array.isArray(connection.scopeSnapshot) ? connection.scopeSnapshot : [],
-    apiVersion: connection.apiVersion || LINKEDIN_DEFAULT_API_VERSION,
+    apiVersion: LINKEDIN_API_VERSION,
     lastValidatedAt: connection.lastValidatedAt || null,
     lastValidationStatus: connection.lastValidationStatus || normalized.status,
     lastValidationNote: connection.lastValidationNote || normalized.note,
@@ -206,16 +228,65 @@ function serializeConnection(connection = null, { includeSecret = false } = {}) 
   return serialized;
 }
 
-async function getOrCreateConnection(channelKey = "linkedin_company") {
+async function getOrCreateConnection(channelKey = "linkedin_company", { session = null } = {}) {
   const normalizedChannelKey = normalizeChannelKey(channelKey);
-  let connection = await MarketingChannelConnection.findOne({ channelKey: normalizedChannelKey });
+  let connection = await MarketingChannelConnection.findOne({ channelKey: normalizedChannelKey }).session(session);
   if (connection) return connection;
-  connection = await MarketingChannelConnection.create({
-    channelKey: normalizedChannelKey,
-    provider: normalizedChannelKey === "linkedin_company" ? "linkedin" : "facebook",
-    status: normalizedChannelKey === "linkedin_company" ? "not_connected" : "blocked",
-  });
-  return connection;
+  try {
+    if (session) {
+      const [created] = await MarketingChannelConnection.create([{
+        channelKey: normalizedChannelKey, provider: "linkedin", status: "not_connected",
+      }], { session });
+      return created;
+    }
+    return await MarketingChannelConnection.create({
+      channelKey: normalizedChannelKey,
+      provider: "linkedin",
+      status: "not_connected",
+    });
+  } catch (error) {
+    // Concurrent first connections still share the canonical channel record.
+    if (error.code !== 11000) throw error;
+    if (session) throw connectionChangedError();
+    const existing = await MarketingChannelConnection.findOne({ channelKey: normalizedChannelKey });
+    if (!existing) throw error;
+    return existing;
+  }
+}
+
+function connectionIntentFilter(connection) {
+  const intentVersion = connection.intentVersion || 0;
+  return {
+    _id: connection._id,
+    // Pre-existing records have no generation field until the next owner
+    // update. Match that legacy generation without requiring a migration.
+    ...(intentVersion === 0
+      ? { $or: [{ intentVersion: 0 }, { intentVersion: { $exists: false } }] }
+      : { intentVersion }),
+  };
+}
+
+function connectionChangedError() {
+  const error = new Error("LinkedIn connection changed during authorization or validation. Use the current connection and retry if needed.");
+  error.statusCode = 409;
+  error.code = "LINKEDIN_CONNECTION_SUPERSEDED";
+  return error;
+}
+
+async function saveValidationForIntent(connection, filter, authority) {
+  const fields = [
+    "status", "memberId", "memberUrn", "memberName", "organizationId", "organizationUrn",
+    "organizationName", "discoveredOrganizations", "authorizationAction", "authorizationGranted",
+    "lastValidatedAt", "lastValidationStatus", "lastValidationNote", "updatedBy",
+  ];
+  const values = Object.fromEntries(fields.filter((field) => connection.isModified(field))
+    .map((field) => [field, connection.get(field)]));
+  const saved = await withConnectionOwnerWrite(authority, session =>
+    MarketingChannelConnection.findOneAndUpdate(filter, { $set: values }, {
+      returnDocument: "after", runValidators: true, session,
+    }));
+  if (!saved) throw connectionChangedError();
+  return serializeConnection(saved);
 }
 
 async function getChannelConnection(channelKey = "", options = {}) {
@@ -252,33 +323,34 @@ function normalizeOrganizationPayload(payload = {}) {
 
 async function upsertChannelConnection({ channelKey = "", payload = {}, actor = {} } = {}) {
   const normalizedChannelKey = normalizeChannelKey(channelKey);
-  const connection = await getOrCreateConnection(normalizedChannelKey);
-
-  connection.isActive = payload.isActive !== false;
   const orgPayload = normalizeOrganizationPayload(payload);
-  connection.organizationId = orgPayload.organizationId;
-  connection.organizationUrn = orgPayload.organizationUrn;
-  connection.organizationName = orgPayload.organizationName || connection.organizationName || "";
-  connection.apiVersion = normalizeApiVersion(payload.apiVersion);
-  connection.updatedBy = toActor(actor);
-  if (Object.prototype.hasOwnProperty.call(payload, "scopeSnapshot")) {
-    connection.scopeSnapshot = uniqueStrings(payload.scopeSnapshot || []);
-  }
-  if (Object.prototype.hasOwnProperty.call(payload, "accessToken")) {
-    const accessToken = String(payload.accessToken || "").trim();
-    connection.encryptedAccessToken = accessToken ? encryptString(accessToken) : "";
-    connection.accessTokenLast4 = accessToken ? accessToken.slice(-4) : "";
-  }
-  if (Object.prototype.hasOwnProperty.call(payload, "tokenExpiresAt")) {
-    connection.tokenExpiresAt = payload.tokenExpiresAt ? new Date(payload.tokenExpiresAt) : null;
-  }
-
-  const normalized = normalizeConnectionStatus(connection);
-  connection.status = normalized.status;
-  connection.lastValidationStatus = normalized.status;
-  connection.lastValidationNote = normalized.note;
-  await connection.save();
-  return serializeConnection(connection);
+  const authority = connectionOwnerAuthority(actor);
+  return withConnectionOwnerWrite(authority, async session => {
+    const connection = await getOrCreateConnection(normalizedChannelKey, { session });
+    const organizationChanged = connection.organizationUrn !== orgPayload.organizationUrn;
+    const projected = {
+      ...connection.toObject(), isActive: payload.isActive !== false, ...orgPayload,
+      organizationName: orgPayload.organizationName || connection.organizationName || "",
+      ...(organizationChanged ? { authorizationGranted: false, lastValidationStatus: "", lastValidationNote: "" } : {}),
+    };
+    const normalized = normalizeConnectionStatus(projected);
+    const saved = await MarketingChannelConnection.findOneAndUpdate({
+      ...connectionIntentFilter(connection), encryptedAccessToken: connection.encryptedAccessToken,
+    }, {
+      $set: {
+        isActive: projected.isActive, organizationId: projected.organizationId,
+        organizationUrn: projected.organizationUrn, organizationName: projected.organizationName,
+        authorizationGranted: projected.authorizationGranted,
+        apiVersion: LINKEDIN_API_VERSION, updatedBy: toActor(actor),
+        status: normalized.status, lastValidationStatus: normalized.status, lastValidationNote: normalized.note,
+        // Even an identical-value reconnect/disconnect is a newer owner intent.
+        oauthStateHash: "", oauthStateExpiresAt: null,
+      },
+      $inc: { intentVersion: 1 },
+    }, { returnDocument: "after", runValidators: true, session });
+    if (saved) return serializeConnection(saved);
+    throw connectionChangedError();
+  });
 }
 
 async function markConnectionPublishResult({
@@ -302,13 +374,6 @@ async function markConnectionPublishResult({
 }
 
 async function getChannelReadinessSummary(channelKey = "") {
-  if (channelKey === "facebook_page") {
-    return {
-      channelKey,
-      status: "blocked",
-      note: "Facebook Page publishing is not implemented yet.",
-    };
-  }
   const serialized = await getChannelConnection(channelKey);
   return {
     channelKey,
@@ -317,11 +382,11 @@ async function getChannelReadinessSummary(channelKey = "") {
   };
 }
 
-function buildLinkedInHeaders(accessToken = "", apiVersion = LINKEDIN_DEFAULT_API_VERSION) {
+function buildLinkedInHeaders(accessToken = "") {
   return {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
-    "Linkedin-Version": normalizeApiVersion(apiVersion),
+    "Linkedin-Version": LINKEDIN_API_VERSION,
     "X-Restli-Protocol-Version": "2.0.0",
   };
 }
@@ -392,9 +457,9 @@ async function fetchLinkedInUserInfo({ accessToken = "" } = {}) {
   };
 }
 
-async function discoverManagedOrganizations({ accessToken = "", apiVersion = LINKEDIN_DEFAULT_API_VERSION } = {}) {
+async function discoverManagedOrganizations({ accessToken = "" } = {}) {
   const response = await axios.get("https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&state=APPROVED", {
-    headers: buildLinkedInHeaders(accessToken, apiVersion),
+    headers: buildLinkedInHeaders(accessToken),
     timeout: 15000,
     validateStatus: () => true,
   });
@@ -418,7 +483,7 @@ async function discoverManagedOrganizations({ accessToken = "", apiVersion = LIN
   const lookupResponse = await axios.get(
     `https://api.linkedin.com/rest/organizationsLookup?ids=List(${ids})`,
     {
-      headers: buildLinkedInHeaders(accessToken, apiVersion),
+      headers: buildLinkedInHeaders(accessToken),
       timeout: 15000,
       validateStatus: () => true,
     }
@@ -441,14 +506,13 @@ async function validateOrganizationAuthorization({
   accessToken = "",
   memberUrn = "",
   organizationUrn = "",
-  apiVersion = LINKEDIN_DEFAULT_API_VERSION,
 } = {}) {
   const encodedMemberUrn = encodeURIComponent(memberUrn);
   const encodedOrganizationUrn = encodeURIComponent(organizationUrn);
   const response = await axios.get(
     `https://api.linkedin.com/rest/organizationAuthorizations/(impersonator:${encodedMemberUrn},organization:${encodedOrganizationUrn},action:(organizationContentAuthorizationAction:(actionType:${LINKEDIN_CONTENT_AUTHORIZATION_ACTION})))`,
     {
-      headers: buildLinkedInHeaders(accessToken, apiVersion),
+      headers: buildLinkedInHeaders(accessToken),
       timeout: 15000,
       validateStatus: () => true,
     }
@@ -488,17 +552,27 @@ function pickOrganizationForValidation(connection = {}, discoveredOrganizations 
   return null;
 }
 
-async function validateLinkedInConnection({ actor = {}, forceRevalidate = false } = {}) {
-  const connection = await getOrCreateConnection("linkedin_company");
+async function validateLinkedInConnection({ actor = {}, forceRevalidate = false, expectedIntentVersion, expectedAccessToken } = {}) {
+  const authority = connectionOwnerAuthority(actor);
+  const connection = await withConnectionOwnerWrite(authority, session =>
+    getOrCreateConnection("linkedin_company", { session }));
+  if ((expectedIntentVersion !== undefined && (connection.intentVersion || 0) !== expectedIntentVersion)
+    || (expectedAccessToken !== undefined && connection.encryptedAccessToken !== expectedAccessToken)) {
+    throw connectionChangedError();
+  }
+  const validationFilter = {
+    ...connectionIntentFilter(connection),
+    encryptedAccessToken: connection.encryptedAccessToken,
+    isActive: connection.isActive,
+  };
   const accessToken = decryptString(connection.encryptedAccessToken || "") || "";
-  if (!accessToken) {
+  if (!accessToken || connection.isActive === false) {
     connection.status = "not_connected";
     connection.authorizationGranted = false;
     connection.lastValidatedAt = new Date();
     connection.lastValidationStatus = "not_connected";
     connection.lastValidationNote = "Connect LinkedIn to acquire an access token.";
-    await connection.save();
-    return serializeConnection(connection);
+    return saveValidationForIntent(connection, validationFilter, authority);
   }
   const grantedScopes = new Set(Array.isArray(connection.scopeSnapshot) ? connection.scopeSnapshot : []);
   const missingScopes = LINKEDIN_REQUIRED_SCOPES.filter((scope) => !grantedScopes.has(scope));
@@ -508,8 +582,7 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
     connection.status = "blocked";
     connection.lastValidationStatus = "blocked";
     connection.lastValidationNote = `LinkedIn token is missing required scope${missingScopes.length > 1 ? "s" : ""}: ${missingScopes.join(", ")}.`;
-    await connection.save();
-    return serializeConnection(connection);
+    return saveValidationForIntent(connection, validationFilter, authority);
   }
 
   if (!forceRevalidate && connection.status === "connected_validated" && connection.lastValidatedAt) {
@@ -526,7 +599,6 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
 
     const discoveredOrganizations = await discoverManagedOrganizations({
       accessToken,
-      apiVersion: connection.apiVersion || LINKEDIN_DEFAULT_API_VERSION,
     });
     connection.discoveredOrganizations = discoveredOrganizations;
 
@@ -540,8 +612,7 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
         ? "Multiple LinkedIn organizations were discovered. Confirm the LPC organization before publishing."
         : "LinkedIn is connected, but no administered organization was discovered.";
       connection.updatedBy = toActor(actor);
-      await connection.save();
-      return serializeConnection(connection);
+      return await saveValidationForIntent(connection, validationFilter, authority);
     }
 
     connection.organizationId = candidateOrganization.organizationId || connection.organizationId || "";
@@ -553,7 +624,6 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
       accessToken,
       memberUrn: connection.memberUrn,
       organizationUrn: connection.organizationUrn,
-      apiVersion: connection.apiVersion || LINKEDIN_DEFAULT_API_VERSION,
     });
 
     connection.authorizationGranted = validation.granted === true;
@@ -568,42 +638,45 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
       connection.lastValidationStatus = "blocked";
       connection.lastValidationNote = "LinkedIn connection does not have organization authorization to create company posts.";
     }
-    await connection.save();
-    return serializeConnection(connection);
+    return await saveValidationForIntent(connection, validationFilter, authority);
   } catch (error) {
+    if (error.code === "LINKEDIN_CONNECTION_SUPERSEDED" || isOwnerAuthorityFailure(error)) throw error;
     connection.authorizationGranted = false;
     connection.lastValidatedAt = new Date();
     connection.updatedBy = toActor(actor);
-    connection.status =
-      error.failureStatus || error.statusCode === 401 || error.statusCode === 403
-        ? "auth_failed"
-        : "blocked";
+    const failureStatus = ["auth_failed", "blocked"].includes(error.failureStatus)
+      ? error.failureStatus
+      : null;
+    connection.status = failureStatus || ([401, 403].includes(error.statusCode) ? "auth_failed" : "blocked");
     connection.lastValidationStatus = connection.status;
     connection.lastValidationNote = String(error.message || "LinkedIn validation failed.").trim().slice(0, 1000);
-    await connection.save();
-    return serializeConnection(connection);
+    return saveValidationForIntent(connection, validationFilter, authority);
   }
 }
 
 async function startLinkedInOAuth({ actor = {}, hints = {} } = {}) {
   const config = ensureLinkedInOAuthConfigured();
-  const connection = await getOrCreateConnection("linkedin_company");
+  const authority = connectionOwnerAuthority(actor);
   const orgPayload = normalizeOrganizationPayload(hints);
-  if (orgPayload.organizationId) connection.organizationId = orgPayload.organizationId;
-  if (orgPayload.organizationUrn) connection.organizationUrn = orgPayload.organizationUrn;
-  if (orgPayload.organizationName) connection.organizationName = orgPayload.organizationName;
-  if (Object.prototype.hasOwnProperty.call(hints, "apiVersion")) {
-    connection.apiVersion = normalizeApiVersion(hints.apiVersion);
-  }
-
   const state = crypto.randomBytes(24).toString("hex");
-  connection.oauthStateHash = hashState(state);
-  connection.oauthStateExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-  connection.oauthRequestedBy = toActor(actor);
-  connection.oauthRequestedAt = new Date();
-  connection.oauthLastError = "";
-  connection.updatedBy = toActor(actor);
-  await connection.save();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const values = {
+    ...Object.fromEntries(Object.entries(orgPayload).filter(([, value]) => value)),
+    apiVersion: LINKEDIN_API_VERSION, oauthStateHash: hashState(state), oauthStateExpiresAt: expiresAt,
+    oauthRequestedBy: toActor(actor), oauthRequestedAuthVersion: authority.authVersion,
+    oauthRequestedAt: new Date(), oauthLastError: "", updatedBy: toActor(actor),
+  };
+  if (orgPayload.organizationUrn) {
+    values.authorizationGranted = false;
+    values.lastValidationStatus = "connected_unvalidated";
+    values.lastValidationNote = "Validate the current organization before publishing.";
+  }
+  await withConnectionOwnerWrite(authority, async session => {
+    const connection = await getOrCreateConnection("linkedin_company", { session });
+    await MarketingChannelConnection.findOneAndUpdate({ _id: connection._id }, {
+      $set: values, $inc: { intentVersion: 1 },
+    }, { returnDocument: "after", runValidators: true, session });
+  });
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -614,7 +687,7 @@ async function startLinkedInOAuth({ actor = {}, hints = {} } = {}) {
   });
   return {
     connectUrl: `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`,
-    expiresAt: connection.oauthStateExpiresAt,
+    expiresAt,
   };
 }
 
@@ -655,11 +728,33 @@ function renderOAuthCallbackHtml(payload = {}) {
 
 async function completeLinkedInOAuth({ code = "", state = "", error = "", errorDescription = "" } = {}) {
   const stateHash = hashState(state);
-  const connection = await MarketingChannelConnection.findOne({
-    channelKey: "linkedin_company",
-    oauthStateHash: stateHash,
+  const stateFilter = {
+    channelKey: "linkedin_company", oauthStateHash: stateHash,
     oauthStateExpiresAt: { $gt: new Date() },
+  };
+  const issued = await MarketingChannelConnection.findOne(stateFilter).lean();
+  const ownerUnavailablePayload = (authorityError = accountChanged()) => buildCallbackPayload({
+    ok: false, message: authorityError.message,
   });
+  if (!issued) return buildCallbackPayload({ ok: false, message: "LinkedIn connection state is invalid or expired." });
+  let authority, connection;
+  // Claim before any provider await: a replay cannot exchange the code twice.
+  // Later owner intents advance the generation and invalidate every commit
+  // below, including error and validation paths. The issuing Admin account
+  // and session generation must still be active in the same transaction.
+  try {
+    authority = connectionOwnerAuthority({
+      userId: issued.oauthRequestedBy?.userId,
+      authVersion: issued.oauthRequestedAuthVersion,
+    });
+    connection = await withConnectionOwnerWrite(authority, session =>
+      MarketingChannelConnection.findOneAndUpdate({ ...stateFilter, ...connectionIntentFilter(issued) }, {
+        $set: { oauthStateHash: "", oauthStateExpiresAt: null }, $inc: { intentVersion: 1 },
+      }, { returnDocument: "after", runValidators: true, session }));
+  } catch (claimError) {
+    if (isOwnerAuthorityFailure(claimError)) return ownerUnavailablePayload(claimError);
+    throw claimError;
+  }
 
   if (!connection) {
     return buildCallbackPayload({
@@ -668,40 +763,64 @@ async function completeLinkedInOAuth({ code = "", state = "", error = "", errorD
     });
   }
 
-  connection.oauthStateHash = "";
-  connection.oauthStateExpiresAt = null;
-  connection.oauthLastCompletedAt = new Date();
+  let intentFilter = connectionIntentFilter(connection);
+  const commitOwnerOutcome = update => withConnectionOwnerWrite(authority, session =>
+    MarketingChannelConnection.findOneAndUpdate(intentFilter, update, {
+      returnDocument: "after", runValidators: true, session,
+    }));
+  const stalePayload = async () => {
+    try {
+      const current = await withConnectionOwnerWrite(authority, async session =>
+        serializeConnection(await MarketingChannelConnection.findOne({ channelKey: "linkedin_company" }).session(session)));
+      return buildCallbackPayload({ ok: false, message: connectionChangedError().message, connection: current });
+    } catch (readError) {
+      if (isOwnerAuthorityFailure(readError)) return ownerUnavailablePayload(readError);
+      throw readError;
+    }
+  };
 
   if (error) {
-    connection.status = "auth_failed";
-    connection.lastValidationStatus = "auth_failed";
-    connection.lastValidationNote = String(errorDescription || error || "LinkedIn authorization was denied.")
+    const note = String(errorDescription || error || "LinkedIn authorization was denied.")
       .trim()
       .slice(0, 1000);
-    connection.oauthLastError = connection.lastValidationNote;
-    await connection.save();
+    let saved;
+    try {
+      saved = await commitOwnerOutcome({ $set: {
+        status: "auth_failed", lastValidationStatus: "auth_failed", lastValidationNote: note,
+        oauthLastError: note, oauthLastCompletedAt: new Date(),
+      }, $inc: { intentVersion: 1 } });
+    } catch (denialError) {
+      if (isOwnerAuthorityFailure(denialError)) return ownerUnavailablePayload(denialError);
+      throw denialError;
+    }
+    if (!saved) return stalePayload();
     return buildCallbackPayload({
       ok: false,
-      message: connection.lastValidationNote,
-      connection: serializeConnection(connection),
+      message: note,
+      connection: serializeConnection(saved),
     });
   }
 
   try {
     const tokenResult = await exchangeLinkedInAuthorizationCode({ code });
-    connection.encryptedAccessToken = encryptString(tokenResult.accessToken);
-    connection.accessTokenLast4 = tokenResult.accessToken.slice(-4);
-    connection.tokenExpiresAt = tokenResult.tokenExpiresAt;
-    connection.scopeSnapshot = tokenResult.scopeSnapshot.length ? tokenResult.scopeSnapshot : connection.scopeSnapshot;
-    connection.oauthLastError = "";
-    connection.status = "connected_unvalidated";
-    connection.lastValidationStatus = "connected_unvalidated";
-    connection.lastValidationNote = "LinkedIn connected. Validating organization authorization.";
-    await connection.save();
+    const encryptedAccessToken = encryptString(tokenResult.accessToken);
+    const saved = await commitOwnerOutcome({ $set: {
+      encryptedAccessToken, accessTokenLast4: tokenResult.accessToken.slice(-4),
+      tokenExpiresAt: tokenResult.tokenExpiresAt,
+      // The exchanged token's actual scopes replace prior token permissions.
+      scopeSnapshot: tokenResult.scopeSnapshot, authorizationGranted: false,
+      oauthLastError: "", status: "connected_unvalidated", lastValidationStatus: "connected_unvalidated",
+      lastValidationNote: "LinkedIn connected. Validating organization authorization.", oauthLastCompletedAt: new Date(),
+    }, $inc: { intentVersion: 1 } });
+    if (!saved) return stalePayload();
+    intentFilter = connectionIntentFilter(saved);
 
     const validated = await validateLinkedInConnection({
-      actor: connection.oauthRequestedBy || {},
+      actor: { ...(connection.oauthRequestedBy?.toObject?.() || connection.oauthRequestedBy || {}),
+        authVersion: authority.authVersion },
       forceRevalidate: true,
+      expectedIntentVersion: saved.intentVersion || 0,
+      expectedAccessToken: encryptedAccessToken,
     });
     return buildCallbackPayload({
       ok: validated.status === "connected_validated",
@@ -709,15 +828,25 @@ async function completeLinkedInOAuth({ code = "", state = "", error = "", errorD
       connection: validated,
     });
   } catch (err) {
-    connection.status = err.statusCode === 401 || err.statusCode === 403 ? "auth_failed" : "blocked";
-    connection.lastValidationStatus = connection.status;
-    connection.lastValidationNote = String(err.message || "LinkedIn connection failed.").trim().slice(0, 1000);
-    connection.oauthLastError = connection.lastValidationNote;
-    await connection.save();
+    if (isOwnerAuthorityFailure(err)) return ownerUnavailablePayload(err);
+    if (err.code === "LINKEDIN_CONNECTION_SUPERSEDED") return stalePayload();
+    const status = err.statusCode === 401 || err.statusCode === 403 ? "auth_failed" : "blocked";
+    const note = String(err.message || "LinkedIn connection failed.").trim().slice(0, 1000);
+    let saved;
+    try {
+      saved = await commitOwnerOutcome({ $set: {
+        status, lastValidationStatus: status, lastValidationNote: note,
+        oauthLastError: note, oauthLastCompletedAt: new Date(),
+      }, $inc: { intentVersion: 1 } });
+    } catch (outcomeError) {
+      if (isOwnerAuthorityFailure(outcomeError)) return ownerUnavailablePayload(outcomeError);
+      throw outcomeError;
+    }
+    if (!saved) return stalePayload();
     return buildCallbackPayload({
       ok: false,
-      message: connection.lastValidationNote,
-      connection: serializeConnection(connection),
+      message: note,
+      connection: serializeConnection(saved),
     });
   }
 }

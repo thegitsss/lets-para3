@@ -1,0 +1,785 @@
+/* Attorney matters: a focused work queue, not an inventory table. */
+body.lpc-product-clean .view-cases {
+  --matter-ink: #1f2937;
+  --matter-muted: #697386;
+  --matter-line: #e6e9ed;
+  --matter-accent: #8b7546;
+  --matter-surface: #fff;
+  --matter-hover: #fafbfc;
+  --matter-selected: #f0f2f5;
+  --matter-control-line: #d9dde3;
+  padding-bottom: 32px;
+}
+
+body.lpc-product-clean .view-cases .cases-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 8px 40px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--matter-surface) !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean .view-cases .cases-header {
+  align-items: end;
+  padding: 14px 4px 22px;
+  border-bottom: 1px solid var(--matter-line);
+}
+
+body.lpc-product-clean .view-cases .cases-header h1 {
+  margin: 0 0 5px;
+  color: var(--matter-ink);
+  font: 400 clamp(1.7rem, 2.5vw, 2.15rem)/1.15 var(--lpc-dashboard-heading-font, "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
+  font-feature-settings: "ss01" 1;
+  letter-spacing: 0;
+}
+
+body.lpc-product-clean .view-cases .cases-header p {
+  margin: 0;
+  color: var(--matter-muted) !important;
+  font: 200 0.92rem/1.45 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases #casesViewSection {
+  padding-top: 18px;
+}
+
+body.lpc-product-clean .view-cases .filter-tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 230px) max-content;
+  align-items: center;
+  gap: 3px;
+  margin: 0 0 13px;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid var(--matter-line);
+}
+
+body.lpc-product-clean .view-cases .matter-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+body.lpc-product-clean .view-cases :is(.matter-title-line, .matter-title-line > *, .matter-meta-item, .matter-primary-action) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+body.lpc-product-clean .view-cases :is(button, a, input, select, summary):focus-visible {
+  outline: 2px solid var(--matter-ink) !important;
+  outline-offset: 3px;
+}
+
+body.lpc-product-clean .view-cases .filter-tab {
+  min-height: 44px;
+  padding: 6px 10px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--matter-muted) !important;
+  font: 200 0.82rem/1 'Sarabun', sans-serif !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean .view-cases .filter-tab:hover {
+  background: var(--matter-hover) !important;
+  color: var(--matter-ink) !important;
+}
+
+body.lpc-product-clean .view-cases .filter-tab.active {
+  background: var(--matter-selected) !important;
+  color: var(--matter-ink) !important;
+  font-weight: 300 !important;
+}
+
+body.lpc-product-clean .view-cases .filter-search {
+  width: min(230px, 100%);
+  margin-left: auto;
+}
+
+body.lpc-product-clean .view-cases .filter-search input[type='search'] {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px 6px 31px !important;
+  border: 1px solid var(--matter-line) !important;
+  border-radius: 7px !important;
+  color: var(--matter-ink) !important;
+  background-color: var(--matter-surface) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23697386' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: 10px center !important;
+  font: 200 0.8rem/1 'Sarabun', sans-serif !important;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.03) !important;
+}
+
+body.lpc-product-clean .view-cases .filter-search input[type='search']::placeholder {
+  color: #98a1af;
+  opacity: 1;
+}
+
+body.lpc-product-clean .view-cases .matter-filter-menu > summary {
+  min-height: 44px;
+  padding: 6px 10px !important;
+  border: 1px solid var(--matter-line) !important;
+  border-radius: 7px !important;
+  background: var(--matter-surface) !important;
+  color: var(--matter-muted) !important;
+  font: 200 0.8rem/1.35 'Sarabun', sans-serif !important;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.03) !important;
+}
+
+body.lpc-product-clean .view-cases .matter-filter-panel {
+  border-color: var(--matter-line) !important;
+  border-radius: 9px !important;
+  background: var(--matter-surface) !important;
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.13) !important;
+}
+
+/* Match LPC's existing native dropdown treatment, including WebKit sizing. */
+body.lpc-product-clean .view-cases :is(.matter-filter-field, .lpc-saved-view-field) select:not([multiple]) {
+  appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 44px;
+  height: max(44px, 2.75rem);
+  padding-left: 12px;
+  padding-right: 34px;
+}
+
+body.lpc-product-clean .view-cases :is(.matter-filter-field, .lpc-saved-view-field):has(select:not([multiple])) {
+  position: relative;
+}
+
+body.lpc-product-clean .view-cases :is(.matter-filter-field, .lpc-saved-view-field):has(select:not([multiple]))::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  bottom: calc(max(44px, 2.75rem) / 2 - 3px);
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+body.lpc-product-clean .view-cases .case-table {
+  overflow: visible;
+}
+
+body.lpc-product-clean .view-cases .case-table table {
+  width: 100%;
+  min-width: 0;
+  border: 0 !important;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border-radius: 0 !important;
+  background: var(--matter-surface) !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean .view-cases .matter-queue-row {
+  position: relative;
+  background: var(--matter-surface);
+  transition: background-color 130ms ease;
+}
+
+body.lpc-product-clean .view-cases .matter-queue-row:hover {
+  background: var(--matter-hover);
+}
+
+body.lpc-product-clean .view-cases .matter-queue-row > td {
+  padding: 17px 12px !important;
+  border-bottom: 1px solid var(--matter-line) !important;
+  vertical-align: middle;
+  box-sizing: border-box;
+  min-width: 0;
+  background: transparent !important;
+  font-family: 'Sarabun', sans-serif !important;
+  font-weight: 200 !important;
+}
+
+body.lpc-product-clean .view-cases .matter-queue-row > td:first-child {
+  padding-left: 6px !important;
+}
+
+body.lpc-product-clean .view-cases .matter-identity {
+  width: 56%;
+}
+body.lpc-product-clean .view-cases .matter-identity[colspan="2"] { width: auto; }
+
+body.lpc-product-clean .view-cases .matter-title-line,
+body.lpc-product-clean .view-cases .matter-title-line a,
+body.lpc-product-clean .view-cases .matter-title-line .case-title-trigger {
+  color: var(--matter-ink) !important;
+  font: 300 0.98rem/1.35 'Sarabun', sans-serif !important;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+body.lpc-product-clean .view-cases .matter-title-line a:hover,
+body.lpc-product-clean .view-cases .matter-title-line .case-title-trigger:hover {
+  color: var(--matter-accent) !important;
+}
+
+body.lpc-product-clean .view-cases .matter-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 0;
+  margin-top: 5px;
+  color: var(--matter-muted);
+  font: 200 0.75rem/1.35 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases .matter-meta-item {
+  display: inline-flex;
+  align-items: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body.lpc-product-clean .view-cases .matter-meta-item:not(:last-child)::after {
+  width: 2px;
+  height: 2px;
+  margin: 0 8px;
+  border-radius: 50%;
+  background: #aab1bc;
+  content: '';
+}
+
+body.lpc-product-clean .view-cases .matter-meta-deadline {
+  color: #705b31;
+}
+
+body.lpc-product-clean .view-cases .matter-next-step {
+  width: 20%;
+}
+
+body.lpc-product-clean .view-cases .matter-status-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+body.lpc-product-clean .view-cases .status,
+body.lpc-product-clean .view-cases .status-history-status {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--matter-muted) !important;
+  font: 300 0.72rem/1.3 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases .status::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #99a2af;
+  content: '';
+}
+
+body.lpc-product-clean .view-cases .status.accepted::before,
+body.lpc-product-clean .view-cases .status.public::before,
+body.lpc-product-clean .view-cases .status.relisted::before {
+  background: #44936c;
+}
+
+body.lpc-product-clean .view-cases .status.pending::before {
+  background: #b89548;
+}
+
+body.lpc-product-clean .view-cases .status.declined::before,
+body.lpc-product-clean .view-cases .status.withdrawn::before,
+body.lpc-product-clean .view-cases .status.private::before {
+  background: #b86262;
+}
+
+body.lpc-product-clean .view-cases .matter-next-copy {
+  display: block;
+  max-width: 100%;
+  color: var(--matter-muted);
+  font: 200 0.76rem/1.4 'Sarabun', sans-serif !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body.lpc-product-clean .view-cases .matter-row-actions {
+  width: 24%;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body.lpc-product-clean .view-cases .matter-action-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+
+body.lpc-product-clean .view-cases .matter-action-controls > .case-actions {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer-row.hidden {
+  display: none !important;
+}
+
+body.lpc-product-clean .view-cases [data-applicant-row] {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  text-align: left;
+  color: var(--matter-ink);
+}
+
+body.lpc-product-clean .view-cases .applicant-card-info,
+body.lpc-product-clean .view-cases .applicant-card-name {
+  display: block;
+  min-width: 0;
+}
+
+body.lpc-product-clean .view-cases .applicant-card-name {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+body.lpc-product-clean .view-cases .case-menu {
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto !important;
+  overscroll-behavior: contain;
+}
+
+body.lpc-product-clean .view-cases .case-menu button {
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer {
+  margin: 0 0 1rem;
+  color: var(--matter-ink);
+  overflow-wrap: anywhere;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer-header {
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .6rem .75rem;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer-close {
+  min-height: 44px;
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer :is(.applicant-layout, .applicant-detail-grid, .applicant-card, .applicant-detail, .applicant-card-top, .applicant-detail-side) {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer-body {
+  padding: .75rem;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer-row > td {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+body.lpc-product-clean .view-cases .applicant-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+}
+
+body.lpc-product-clean .view-cases .applicant-detail-grid {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer :is(.applicant-side-btn, .applicant-side-hire) {
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body.lpc-product-clean .view-cases .applicant-side-hire {
+  background: #4b7193;
+  color: #fff;
+}
+
+body.lpc-product-clean .view-cases .applicant-side-hire:hover {
+  background: #355875;
+}
+
+@media (max-width: 1100px) {
+  body.lpc-product-clean .view-cases :is(.applicant-layout, .applicant-detail-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.lpc-product-clean .view-cases .applicant-detail-side {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+body.lpc-product-clean .view-cases .matter-primary-action {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid var(--matter-control-line);
+  border-radius: 6px;
+  background: var(--matter-surface);
+  color: var(--matter-ink);
+  font: 300 0.76rem/1 'Sarabun', sans-serif !important;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+}
+
+body.lpc-product-clean .view-cases .matter-primary-action:hover {
+  border-color: #bcc3cd;
+  color: var(--matter-ink);
+  background: var(--matter-hover);
+}
+
+body.lpc-product-clean .view-cases .matter-row-actions .case-actions {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  line-height: 1;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+body.lpc-product-clean .view-cases .matter-row-actions .menu-trigger {
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 2px !important;
+  color: #7b8492;
+  font: 300 1.05rem/1 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases .empty-row {
+  height: 132px;
+  padding: 28px !important;
+  border-bottom: 1px solid var(--matter-line) !important;
+  color: var(--matter-muted) !important;
+  background: var(--matter-surface) !important;
+  font: 200 0.86rem/1.5 'Sarabun', sans-serif !important;
+  font-style: normal !important;
+}
+
+body.lpc-product-clean .view-cases .archived-bulk-bar {
+  justify-content: flex-end;
+  margin: 0 0 5px;
+}
+
+body.lpc-product-clean .view-cases .archived-status-filter {
+  min-width: 134px !important;
+  min-height: 44px;
+  margin-left: auto;
+  padding: 6px 9px !important;
+  border-color: var(--matter-line) !important;
+  border-radius: 7px !important;
+  font: 200 0.78rem/1 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases .case-pagination {
+  margin-top: 16px;
+}
+
+body.lpc-product-clean .view-cases .case-pagination .page-btn {
+  min-height: 44px;
+  padding: 5px 10px !important;
+  border-color: var(--matter-line) !important;
+  border-radius: 6px !important;
+  font: 200 0.76rem/1 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases .case-pagination .page-info {
+  color: var(--matter-muted);
+  font: 200 0.75rem/1 'Sarabun', sans-serif !important;
+}
+
+body.lpc-product-clean .view-cases .applicant-drawer-row > td {
+  padding: 0 0 14px !important;
+  border-bottom: 1px solid var(--matter-line) !important;
+}
+
+@media (max-width: 980px) {
+  body.lpc-product-clean .view-cases .filter-tabs {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-menu {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+  }
+
+  body.lpc-product-clean .view-cases .matter-category-tabs {
+    grid-column: 1 / -1;
+  }
+
+  body.lpc-product-clean .view-cases .filter-search {
+    width: 100%;
+    max-width: none;
+  }
+
+  body.lpc-product-clean .view-cases .matter-identity {
+    width: 52%;
+  }
+
+  body.lpc-product-clean .view-cases .matter-row-actions {
+    width: 23%;
+  }
+}
+
+@media (max-width: 720px) {
+  body.lpc-product-clean .view-cases .cases-shell {
+    padding: 2px 2px 28px !important;
+  }
+
+  body.lpc-product-clean .view-cases .filter-tabs {
+    display: flex;
+    gap: 2px;
+    overflow: visible;
+  }
+
+  body.lpc-product-clean .view-cases .filter-tab {
+    flex: 0 0 auto;
+  }
+
+  body.lpc-product-clean .view-cases .matter-category-tabs {
+    width: 100%;
+  }
+
+  body.lpc-product-clean .view-cases .filter-search {
+    order: 5;
+    width: 100%;
+    margin: 8px 0 0;
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-menu {
+    order: 6;
+    width: auto;
+    margin: 8px 0 0 auto;
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-menu > summary {
+    text-align: left;
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-menu[open] {
+    width: 100%;
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-menu[open] > summary {
+    width: max-content;
+    margin-left: auto;
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-panel {
+    position: static;
+    inset: auto;
+    width: 100%;
+    max-height: none;
+    margin-top: 8px;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.lpc-product-clean .view-cases .matter-filter-field select {
+    min-width: 0;
+  }
+
+  body.lpc-product-clean .view-cases .matter-queue-row > td {
+    display: block;
+    width: 100%;
+    border-bottom: 0 !important;
+  }
+
+  body.lpc-product-clean .view-cases .matter-queue-row > .matter-identity {
+    padding: 15px 6px 7px !important;
+  }
+
+  body.lpc-product-clean .view-cases .matter-queue-row > .matter-row-actions {
+    padding: 2px 6px 14px !important;
+    border-bottom: 1px solid var(--matter-line) !important;
+    text-align: left;
+  }
+
+  body.lpc-product-clean .view-cases .matter-action-controls {
+    justify-content: flex-start;
+  }
+
+  body.lpc-product-clean .view-cases .case-table table,
+  body.lpc-product-clean .view-cases .case-table tbody,
+  body.lpc-product-clean .view-cases .matter-queue-row,
+  body.lpc-product-clean .view-cases .applicant-drawer-row,
+  body.lpc-product-clean .view-cases .applicant-drawer-row > td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.lpc-product-clean .view-cases .matter-queue-row > .matter-next-step {
+    padding: 4px 6px 8px !important;
+  }
+}
+
+/* Use the same saved dark palette as current Payments. The current skin has
+   later light resets, so restore the whole Matter shell while it is visible. */
+body.lpc-product-clean.theme-dark:has(.view-cases:not([hidden])) {
+  color-scheme: dark;
+  --bg: #111b2a;
+  --panel: #192538;
+  --ink: #f2f5f9;
+  --muted: #b2bccb;
+  --line: #354258;
+  --accent: #b4d2ff;
+  --sidebar-bg: #111b2a;
+  --sidebar-text: #f2f5f9;
+  --app-surface: #111b2a;
+  --app-surface-contrast: #192538;
+  --app-card-muted: #192538;
+  --app-text: #f2f5f9;
+  --app-muted: #b2bccb;
+  --app-border: #354258;
+  --app-border-soft: #354258;
+  --lpc-surface-page: #111b2a;
+  --lpc-surface-canvas: #111b2a;
+  --lpc-surface-panel: #192538;
+  --lpc-surface-raised: #192538;
+  --lpc-surface-subtle: #192538;
+  --lpc-text-primary: #f2f5f9;
+  --lpc-text-secondary: #b2bccb;
+  --lpc-border-subtle: #354258;
+  --lpc-accent-primary: #b4d2ff;
+  --lpc-accent-soft: #283c57;
+  --lpc-danger: #ffb4b4;
+  --lpc-success: #8ed9b5;
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+}
+
+body.lpc-product-clean.theme-dark:has(.view-cases:not([hidden])) :is(.main, main#main, .lpc-auth-page-shell, .lpc-universal-header-shell, .topbar, .sidebar) {
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+body.lpc-product-clean.theme-dark:has(.view-cases:not([hidden])) :is(.sidebar, .lpc-universal-header-shell) :is(a, button, .logo, .sidebar-footer, .lpc-sidebar-section-label, .lpc-sidebar-profile-name, .lpc-sidebar-profile-role) {
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+body.lpc-product-clean.theme-dark:has(.view-cases:not([hidden])) .sidebar-toggle {
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+body.lpc-product-clean.theme-dark:has(.view-cases:not([hidden])) .sidebar-toggle::before {
+  background: transparent !important;
+}
+
+body.lpc-product-clean.theme-dark:has(.view-cases:not([hidden])) .lpc-sidebar-grip__label {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+body.lpc-product-clean.theme-dark .view-cases {
+  --matter-ink: #f2f5f9;
+  --matter-muted: #b2bccb;
+  --matter-line: #354258;
+  --matter-accent: #b4d2ff;
+  --matter-surface: #111b2a;
+  --matter-hover: #192538;
+  --matter-selected: #283c57;
+  --matter-control-line: #8292aa;
+}
+
+body.lpc-product-clean.theme-dark .view-cases :is(h1, h2, h3, .matter-filter-summary) {
+  color: var(--matter-ink) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases :is(input, select, .saved-view-button, .matter-filter-reset, .case-menu, .case-menu button, .saved-view-review) {
+  background-color: var(--panel) !important;
+  color: var(--matter-ink) !important;
+  border-color: var(--matter-control-line) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .case-menu button:hover,
+body.lpc-product-clean.theme-dark .view-cases .case-menu button:focus-visible {
+  background: var(--matter-selected) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .case-menu .danger {
+  color: var(--lpc-danger) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .matter-meta-deadline {
+  color: #e9cd92;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-drawer :is(.applicant-drawer-header, .applicant-drawer-body, .applicant-layout, .applicant-card, .applicant-detail, .applicant-side-card, .applicant-cover-box, .applicant-preengagement-box, .applicant-side-btn) {
+  background: var(--panel) !important;
+  color: var(--matter-ink) !important;
+  border-color: var(--matter-line) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-drawer {
+  background: var(--panel);
+  border-color: var(--matter-line);
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-card.is-active {
+  background: var(--matter-selected) !important;
+  border-color: var(--matter-control-line) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-avatar {
+  background: var(--matter-selected);
+  color: var(--matter-ink);
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-drawer :is(.applicant-card-meta, .applicant-detail-line, .applicant-detail-empty, .applicant-side-meta, .applicant-side-note, .applicant-side-btn.muted) {
+  color: var(--matter-muted) !important;
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-side-hire {
+  background: var(--matter-accent);
+  color: var(--matter-surface);
+}
+
+body.lpc-product-clean.theme-dark .view-cases .applicant-side-btn.danger {
+  color: var(--lpc-danger) !important;
+  border-color: var(--lpc-danger) !important;
+}
+
+/* The action's flex display must respect the draft reader's unavailable state. */
+body.lpc-product-clean .view-cases :is([data-drafts-refresh], [data-matters-refresh])[hidden] {
+  display: none;
+}

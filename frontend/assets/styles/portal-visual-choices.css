@@ -1,0 +1,177 @@
+/* Keep fixed-pixel typography in step with the saved reading size.
+   The unit is 1px at Default; shared styles retain 1px outside LPC portals. */
+body.lpc-v2 { --lpc-reading-unit: 0.0625rem; }
+
+/* Samantha's numbered selections from the October 16 portal comparison.
+   Both = preserve each role. All chosen treatments are applied; 42-43 remain pending. */
+
+/* 01-14: compact desktop shell; taller mobile header and 44px mobile utilities. */
+body.av2 { --av2-header:48px; }
+body.av2 .av2-header { height:48px; min-height:48px; padding:0 20px; flex-wrap:nowrap; }
+body.av2 .av2-header-tools { gap:5px; flex-wrap:nowrap; }
+body.av2 .av2-header :is([data-av2-open="notifications"],[data-av2-assistant]) { width:30px; min-width:30px; height:30px; min-height:30px; padding:6px; border-radius:6px; gap:0; }
+body.av2 .av2-header .av2-create-trigger { height:30px; min-height:30px; padding:0 11px; border-radius:5px; font-size:calc(12 * var(--lpc-reading-unit, 1px)) !important; line-height:1.4; }
+body.av2 .av2-sidebar { padding:10px 8px; }
+body.av2 .av2-brand-row { margin-bottom:16px; }
+body.av2 .av2-sidebar > .av2-nav a { min-height:30px; padding:5px 8px; gap:10px; font-size:calc(13 * var(--lpc-reading-unit, 1px)); line-height:1.4; }
+body.av2 .av2-main { padding:20px 32px 72px; }
+:root body.lpc-v2:not(.av2) .v2-view { padding:20px 32px 72px; }
+
+/* 17,19,22: centered account control, steady chevron, icon-only Assistant. */
+body.av2:not(.av2-collapsed) .av2-brand-menu > .av2-brand { display:flex; justify-content:center; gap:8px; min-height:36px; padding:0 8px; }
+body.av2 .av2-brand-menu[open] .av2-brand > svg { transform:none; }
+body.av2 .av2-header [data-av2-assistant] > span { display:none; }
+
+/* 18: initials are the missing-photo fallback in both account menus. */
+.v2-menu-identity .portal-identity-initials { display:grid; place-items:center; width:64px; height:64px; flex:none; border:1px solid var(--v2-line); border-radius:50%; background:var(--v2-soft); color:var(--v2-ink); font:400 calc(20 * var(--lpc-reading-unit, 1px))/1 "Sarabun",sans-serif; }
+.v2-menu-identity [hidden] { display:none !important; }
+
+/* 20-21: Attorney charcoal palette, including role-local conversation tokens. */
+:root.theme-dark:has(body:not(.av2)) { --v2-white:#18191b; --v2-canvas:#18191b; --v2-soft:#242527; --v2-ink:#d9dce1; --v2-muted:#a0a5af; --v2-faint:#a0a5af; --v2-line:#303237; --v2-blue:#a9bafa; --v2-blue-hover:#a9bafa; --v2-navy:#10243f; }
+:root.theme-dark body:not(.av2) .v2-sidebar { background:#121315; }
+:root.theme-dark body:not(.av2) .v2-nav-link[aria-current="page"] { background:#26282c; color:#a9bafa; }
+:root.theme-dark body:not(.av2) .pv2-conversations { --av2-bg:#18191b; --av2-soft:#242527; --av2-ink:#d9dce1; --av2-muted:#a0a5af; --av2-line:#303237; --av2-accent:#a9bafa; --av2-selected:#26282c; }
+:root.theme-dark body:not(.av2) .v2-header-find-work { background:#242527; color:#a9bafa; border-color:#303237; }
+:root.theme-dark body:not(.av2) .v2-header-find-work:hover { background:#26282c; color:#d9dce1; }
+
+/* 23 is already shared by the current search controllers: 160ms / 150ms.
+   24 selects the current pale-blue Paralegal caption, not the obsolete dark caption. */
+body.av2 .av2-header :is([data-av2-open="notifications"],[data-av2-assistant])::after { transition:opacity 150ms ease,transform 150ms ease; }
+
+/* 27: conversation-list typography only. 25/26 retain each role's surface and split width. */
+body:not(.av2) .pv2-conversations .av2-thread-link { gap:12px; padding:18px 16px 18px 12px; border-bottom:1px solid var(--av2-line); }
+body:not(.av2) .pv2-conversations .av2-thread-person { font-size:.9375rem; line-height:1.4; }
+body:not(.av2) .pv2-conversations .av2-thread-unread .av2-thread-person { font-weight:600; }
+body:not(.av2) .pv2-conversations .av2-thread-row-heading { flex-wrap:wrap; gap:2px 8px; margin-bottom:4px; }
+body:not(.av2) .pv2-conversations .av2-thread-row-heading time { font-size:.75rem; }
+body:not(.av2) .pv2-conversations .av2-thread-matter { font-size:.8125rem; margin-bottom:5px; }
+body:not(.av2) .pv2-conversations .av2-thread-preview { font-size:.8125rem; line-height:1.5; }
+body:not(.av2) .pv2-conversations .av2-thread-unread-count { top:48px; font-size:.75rem; }
+body:not(.av2) .pv2-conversations .av2-thread-link .av2-person-avatar { width:36px; height:36px; font-size:.75rem; }
+
+/* 29: one composer border; keep the Paralegal transport and attachment owners. */
+body:not(.av2) .pv2-conversations .v2-matter-message-form { width:calc(100% - 56px); max-width:824px; align-self:center; margin:12px 28px 0; padding:0; border:0; border-radius:0; background:transparent; }
+body:not(.av2) .pv2-conversations .av2-composer-row { display:flex; align-items:flex-end; gap:10px; padding:10px 12px; border:1px solid var(--av2-line); border-radius:7px; background:var(--av2-bg); }
+body:not(.av2) .pv2-conversations .av2-composer-row:focus-within { border-color:var(--av2-accent); }
+body:not(.av2) .pv2-conversations .av2-composer-row textarea { flex:1; min-width:0; width:auto; border:0; border-radius:0; padding:3px 0; background:transparent; font-size:.875rem; box-shadow:none; grid-column:auto; }
+body:not(.av2) .pv2-conversations .av2-composer-row > .av2-button { flex:none; grid-column:auto; grid-row:auto; min-height:32px; padding:8px 12px; border:0; border-radius:4px; font-size:.8125rem; line-height:calc(16 * var(--lpc-reading-unit, 1px)); }
+body:not(.av2) .pv2-conversations .av2-composer-row > .av2-button:disabled { background:var(--av2-soft); color:var(--av2-muted); opacity:1; }
+body:not(.av2) .pv2-conversations .v2-matter-message-attachments { max-height:180px; overflow:auto; margin:0 0 7px; padding:10px 12px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-soft); }
+
+/* 32: Matter inventory tabs match the Attorney recipe. */
+body.lpc-v2 .v2-work .v2-work-index { gap:18px; margin-top:12px; flex-wrap:wrap; overflow:visible; }
+body.lpc-v2 .v2-work .v2-work-index-link { min-height:32px; padding:6px 2px; border-bottom:2px solid transparent; color:var(--v2-muted); }
+body.lpc-v2 .v2-work .v2-work-index-link[aria-current] { border-bottom-color:var(--v2-blue-hover); color:var(--v2-ink); font-weight:600; }
+
+/* 33: compact settings tabs; profile editors/content widths remain role-specific. */
+body.av2 .av2-account-nav { gap:4px; margin:12px 0 0; padding-bottom:12px; }
+body.av2 .av2-account-nav a { display:inline-flex; align-items:center; min-height:32px; padding:6px 10px; border:0; border-radius:6px; font-size:.8125rem; line-height:calc(20 * var(--lpc-reading-unit, 1px)); }
+body.av2 .av2-account-nav a[aria-current="page"] { background:var(--av2-soft); }
+:root body.lpc-v2:not(.av2) .v2-settings .v2-settings-tab { min-height:32px; padding:6px 10px; line-height:calc(20 * var(--lpc-reading-unit, 1px)); }
+body.av2 .av2-account-nav + * { margin-top:20px; }
+.av2-security .portal-security-section { margin-top:32px; max-width:800px; }
+.av2-security .portal-security-section > .av2-view-header { display:none; }
+.av2-security .portal-security-section .av2-blocked-title { position:static; width:auto; height:auto; padding:0; margin:0 0 16px; overflow:visible; clip-path:none; white-space:normal; font-size:calc(18 * var(--lpc-reading-unit, 1px)); }
+
+/* 37-39: horizontal Help directory, outlined Assistant action, airy FAQ sections. */
+body:not(.av2) .v2-help-layout { display:block; padding-top:0; }
+body:not(.av2) .v2-help-directory { position:static; display:flex; flex-wrap:wrap; gap:8px 20px; margin:16px 0 30px; padding:0; }
+body:not(.av2) .v2-help-directory > p { display:none; }
+body:not(.av2) .v2-help-directory button { width:auto; min-height:40px; padding:8px 0; border:0; background:transparent; border-radius:0; font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
+body:not(.av2) .v2-help-content { max-width:800px; }
+body.lpc-v2:not(.av2) .v2-help .v2-help-assistant-button { min-height:44px; padding:10px 14px; border:1px solid var(--v2-line); border-radius:6px; background:transparent; color:var(--v2-blue-hover); font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
+body.av2 .av2-help .v2-help-article-section { padding:0 0 30px; margin:0 0 30px; border-top:0; border-bottom:1px solid var(--av2-line); }
+body.av2 .av2-help .v2-help-article-section h2 { margin:0 0 12px; font:500 calc(21 * var(--lpc-reading-unit, 1px))/1.4 "Sarabun",sans-serif; }
+body.av2 .av2-help .v2-help-answer { border:0; }
+body.av2 .av2-help .v2-help-answer > summary { min-height:44px; padding:10px 0; font-size:.875rem; line-height:1.5; }
+body.av2 .av2-help .v2-help-answer > p { margin:0; padding:0 0 16px; font-size:.875rem; line-height:1.65; }
+
+/* 41: primary and secondary recipes; danger, link, icon and composer actions keep their semantics. */
+body.lpc-v2:not(.av2) :is(.v2-work-primary,.v2-settings-primary,.pv2-button,.v2-profile-form-save,.v2-help-submit) { background:#10243f; border:1px solid #10243f; border-radius:5px; color:#fff; }
+body.lpc-v2:not(.av2) :is(.v2-work-secondary,.v2-settings-secondary,.pv2-secondary,.v2-profile-form-cancel) { border:1px solid var(--v2-line); border-radius:5px; background:var(--v2-white); color:var(--v2-ink); }
+
+/* 44: keep the compact Matter subnavigation. Supplemental views move to a
+   contextual Home menu; every existing link and route is retained. */
+.portal-home-tools { position:relative; margin:0 0 18px; width:fit-content; }
+.portal-home-tools > summary { display:flex; align-items:center; gap:8px; min-height:36px; padding:7px 10px; list-style:none; border:1px solid var(--v2-line); border-radius:5px; color:var(--v2-muted); font-size:calc(13 * var(--lpc-reading-unit, 1px)); cursor:pointer; }
+.portal-home-tools > summary::-webkit-details-marker { display:none; }
+.portal-home-tools > summary svg { width:14px; height:14px; flex:none; }
+.portal-home-tools[open] > summary svg { transform:rotate(90deg); }
+.portal-home-tools[open] { padding-bottom:8px; border:1px solid var(--v2-line); border-radius:5px; background:var(--v2-white); }
+.portal-home-tools[open] > summary { border:0; }
+.portal-home-tools .v2-nav-link { min-height:36px; padding:7px 12px; font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+
+@media(max-width:1120px) { body.lpc-v2 .v2-work-active > .v2-work-list:not(.pv2-work-board) { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:900px) {
+ body.av2 { --av2-header:61px; }
+ :root:has(body:not(.av2)) { --v2-header-height:61px; }
+ body.av2 .av2-header,body:not(.av2) .v2-header { height:61px; min-height:61px; padding-block:0; padding-inline:12px; }
+ body.av2 .av2-header-tools { gap:4px; }
+ body.av2 .av2-header :is([data-av2-open="notifications"],[data-av2-assistant]) { width:44px; min-width:44px; height:44px; min-height:44px; }
+ body.av2 .av2-main { padding:20px 16px 48px; }
+ :root body.lpc-v2:not(.av2) .v2-view { padding:20px 16px 48px; }
+}
+@media(max-width:600px) { body.av2 .av2-header { padding-inline:8px; } }
+@container(max-width:660px) {
+ body:not(.av2) .pv2-conversations .v2-matter-message-form { width:100%; margin:12px 0 0; }
+ body:not(.av2) .pv2-conversations .av2-composer-row { gap:8px; padding:8px; }
+}
+@media(pointer:coarse) {
+ body.av2 .av2-header :is([data-av2-open="notifications"],[data-av2-assistant]) { width:44px; min-width:44px; height:44px; min-height:44px; }
+ body.av2 .av2-sidebar > .av2-nav a,body.av2 .av2-account-nav a { min-height:44px; }
+ body:not(.av2) .pv2-conversations .av2-composer-row > .av2-button { min-height:44px; }
+}
+@media(prefers-reduced-motion:reduce) { body.av2 .av2-header :is([data-av2-open="notifications"],[data-av2-assistant])::after { transition:none; } }
+
+
+/* 15d + 16c: 304px account menus with the photo/initials before the identity. */
+body.av2 .av2-brand-menu .av2-sidebar-bottom { position:fixed; left:8px; top:54px; width:min(304px,calc(100vw - 16px)); padding:10px; border-radius:8px; box-shadow:0 8px 28px #10243f15; }
+body.av2 .av2-menu-identity,body.lpc-v2:not(.av2) .v2-menu-identity { display:flex; flex-direction:row; align-items:center; gap:12px; padding:12px 8px 18px; margin:0 0 8px; text-align:left; border-bottom:1px solid var(--v2-line,var(--av2-line)); }
+body.av2 .av2-menu-identity :is(.av2-avatar,.av2-identity-photo) { width:40px; height:40px; flex-basis:40px; font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
+body.av2 .av2-menu-identity .av2-identity-copy { display:block; min-width:0; }
+body.av2 .av2-menu-identity strong,body.lpc-v2:not(.av2) .v2-menu-identity strong { font-size:calc(15 * var(--lpc-reading-unit, 1px)); font-weight:500; }
+body.av2 .av2-menu-identity .av2-identity-copy > span,body.lpc-v2:not(.av2) .v2-menu-identity small { display:block; font-size:calc(12 * var(--lpc-reading-unit, 1px)); margin-top:3px; }
+body.av2 .av2-sidebar-bottom .av2-nav a,body.av2 .av2-sidebar-bottom > button { min-height:40px; padding:9px 10px; font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+body.av2 .av2-sidebar-account { border-bottom:1px solid var(--av2-line); padding-bottom:8px; margin-bottom:4px; }
+body.lpc-v2:not(.av2) .v2-menu { width:min(304px,calc(100vw - 16px)); padding:10px; border-radius:8px; box-shadow:0 8px 28px #10243f15; }
+body.lpc-v2:not(.av2) .v2-menu-identity :is(img,.portal-identity-initials) { width:40px; height:40px; flex:0 0 40px; font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
+body.lpc-v2:not(.av2) .v2-menu-identity > span:not(.portal-identity-initials) { display:block; min-width:0; flex:1; }
+body.lpc-v2:not(.av2) .v2-menu > :is(a,button) { min-height:40px; padding:9px 10px; font-size:calc(13 * var(--lpc-reading-unit, 1px)); }
+body.lpc-v2:not(.av2) .v2-menu > [data-v2-sign-out] { border-top:1px solid var(--v2-line); border-radius:0; margin-top:8px; }
+
+/* 28d: approved soft, rounded transcript bubbles in both portals. */
+body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation{max-width:820px;padding:24px}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation>li[data-message-id]{max-width:82%;margin-bottom:22px}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation > li[data-message-id] p.av2-preserve-lines{padding:12px 16px;border:1px solid var(--av2-line);border-radius:14px;background:var(--av2-soft);font-size:calc(15 * var(--lpc-reading-unit, 1px));line-height:1.65}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace [data-message-own=true] p.av2-preserve-lines{background:var(--av2-selected);border-color:transparent}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-message-heading{font-size:calc(12 * var(--lpc-reading-unit, 1px));margin-bottom:6px}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation>li[data-message-id]:not(.is-highlighted):not(:focus-visible){background:transparent}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation>li[data-message-id][data-message-own=true] p.av2-preserve-lines{background:var(--av2-selected);border-color:transparent;border-radius:14px}body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation [data-message-own=true] .av2-message-heading strong{position:static;width:auto;height:auto;clip-path:none;overflow:visible}
+
+/* 40d: 608px Matter dialogs with a shaded inset header and separated actions.
+   Each role retains its own form, transport, validation and confirmation owners. */
+body.lpc-v2 :is(.av2-matter-dialog,.v2-work-dialog,.v2-matter-dialog) { width:608px; max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px); padding:28px; border-radius:12px; overflow:auto; }
+body.lpc-v2 .av2-matter-dialog > .av2-section-heading,
+body.lpc-v2 :is(.v2-work-dialog,.v2-matter-dialog) > header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 24px; padding:12px 16px; border:1px solid var(--v2-line,var(--av2-line)); border-radius:6px; background:var(--v2-soft,var(--av2-soft)); min-height:0; }
+body.lpc-v2 :is(.av2-matter-dialog,.v2-work-dialog,.v2-matter-dialog) h2 { margin:0; padding:0; border:0; background:none; font:500 calc(20 * var(--lpc-reading-unit, 1px))/1.35 "Sarabun",sans-serif; min-width:0; overflow-wrap:anywhere; }
+body.lpc-v2 .av2-matter-dialog > .av2-section-heading > button,
+body.lpc-v2 :is(.v2-work-dialog,.v2-matter-dialog) > header > button { position:static; display:grid; place-items:center; flex:none; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; border:0; background:transparent; font-size:calc(24 * var(--lpc-reading-unit, 1px)); text-decoration:none; }
+body.lpc-v2 :is(.v2-work-dialog-body,.v2-matter-dialog-body) { padding:0; }
+body.lpc-v2 .av2-matter-dialog .av2-date-grid { grid-template-columns:130px minmax(0,1fr); gap:14px 18px; font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
+body.lpc-v2 .av2-matter-dialog > .av2-actions,
+body.lpc-v2 :is(.v2-work-dialog,.v2-matter-dialog) > footer { justify-content:flex-end; flex-wrap:wrap; border-top:1px solid var(--v2-line,var(--av2-line)); padding:22px 0 0; margin:24px 0 0; background:transparent; }
+@media(max-width:600px) {
+ body.av2 .av2-navigation-dialog .av2-brand-menu .av2-sidebar-bottom { position:absolute; left:0; top:calc(100% + 8px); max-width:min(304px,calc(100vw - 64px)); }
+ body.lpc-v2 :is(.av2-matter-dialog,.v2-work-dialog,.v2-matter-dialog) { padding:20px; }
+ body.lpc-v2 .av2-matter-dialog .av2-date-grid { grid-template-columns:minmax(0,1fr); gap:8px; }
+ body.lpc-v2 .av2-matter-dialog > .av2-section-heading,
+ body.lpc-v2 :is(.v2-work-dialog,.v2-matter-dialog) > header { padding:10px 12px; gap:10px; }
+}
+@container(max-width:660px) {
+ body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation { padding:16px 12px; }
+ body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation > li[data-message-id] { max-width:calc(100% - 8px); }
+ body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation > li[data-message-id] p.av2-preserve-lines { padding:10px 12px; font-size:calc(14 * var(--lpc-reading-unit, 1px)); line-height:1.6; }
+}
+@media(pointer:coarse) {
+ body.av2 .av2-sidebar-bottom .av2-nav a,body.av2 .av2-sidebar-bottom > button,
+ body.lpc-v2:not(.av2) .v2-menu > :is(a,button) { min-height:44px; }
+}
+
+@media(max-width:900px) {
+ body.av2 .av2-navigation-dialog .av2-brand-menu .av2-sidebar-bottom { position:absolute; left:0; top:calc(100% + 8px); max-width:min(304px,calc(100vw - 64px)); }
+ body.lpc-v2:not(.av2) .v2-navigation-dialog .v2-menu { max-width:min(284px,calc(100vw - 56px)); }
+}

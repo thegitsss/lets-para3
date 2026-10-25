@@ -1,0 +1,227 @@
+/* Flat working surfaces. Overview destination cards and form boundaries remain distinct. */
+body.admin-menu-mode #adminFinanceRecords>h2{display:none}
+body.admin-menu-mode #adminFinanceRecords>.pending-controls{justify-content:flex-start;margin-bottom:10px}
+body.admin-menu-mode #adminFinanceSearch{flex:0 1 300px;min-width:0}
+body.admin-menu-mode #adminFinanceFilters{margin:8px 0 16px}
+body.admin-menu-mode .admin-empty-table thead{display:none}
+body.admin-menu-mode .admin-empty-table .pending-empty{text-align:left;padding:16px 0}
+body.admin-menu-mode .admin-calm-inbox .admin-mail-columns[hidden]{display:none}
+body.admin-menu-mode .admin-calm-inbox #adminInboxList .admin-empty{min-height:120px;border-bottom:0}
+body.admin-menu-mode .admin-calm-inbox #adminInboxRefresh{min-height:36px;padding:6px 10px;font-size:13px}
+body.admin-menu-mode #adminSystemAttention{list-style:none;padding:0;margin:0 0 16px}
+body.admin-menu-mode #adminSystemAttention>li{padding:12px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.5}
+body.admin-menu-mode #adminSystemAttention:empty{display:none}
+body.admin-live .admin-people-workspace>#adminPeopleView{width:220px;max-width:100%;margin-bottom:20px}
+body.admin-live .admin-people-workspace>[hidden]{display:none!important}
+body.admin-live .admin-people-workspace .admin-user-panel>.panel-header h2{display:none}
+body.admin-live .admin-people-workspace .pending-controls{justify-content:flex-start;margin-bottom:12px}
+body.admin-live .admin-people-workspace .pending-controls input[type=search]{flex:0 1 320px;width:320px;max-width:100%;min-width:0}
+body.admin-live .admin-people-empty>.panel-header,body.admin-live .admin-people-empty thead{display:none!important}
+body.admin-live .admin-people-unfiltered-empty>.pending-controls{display:none!important}
+body.admin-live .admin-people-empty .pending-empty{text-align:left;padding:12px 0!important;border:0;color:var(--muted);font-size:14px}
+body.admin-live .admin-people-empty .table-wrap{margin:0}
+body.admin-live #pendingUsersPanel.admin-people-empty .pending-users-table tr{padding:0;border:0}
+body.admin-live #pendingUsersPanel.admin-people-empty .pending-empty{display:block}
+body.admin-live #pendingUsersPanel.admin-people-empty .pending-empty::before{display:none}
+body.admin-live .admin-people-empty-refresh{min-height:44px;font-size:13px}
+body.admin-live [aria-label="System views"] .admin-identity{display:inline-flex;align-items:center;min-height:44px;margin-left:12px;font-size:13px}
+body.admin-live .admin-dispute-reviewing :is(.admin-dispute-summary,thead,.admin-dispute-filters,#adminDisputePager){display:none!important}
+body.admin-live .admin-dispute-reviewing>.admin-inline-actions{display:none!important}
+body.admin-live .admin-dispute-detail>td{padding:0!important;border:0!important}
+body.admin-live .admin-dispute-detail section.admin-dispute-review{padding:0!important;max-width:680px;margin:0}
+body.admin-live .admin-dispute-review h3{font-family:inherit;font-size:22px;font-weight:600;line-height:1.25;margin:18px 0 6px}
+body.admin-live .admin-dispute-review p{margin:4px 0;font-size:14px;line-height:1.5}
+body.admin-live .admin-dispute-review .admin-dispute-date{font-size:12px;color:var(--muted)}
+body.admin-live .admin-dispute-record{margin:16px 0;font-size:13px;color:var(--muted)}
+body.admin-live .admin-dispute-record .admin-inline-actions{margin-top:10px}
+body.admin-live .admin-dispute-decision{margin-top:20px;border-top:1px solid var(--line);padding-top:16px}
+body.admin-live .admin-dispute-decision>select{width:auto;max-width:100%;min-width:200px}
+body.admin-live .admin-dispute-decision .dispute-actions{border:0;margin:10px 0 0;padding:0;align-items:end}
+body.admin-live .admin-dispute-decision [hidden]{display:none!important}
+body.admin-live .admin-dispute-decision label{font-size:12px;color:var(--muted)}
+body.admin-live .admin-dispute-review .admin-dispute-outcome{margin-top:20px;font-weight:500}
+body.admin-live .admin-flow-body [data-dispute-back]{display:none!important}
+body.admin-live .admin-dispute-review>[data-dispute-back]{min-height:32px;display:inline-flex;align-items:center}
+@media(max-width:760px){body.admin-live .admin-dispute-review>[data-dispute-back]{min-height:44px}}
+body.admin-live #main>.admin-topbar{margin-bottom:18px}
+body.admin-live .section>header{margin-bottom:16px}
+body.admin-live .section :is(.panel,.admin-review-card,.admin-inbox-layout,.admin-conversation,.admin-message,.admin-facts,.workspace-panel,.ai-room-focus-block,.ai-room-focus-blocks-left){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+body.admin-live .section .panel{padding:0;margin-bottom:20px}
+body.admin-live .section .panel .panel{padding:0;margin:12px 0}
+body.admin-live .section .panel-header{margin-bottom:12px;gap:10px}
+body.admin-live .section :is(.admin-review-card,.admin-message){padding:12px 0;margin:0;border-bottom:1px solid var(--line)!important}
+body.admin-live .section :is(.table-wrap,table){border:0!important;border-radius:0!important;box-shadow:none!important}
+body.admin-live .section th{background:transparent;padding:8px 10px;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0}
+body.admin-live .section td{padding:10px;line-height:1.4}
+body.admin-live .section .admin-facts>div{padding:10px 12px;border-radius:0;background:transparent;border:0;border-bottom:1px solid var(--line)}
+body.admin-live .section :is(.pending-controls,.admin-inline-actions){gap:10px}
+body.admin-live .section .admin-tabs{margin-bottom:14px;gap:18px}
+body.admin-live .section .admin-detail-fold>summary{padding:8px 0}
+body.admin-live .section .admin-calm-options{margin:8px 0}
+body.admin-live .section .admin-empty{min-height:90px;padding:20px 0}
+body.admin-live #adminIdentity{font-size:13px;font-weight:500;min-height:34px;display:inline-flex;align-items:center;color:var(--ink);padding:0 4px}
+body.admin-live #adminSearchOpen kbd{display:none}
+body.admin-menu-mode #adminSimpleMenu{margin:20px auto 32px}
+body.admin-menu-mode #adminSimpleMenu h1{margin-bottom:20px}
+body.admin-menu-mode #adminSimpleMenu>nav{gap:12px}
+body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:145px;padding:18px;gap:8px}
+body.admin-menu-mode .admin-card-count{font-size:36px}
+body.admin-menu-mode .admin-calm-inbox .admin-inbox-layout{max-width:920px}
+body.admin-menu-mode .admin-calm-inbox #adminInboxDetail{padding:0}
+body.admin-menu-mode .admin-calm-inbox .admin-inbox-back{margin-bottom:16px}
+body.admin-menu-mode .admin-calm-inbox .admin-request-name{margin-bottom:12px}
+body.admin-menu-mode .admin-calm-inbox .admin-conversation{margin:12px 0;max-height:360px}
+body.admin-menu-mode .admin-calm-inbox .admin-message{margin:0;padding:10px 0}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{padding:14px 0;gap:4px 16px}
+body.admin-menu-mode .admin-calm-inbox #adminReplyText{margin:8px 0;min-height:90px}
+body.admin-menu-mode .admin-calm-inbox .admin-inquiry-options{margin-top:12px}
+body.admin-menu-mode .admin-dispute-table .admin-dispute-summary>td{padding-top:12px;padding-bottom:12px}
+@media(max-width:760px){body.admin-live .section .panel{padding:0}body.admin-live .section :is(button,input:not([type="checkbox"]):not([type="radio"]),select,summary){min-height:44px}body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:135px}}
+body.admin-live .section :is(.card,.ai-room-card,.ai-room-card-queue,.ai-room-summary-tile,.ai-room-list-item,.engineering-detail-meta-item,.engineering-ticket-card,.knowledge-detail-meta-item){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 0}
+body.admin-live .section :is(.ai-room-list-item,.engineering-ticket-card){border-bottom:1px solid var(--line)!important}
+body.admin-live .admin-account-scroll :is(.admin-review-card,.admin-facts){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 0;margin-bottom:12px}
+body.admin-live .admin-account-scroll .admin-facts>div{background:transparent;border:0;border-bottom:1px solid var(--line);padding:10px}
+/* Inbox: compact toolbar, familiar sender/subject/date rows, deliberate empty state. */
+body.admin-menu-mode .admin-calm-inbox .admin-inbox-layout{max-width:none}
+body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar{display:flex;align-items:center;gap:8px;margin:0;padding:0 0 14px;border-bottom:1px solid var(--line)}
+body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar select{width:auto;min-width:0;min-height:36px;padding:6px 28px 6px 10px;font-size:13px}
+body.admin-menu-mode .admin-calm-inbox #adminInboxSearch{width:250px;max-width:40%;min-height:36px;margin-left:auto;padding:7px 10px;font-size:13px}
+body.admin-menu-mode .admin-calm-inbox #adminInboxListStatus{margin:10px 0;font-size:12px}
+body.admin-menu-mode .admin-mail-columns{display:grid;grid-template-columns:190px minmax(0,1fr) 100px;gap:20px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+body.admin-menu-mode .admin-mail-columns>span:last-child{text-align:right}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{grid-template-columns:190px minmax(0,1fr) 100px;gap:4px 20px;padding:14px 12px;min-height:68px}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-person{grid-column:1;grid-row:1 / span 2;font-size:14px;align-self:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>strong{grid-column:2;grid-row:1;font-size:14px;font-weight:500}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>.admin-row-preview{display:block;grid-column:2;grid-row:2;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;color:var(--muted)}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-meta{grid-column:3;grid-row:1;justify-content:flex-end;white-space:nowrap}
+body.admin-menu-mode .admin-calm-inbox .admin-empty{display:flex;min-height:260px;align-items:center;justify-content:center;gap:12px;text-align:center;border-bottom:1px solid var(--line)}
+body.admin-menu-mode .admin-calm-inbox .admin-empty-icon{display:grid;width:40px;height:40px;border:0;border-radius:0;background:transparent;color:var(--muted)}
+body.admin-menu-mode .admin-calm-inbox .admin-empty strong{font-size:14px;font-weight:500;color:var(--muted)}
+body.admin-menu-mode .admin-calm-inbox #adminInboxDetail{max-width:920px}
+@media(max-width:760px){
+ body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar{flex-wrap:wrap}
+ body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar select{min-height:44px;flex:1}
+ body.admin-menu-mode .admin-calm-inbox #adminInboxSearch{width:100%;max-width:100%;min-height:44px;margin:0;flex-basis:100%}
+ body.admin-menu-mode .admin-mail-columns{display:none}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:14px 0}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-person{grid-column:1;grid-row:1}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-meta{grid-column:2;grid-row:1}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>strong{grid-column:1 / -1;grid-row:2}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>.admin-row-preview{grid-column:1 / -1;grid-row:3}
+}
+body.admin-menu-mode #section-ai-control-room.visible{display:block}
+body.admin-menu-mode .admin-system-navigation{border:0;margin:0 0 20px}
+body.admin-menu-mode .admin-system-navigation>[data-section]{display:none}
+body.admin-menu-mode #adminSystemView{font-size:14px;min-width:190px;min-height:38px}
+body.admin-menu-mode .admin-system-overview{max-width:800px;margin-bottom:24px}
+body.admin-menu-mode .admin-system-heading{display:flex;align-items:center;justify-content:space-between}
+body.admin-menu-mode .admin-system-overview h2{font-size:16px;font-weight:600;margin:18px 0 10px}
+body.admin-menu-mode #adminSystemConnections{margin:0 0 24px}
+body.admin-menu-mode #adminSystemConnections>div{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+body.admin-menu-mode #adminSystemConnections dd{margin:0;color:var(--muted)}
+body.admin-menu-mode .admin-system-policy{border-bottom:1px solid var(--line)}
+body.admin-menu-mode .admin-system-policy summary{display:flex;justify-content:space-between;gap:16px;padding:14px 0;cursor:pointer;min-height:44px}
+body.admin-menu-mode .admin-system-policy summary>span:last-child{font-size:13px;color:var(--muted)}
+body.admin-menu-mode .admin-system-policy p{font-size:13px;color:var(--muted);max-width:65ch;margin:0 0 16px}
+body.admin-menu-mode .admin-system-diagnostics>summary{font-size:13px;color:var(--muted);padding:12px 0;cursor:pointer}
+body.admin-menu-mode .admin-system-diagnostics[open]{margin-top:20px}
+body.admin-menu-mode #adminSystemError:empty{display:none}
+body.admin-menu-mode #section-engineering .ai-room-eyebrow,body.admin-menu-mode #section-engineering>header p{display:none}
+body.admin-menu-mode #section-engineering .workspace-grid--engineering-main{gap:20px}
+
+body.admin-menu-mode #section-engineering .workspace-step-label{display:none}
+body.admin-menu-mode #section-activity-logs .pending-controls{display:flex;flex-wrap:wrap;gap:8px}
+body.admin-menu-mode #section-activity-logs .panel-header h3{display:none}
+body.admin-menu-mode #section-settings .settings-grid{max-width:800px;grid-template-columns:1fr}
+body.admin-menu-mode #section-settings .settings-row{padding:12px 0;border-bottom:1px solid var(--line)}
+body.admin-menu-mode #section-settings .settings-help{font-size:13px;color:var(--muted)}
+
+/* One destination, compact controls, references only when requested. */
+.admin-menu-mode #adminFinanceRecords > .admin-tabs { display:none; }
+.admin-menu-mode .escrow-chart-row { display:block; max-width:640px; }
+.admin-menu-mode .admin-payment-check input[type="search"] { width:100%; min-height:36px; margin:4px 0 8px; }
+.admin-menu-mode .admin-payment-match { display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; padding:10px 0; border:0; border-bottom:1px solid var(--line,#e3e7ef); background:transparent; text-align:left; color:inherit; }
+.admin-menu-mode .admin-payment-match small { color:var(--muted); }
+.admin-menu-mode .admin-record-reference { margin:8px 0; font-size:12px; color:var(--muted); }
+.admin-menu-mode .admin-record-reference code { display:block; overflow-wrap:anywhere; max-width:260px; margin-top:6px; }
+.admin-menu-mode .admin-record-reference summary { cursor:pointer; }
+.admin-menu-mode .admin-payment-check > h2 { font-size:18px; }
+.admin-menu-mode #adminPaymentSelection { font-size:13px; color:var(--muted); }
+.admin-menu-mode .workspace-grid > .admin-detail-fold { grid-column:1 / -1; }
+.admin-menu-mode .admin-matters-table td { overflow-wrap:anywhere; }
+.admin-menu-mode #adminFinanceRecordList .btn { white-space:nowrap; }
+.admin-menu-mode #section-sales-workspace .workspace-panel--form,
+.admin-menu-mode #section-marketing-drafts .workspace-panel--form { max-width:760px; }
+
+.admin-menu-mode .ai-room-empty { border:0; border-radius:0; background:transparent; text-align:left; padding:16px 0; min-height:0; }
+.admin-menu-mode #section-sales-workspace .panel-header p,
+.admin-menu-mode #section-marketing-drafts .panel-header p { display:none; }
+.admin-menu-mode #section-sales-workspace .workspace-grid--sales-top { display:block; }
+.admin-menu-mode #section-sales-workspace .panel[hidden] { display:none!important; }
+
+body.admin-menu-mode .admin-owner-review { margin:0 0 24px; padding:0 0 16px; border-bottom:1px solid var(--line,#e3e7ef); }
+body.admin-menu-mode #adminOwnerQueue { display:inline-flex; gap:12px; align-items:center; font-size:18px; font-weight:600; text-decoration:none; color:inherit; }
+body.admin-menu-mode .admin-owner-review p { margin:6px 0 0; font-size:13px; color:var(--muted); }
+
+body.admin-menu-mode #adminOwnerWorkerStatus a { color:var(--muted); text-underline-offset:3px; }
+
+@media(max-width:420px) {
+  body.admin-menu-mode #main > .admin-topbar { flex-wrap:wrap; height:auto; padding-block:6px; }
+  body.admin-menu-mode .admin-topbar-actions { flex-wrap:wrap; max-width:100%; }
+}
+
+/* Growth uses the same single-view navigation as People and Finance. */
+body.admin-menu-mode .admin-growth-navigation>[data-section]{display:none}
+body.admin-menu-mode .admin-growth-navigation{display:flex;align-items:center;flex-wrap:wrap;gap:12px;border:0;margin-bottom:20px}
+body.admin-menu-mode #adminGrowthView{width:220px;max-width:100%;font-size:14px}
+body.admin-menu-mode .admin-growth-navigation>a{order:3;font-size:13px;margin-left:auto}
+body.admin-menu-mode .admin-growth-workspace [data-growth-view][hidden]{display:none!important}
+body.admin-menu-mode .admin-growth-workspace [data-growth-view]>[data-growth-detail]{display:none!important}
+body.admin-menu-mode .admin-growth-workspace .admin-growth-detail-open>[data-growth-detail]{display:block!important}
+body.admin-menu-mode .admin-growth-workspace .admin-growth-detail-open>[data-growth-list]{display:none!important}
+body.admin-menu-mode .admin-growth-workspace [data-growth-view]{max-width:920px}
+body.admin-menu-mode .admin-growth-workspace [data-growth-view]>.panel>.panel-header h2{font-size:16px}
+body.admin-menu-mode .admin-growth-back{min-height:44px;margin-bottom:12px}
+body.admin-menu-mode .admin-growth-workspace .workspace-step-label{display:none}
+
+body.admin-menu-mode .section table:has(tbody>tr:only-child>td[colspan]) thead{display:none}
+body.admin-menu-mode .section table:has(tbody>tr:only-child>td[colspan]) td{display:block;text-align:left;padding:12px 0;border:0}
+body.admin-menu-mode .section table:has(tbody>tr:only-child>td[colspan]) td::before{display:none}
+body.admin-menu-mode #adminPeopleReports .chart-card,body.admin-menu-mode #adminPeopleReports .metric{border:0;border-radius:0;box-shadow:none;background:transparent}
+body.admin-menu-mode .admin-knowledge-simple .workspace-grid{display:block}
+body.admin-menu-mode .admin-knowledge-simple .panel[hidden],body.admin-menu-mode .section .panel[hidden]{display:none!important}
+body.admin-menu-mode #adminKnowledgeView{width:220px;max-width:100%;margin:12px 0 20px}
+body.admin-menu-mode .admin-knowledge-simple .panel-header p,body.admin-menu-mode .admin-knowledge-simple .panel-header h2{display:none}
+body.admin-menu-mode #section-engineering>header .ai-room-header-meta,body.admin-menu-mode #section-engineering .workspace-panel--queue .panel-header{display:none}
+body.admin-menu-mode .admin-growth-navigation #adminGrowthRefresh{border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-height:40px;font-size:13px}
+body.admin-menu-mode .admin-growth-workspace [data-growth-list]>.panel-header{display:none}
+body.admin-menu-mode .admin-growth-workspace .ai-room-empty{text-align:left;padding:16px 0;min-height:0}
+body.admin-menu-mode .admin-growth-workspace .workspace-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+body.admin-menu-mode .admin-growth-workspace .workspace-form-grid>label{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0}
+body.admin-menu-mode .admin-growth-workspace .workspace-form-grid>label>input:not([type="checkbox"]),body.admin-menu-mode .admin-growth-workspace .workspace-form-grid>label>select,body.admin-menu-mode .admin-growth-workspace .workspace-form-grid>label>textarea{width:100%;max-width:100%;box-sizing:border-box}
+body.admin-menu-mode .admin-growth-workspace .workspace-form-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+body.admin-menu-mode .admin-growth-workspace .workspace-form-grid>label.checkbox-inline{flex-direction:row;align-items:center;min-height:44px;gap:8px}
+body.admin-menu-mode .admin-growth-workspace .workspace-form-grid input[type="checkbox"]{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:0}
+body.admin-menu-mode .admin-request-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:28px;align-items:start}
+body.admin-menu-mode .admin-request-main{min-width:0}
+body.admin-menu-mode .admin-request-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+body.admin-menu-mode .admin-request-heading h2{margin:0;min-width:0;overflow-wrap:anywhere}
+body.admin-menu-mode .admin-request-heading>button{flex-shrink:0;white-space:nowrap}
+body.admin-menu-mode .admin-request-workspace:has(>#adminPreparedReply[hidden]){grid-template-columns:minmax(0,1fr)}
+body.admin-menu-mode #adminPreparedReply{margin:0;border:0;border-left:1px solid var(--line);padding:0 0 0 20px;font-size:13px;overflow-wrap:anywhere}
+body.admin-menu-mode #adminPreparedReply>summary{font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+body.admin-menu-mode .admin-request-context{display:flex;flex-direction:column;gap:6px;line-height:1.5}
+body.admin-menu-mode .admin-request-context strong{font-size:12px;color:var(--muted);font-weight:500}
+body.admin-menu-mode #adminPreparedReply [data-prepared-source]{font-size:12px;color:var(--muted)}
+body.admin-menu-mode #adminPreparedReply [data-prepared-source]:empty{display:none}
+body.admin-menu-mode #adminPreparedReply [data-prepared-text]{max-height:260px;overflow:auto;line-height:1.6}
+@media(max-width:1000px){body.admin-menu-mode .admin-request-workspace{grid-template-columns:minmax(0,1fr)}body.admin-menu-mode #adminPreparedReply{border-left:0;border-top:1px solid var(--line);padding:16px 0 0}}
+@media(max-width:760px){body.admin-menu-mode .admin-growth-workspace .workspace-form-grid{grid-template-columns:minmax(0,1fr)}body.admin-menu-mode .admin-growth-workspace .panel-header{flex-wrap:wrap;gap:10px}}
+
+/* Keep owner-reviewed message limits aligned with the existing System forms. */
+body.admin-menu-mode #adminCorrespondenceSettings form{display:grid;gap:8px;max-width:480px;padding:0 0 20px}
+body.admin-menu-mode #adminCorrespondenceSettings form label{display:block;margin:8px 0 0;font-size:13px;color:var(--muted)}
+body.admin-menu-mode #adminCorrespondenceSettings form input,
+body.admin-menu-mode #adminCorrespondenceSettings form select{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+body.admin-menu-mode #adminCorrespondenceSettings form p{margin:8px 0}
+body.admin-menu-mode #adminCorrespondenceSettings form button{justify-self:start;max-width:100%;white-space:normal}

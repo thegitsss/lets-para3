@@ -1,8 +1,9 @@
 export const SECTIONS = Object.freeze([
+  { name: "updates", title: "Updates", path: "/updates", description: "Your account and Matter updates." },
   { name: "conversations", title: "Messages", path: "/conversations", description: "Messages across your Matters." },
   { name: "home", title: "Home", path: "/home", legacy: "/dashboard-attorney.html", description: "Your Matters, deadlines, and recent activity." },
   { name: "matters", title: "Matters", path: "/matters", legacy: "/dashboard-attorney.html#cases", description: "Manage your Matters and review applications." },
-  { name: "tasks", title: "Private Tasks", path: "/tasks", legacy: "/dashboard-attorney.html#tasks", description: "Keep track of your personal tasks and weekly notes." },
+  { name: "tasks", title: "Personal tasks & notes", path: "/tasks", legacy: "/dashboard-attorney.html#tasks", description: "Keep track of your personal tasks and weekly notes." },
   { name: "paralegals", title: "Find a Paralegal", path: "/paralegals", legacy: "/browse-paralegals.html", description: "Explore paralegal profiles and experience." },
   { name: "payments", title: "Payments", path: "/payments", legacy: "/dashboard-attorney.html#funds", description: "Review payment activity and billing details." },
   { name: "settings", title: "Profile Settings", path: "/settings", legacy: "/profile-settings.html?role=attorney", description: "Manage your profile, account security, and preferences." },
@@ -36,6 +37,7 @@ export function parseRoute(hash = "") {
   const [rawPath, ...queryParts] = source.split("?");
   const path = rawPath === "/" ? "/home" : rawPath.replace(/\/$/, "");
   const query = new URLSearchParams(queryParts.join("?"));
+  if (["/inbox", "/pulse"].includes(path) || path === "/home" && ["inbox", "pulse", "updates"].includes(query.get("view"))) return { name:"updates",title:"Updates",path:"/updates",key:source,query,found:true };
   const simple = SECTIONS.find((section) => section.path === path);
   if (simple) return { ...simple, key: source, query, found: true };
   if (path === "/payments/setup") return { name: "payment-setup", title: "Payment card", path, key: source, query, found: true };
@@ -56,7 +58,6 @@ export function parseRoute(hash = "") {
   const management = path.match(/^\/matters\/([a-f0-9]{24})\/manage$/i);
   if (management) return { name: "matter-management", caseId: management[1], title: "Matter notes and history", path, key: source, query, found: true, legacy: `/dashboard-attorney.html?previewCaseId=${management[1]}#cases` };
   const match = path.match(/^\/matters\/([a-f0-9]{24})\/(overview|applications|work|files|messages|deadlines|activity|financials)$/i);
-  if (match && match[2].toLowerCase()==='messages') { query.set('matter',match[1]); return {name:'conversations',title:'Messages',path:'/conversations',caseId:match[1],tab:'messages',key:source,query,found:true}; }
   if (match && match[2].toLowerCase() === "activity" && /^[a-f0-9]{24}$/i.test(query.get("eventId") || "")) match[2] = "deadlines";
   if (match) return { name: "workspace", caseId: match[1], tab: match[2].toLowerCase(), title: "Matter", path, key: source, query, found: true, legacy: `/case-detail.html?caseId=${match[1]}&tab=${match[2]}` };
   if (path === "/matters/new") return { name: "create", title: "Create a Matter", path, key: source, query, found: true, legacy: "/create-case.html", description: "Describe your Matter and the support you need." };

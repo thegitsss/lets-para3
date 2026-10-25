@@ -34,10 +34,12 @@ describe("paralegal Package 7 live-evaluation contract", () => {
       prompt: "Synthetic matter status?",
     }, { env: {} })).toEqual(expect.objectContaining({ passed: true }));
 
+    const credentialedMongoUri = ["mongodb+srv://user", "pass@example.invalid/database"].join(":");
+    const openAiKeyFixture = ["sk-proj", "abcdefghijklmnopqrstuvwxyz"].join("-");
     const unsafe = [
       { email: "customer@example.com" },
-      { uri: "mongodb+srv://user:pass@example.invalid/database" },
-      { token: "sk-proj-abcdefghijklmnopqrstuvwxyz" },
+      { uri: credentialedMongoUri },
+      { token: openAiKeyFixture },
       { hook: "whsec_abcdefghijk" },
       { password: "password='customer-password'" },
     ];

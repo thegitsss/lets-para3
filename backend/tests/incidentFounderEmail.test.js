@@ -255,3 +255,44 @@ describe("Founder engineering issue emails", () => {
     );
   });
 });
+
+
+describe("Durable founder support delivery", () => {
+  const send = incident => notifyFounderSupportEngineeringIssue({ incident, ticket: { id: "durable-ticket", reference: "SUP-DURABLE" } });
+  test("concurrent calls keep one prepared receipt and one SMTP dispatch", async () => {
+    const incident = await buildIncident();
+    await Promise.all([send(incident), send(incident)]);
+    expect(sendEmail).toHaveBeenCalledTimes(1); expect(await IncidentNotification.countDocuments()).toBe(1);
+    expect((await IncidentNotification.findOne()).payload.deliveryState).toBe("accepted");
+  });
+  test("definitive SMTP rejection retries the same receipt and stable Message-ID", async () => {
+    const incident = await buildIncident();
+    sendEmail.mockRejectedValueOnce(Object.assign(Error("Synthetic SMTP rejection"), { responseCode: 451 }));
+    expect((await send(incident))[0]).toMatchObject({ status: "failed", payload: { deliveryState: "rejected" } });
+    const retried = (await send(incident))[0]; expect(retried.status).toBe("sent");
+    expect(await IncidentNotification.countDocuments()).toBe(1); expect(sendEmail).toHaveBeenCalledTimes(2);
+    expect(sendEmail.mock.calls[0][3].messageId).toBe(sendEmail.mock.calls[1][3].messageId);
+  });
+  test("unknown SMTP result stays explicit and is never automatically sent twice", async () => {
+    const incident = await buildIncident();
+    sendEmail.mockRejectedValueOnce(Object.assign(Error("Synthetic timeout after DATA"), { code: "ETIMEDOUT" }));
+    expect((await send(incident))[0].payload.deliveryState).toBe("unknown");
+    expect((await send(incident))[0].status).toBe("failed"); expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+  test("disabled delivery is not marked sent and resumes when the provider returns", async () => {
+    const incident = await buildIncident(); sendEmail.mockResolvedValueOnce({ disabled: true });
+    expect((await send(incident))[0]).toMatchObject({ status: "failed", sentAt: null, payload: { deliveryState: "disabled" } });
+    expect((await send(incident))[0].status).toBe("sent"); expect(await IncidentNotification.countDocuments()).toBe(1);
+  });
+  test("lost acceptance persistence leaves one unknown receipt without automatic SMTP replay", async () => {
+    const incident = await buildIncident(); const update = IncidentNotification.findOneAndUpdate.bind(IncidentNotification);
+    jest.spyOn(IncidentNotification, "findOneAndUpdate").mockImplementation((query, patch, options) => {
+      if (patch?.$set?.status === "sent") throw Error("Synthetic lost acceptance persistence");
+      return update(query, patch, options);
+    });
+    try { await expect(send(incident)).rejects.toThrow("lost acceptance"); }
+    finally { IncidentNotification.findOneAndUpdate.mockRestore(); }
+    await IncidentNotification.updateOne({}, { $set: { "payload.leaseExpiresAt": new Date(0) } });
+    expect((await send(incident))[0].payload.deliveryState).toBe("unknown"); expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+});

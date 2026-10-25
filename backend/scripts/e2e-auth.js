@@ -1,25 +1,12 @@
 const path = require("path");
 const http = require("http");
 const express = require("express");
-const puppeteer = require("puppeteer");
-
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
+const { installWorkspaceReads } = require("./e2e-workspace-fixture");
 
 const VALID_EMAIL = "attorney@example.com";
 const VALID_PASSWORD = "Password123!";
+const USER = { id: "507f1f77bcf86cd799439011", role: "attorney", status: "approved" };
 
 function startStubServer() {
   const app = express();
@@ -37,12 +24,14 @@ function startStubServer() {
     const raw = req.headers.cookie || "";
     return raw.split(";").some((pair) => pair.trim().startsWith(`${sessionCookie}=1`));
   }
+  installWorkspaceReads(app, req => hasSession(req) ? USER : null);
+  app.get("/api/users/me", (req, res) => hasSession(req) ? res.json(USER) : res.status(401).json({ user: null }));
 
   app.get("/api/auth/me", (req, res) => {
     if (!hasSession(req)) return res.status(401).json({ user: null });
     return res.json({
       user: {
-        id: "test-user",
+        id: USER.id,
         role: "attorney",
         status: "approved",
       },
@@ -61,7 +50,7 @@ function startStubServer() {
       return res.json({
         success: true,
         user: {
-          id: "test-user",
+          id: USER.id,
           role: "attorney",
           status: "approved",
         },
@@ -73,7 +62,7 @@ function startStubServer() {
   const server = http.createServer(app);
 
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -87,7 +76,7 @@ async function runLoginFlow(page, baseUrl, { email, password }) {
   await page.type("#password", password);
   await Promise.all([
     page.waitForNavigation({ waitUntil: "networkidle0" }),
-    page.evaluate((selector) => document.querySelector(selector)?.click(), "#loginForm button[type=\"submit\"]"),
+    clickVisible(page, "#loginForm button[type=\"submit\"]"),
   ]);
 }
 
@@ -96,7 +85,7 @@ async function runInvalidLoginFlow(page, baseUrl) {
   await page.waitForSelector("#loginForm");
   await page.type("#email", "bad@example.com");
   await page.type("#password", "wrong");
-  await page.evaluate((selector) => document.querySelector(selector)?.click(), "#loginForm button[type=\"submit\"]");
+  await clickVisible(page, "#loginForm button[type=\"submit\"]");
   await page.waitForSelector("#toastBanner.show");
   const toastText = await page.$eval("#toastBanner", (el) => el.textContent.trim());
   if (!toastText || !toastText.toLowerCase().includes("invalid credentials")) {
@@ -106,9 +95,9 @@ async function runInvalidLoginFlow(page, baseUrl) {
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,

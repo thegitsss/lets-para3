@@ -66,6 +66,14 @@
     background: #07131f;
     margin-bottom: 0;
     padding-bottom: max(18px, env(safe-area-inset-bottom));
-    box-shadow: none;
+    box-shadow: 0 -1px 0 #07131f;
+  }
+}
+
+/* Overlap the opaque footer backing; compensate padding to keep its content fixed. */
+@media (max-width: 767px) {
+  body.lpc-home .home-footer {
+    margin-top: -2px;
+    padding-top: 2px;
   }
 }

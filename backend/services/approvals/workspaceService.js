@@ -10,15 +10,6 @@ const { approveMarketingPacket, rejectMarketingPacket } = require("../marketing/
 const { approveFAQCandidate, rejectFAQCandidate } = require("../support/reviewService");
 const { approveSalesPacket, rejectSalesPacket } = require("../sales/reviewService");
 
-function uniqueList(values = []) {
-  return Array.from(
-    new Set(
-      (Array.isArray(values) ? values : [])
-        .map((value) => String(value || "").trim())
-        .filter(Boolean)
-    )
-  );
-}
 
 function compactText(value = "", max = 220) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
@@ -194,7 +185,7 @@ async function hydrateApprovalTask(task = {}) {
 
 async function listApprovalWorkspaceItems({ pillar = "", itemType = "", status = "" } = {}) {
   const query = {};
-  if (status) query.approvalState = status;
+  if (status) query.approvalState = String(status);
   const tasks = await ApprovalTask.find(query)
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();

@@ -1,0 +1,874 @@
+name: Full product audit (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      execution_scope:
+        description: Full acceptance, or source/backend evidence only (not release
+          certification)
+        type: choice
+        required: true
+        default: full
+        options:
+          - full
+          - backend-source
+          - source-return
+          - recovery-return
+      continuation_plan_sha256:
+        description: Reviewed source-bound continuation plan SHA-256 (explicit manual
+          return scopes only)
+        type: string
+        required: false
+        default: ""
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+defaults:
+  run:
+    working-directory: backend
+jobs:
+  deployment-blueprint:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope !=
+      'source-return'
+    name: Full audit / Deployment Blueprint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependency graph
+        working-directory: backend
+        run: npm ci
+      - name: Validate Render schema and LPC deployment contract
+        working-directory: backend
+        run: npm run check:deploy
+  runtime-checks:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope !=
+      'source-return'
+    name: Full audit / Runtime and source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LPC_JEST_CONTINUATION_PLAN_SHA256: ${{ github.event_name == 'workflow_dispatch'
+        && inputs.execution_scope == 'backend-source' &&
+        inputs.continuation_plan_sha256 || '' }}
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Record exact release candidate
+        run: npm run check:candidate
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Verify private navigation and targeted message-read guards
+        run: node --experimental-vm-modules --test
+          scripts/admin-private-navigation-controls.test.cjs
+          scripts/legacy-message-link-read-controls.test.cjs
+      - name: Validate runtime, source, and frontend assets
+        run: npm run check:ci-workflow && npm run check:repository && npm run
+          check:runtime && npm run check:syntax && npm run check:focus && npm
+          run check:routes && npm run check:backend-reachability && npm run
+          check:runtime-bindings && npm run check:route-security && npm run
+          check:logging && npm run check:secrets && npm run check:frontend &&
+          npm run check:frontend-bindings && npm run check:vendor && npm run
+          check:no-theater && npm run check:api-contract && npm run
+          check:performance && npm run check:legal && npm run
+          check:install-scripts
+      - name: Generate production dependency SBOM
+        run: npm run generate:sbom && npm run check:licenses
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key ""
+          --artifact "supply-chain-evidence-${{ github.run_id }}-${{
+          github.run_attempt }}" --path "backend/test-results/supply-chain"
+          --record "${{ runner.temp }}/lpc-artifact-runtime-checks--1.json"
+      - name: Upload supply-chain launch evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: supply-chain-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/supply-chain
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Bound complete evidence before upload 2
+        id: evidence_limit_2
+        if: always()
+        run: >
+          node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key
+          "" --artifact "candidate-identity-${{ github.run_id }}-${{
+          github.run_attempt }}" --path
+          "backend/test-results/release/candidate.json" --record "${{
+          runner.temp }}/lpc-artifact-runtime-checks--2.json"
+
+          node - <<'JS'
+
+          function verifyRecoveryArtifactAllocation(prefix, recordPath, options
+          = {}) {
+            const assert = require("node:assert/strict"), crypto = require("node:crypto");
+            const env = options.env || process.env, read = options.read || require("node:fs").readFileSync;
+            if (env.GITHUB_EVENT_NAME !== "workflow_dispatch") return { profile: "ordinary-allocation" };
+            const event = JSON.parse(read(env.GITHUB_EVENT_PATH));
+            if (event.inputs?.execution_scope !== "recovery-return") return { profile: "ordinary-allocation" };
+            const fixed = { "candidate-identity": ["runtime-checks", 4 * 1024 ** 2], "secret-scan-evidence": ["secrets", 8 * 1024 ** 2] };
+            assert(Object.hasOwn(fixed, prefix));
+            const approved = event.inputs.continuation_plan_sha256;
+            assert(/^[a-f0-9]{64}$/.test(approved || ""));
+            const bytes = read("tests/playwright/acceptance/native-continuation-plan.json");
+            assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), approved);
+            const plan = JSON.parse(bytes), rows = plan.cloudEvidence?.recoveryArtifacts;
+            assert.equal(plan.candidateCommit, "@checked-out-head");
+            assert.equal(plan.sourcePins?.["backend/tests/playwright/acceptance/native-continuation-plan.json"], "@approved-plan");
+            assert(Array.isArray(rows) && rows.length === 5);
+            const matches = rows.filter(row => row.prefix === prefix);
+            assert.equal(matches.length, 1);
+            const [job, maximum] = fixed[prefix], row = matches[0];
+            assert.equal(row.job, job); assert.equal(row.key, ""); assert.equal(row.maxBytes, maximum);
+            const record = JSON.parse(read(recordPath));
+            assert.equal(record.schemaVersion, 1); assert.equal(record.repository, "thegitsss/lets-para3");
+            assert.equal(record.repository, env.GITHUB_REPOSITORY); assert.equal(record.headSha, env.GITHUB_SHA);
+            assert.equal(record.runId, env.GITHUB_RUN_ID); assert.equal(record.attempt, env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.artifact?.job, job); assert.equal(record.artifact?.key, "");
+            assert.equal(record.artifact?.name, prefix + "-" + env.GITHUB_RUN_ID + "-" + env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.completeEvidence, true); assert.equal(record.retentionDays, 1); assert.equal(record.compressionLevel, 9);
+            assert(Number.isSafeInteger(record.upperBoundBytes) && record.upperBoundBytes > 0 && record.upperBoundBytes <= maximum);
+            return { profile: "recovery-return", maximum, upperBoundBytes: record.upperBoundBytes };
+          }
+
+          verifyRecoveryArtifactAllocation("candidate-identity",
+          require("node:path").join(process.env.RUNNER_TEMP,
+          "lpc-artifact-runtime-checks--2.json"));
+
+          JS
+      - name: Upload candidate identity evidence
+        if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: candidate-identity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/release/candidate.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Bind and balance complete original Jest file shards
+        run: node scripts/verify-ci-jest-shards.js --prepare
+      - name: Bound complete evidence before upload 3
+        id: evidence_limit_3
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key ""
+          --artifact "jest-plan-${{ github.run_id }}-${{ github.run_attempt }}"
+          --path "backend/test-results/jest/plan.json" --record "${{ runner.temp
+          }}/lpc-artifact-runtime-checks--3.json"
+      - name: Upload complete Jest shard plan
+        if: ${{ always() && steps.evidence_limit_3.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/plan.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  backend-tests:
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope !=
+      'source-return' && inputs.execution_scope != 'recovery-return')
+    name: Full audit / Backend original suite shard ${{ matrix.shard }}
+    needs: runtime-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      LPC_JEST_CONTINUATION_PLAN_SHA256: ${{ github.event_name == 'workflow_dispatch'
+        && inputs.execution_scope == 'backend-source' &&
+        inputs.continuation_plan_sha256 || '' }}
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Record exact release candidate
+        run: npm run check:candidate
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Download exact source-bound shard plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest
+          digest-mismatch: error
+      - name: Build matching frontend assets
+        run: npm run build:frontend
+      - name: Run every assigned original Jest suite once
+        run: node scripts/run-ci-jest-shard.js --shard "${{ matrix.shard }}"
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "backend-tests" --key "${{
+          matrix.shard }}" --artifact "jest-shard-${{ github.run_id }}-${{
+          github.run_attempt }}-${{ matrix.shard }}" --path
+          "backend/test-results/jest/shards/shard-${{ matrix.shard }}" --record
+          "${{ runner.temp }}/lpc-artifact-backend-tests-${{ matrix.shard
+          }}-1.json"
+      - name: Upload complete raw Jest shard evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard
+            }}
+          path: backend/test-results/jest/shards/shard-${{ matrix.shard }}
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  backend-coverage:
+    name: Full audit / Complete backend coverage union
+    needs:
+      - runtime-checks
+      - backend-tests
+    if: always() && (github.event_name != 'workflow_dispatch' ||
+      (inputs.execution_scope != 'source-return' && inputs.execution_scope !=
+      'recovery-return'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LPC_JEST_CONTINUATION_PLAN_SHA256: ${{ github.event_name == 'workflow_dispatch'
+        && inputs.execution_scope == 'backend-source' &&
+        inputs.continuation_plan_sha256 || '' }}
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Record exact release candidate
+        run: npm run check:candidate
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Download exact source-bound shard plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest
+          digest-mismatch: error
+      - name: Download all original Jest shard evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: backend/test-results/jest/shard-artifacts
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Require every original backend shard
+        env:
+          CHECKS_RESULT: ${{ needs.runtime-checks.result }}
+          SHARDS_RESULT: ${{ needs.backend-tests.result }}
+        run: |-
+          test "$CHECKS_RESULT" = success
+          test "$SHARDS_RESULT" = success
+      - name: Verify complete raw union and substantive authentication/payment coverage
+        run: node scripts/verify-ci-jest-shards.js --verify
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "backend-coverage" --key ""
+          --artifact "jest-complete-union-${{ github.run_id }}-${{
+          github.run_attempt }}" --path
+          "backend/test-results/jest/required-coverage.json" --record "${{
+          runner.temp }}/lpc-artifact-backend-coverage--1.json"
+      - name: Upload complete backend union evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jest-complete-union-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/required-coverage.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  validate:
+    name: Full audit / Runtime, dependency, and test gates
+    needs:
+      - runtime-checks
+      - backend-tests
+      - backend-coverage
+      - source-bound-recovery-return
+    if: always() && (github.event_name != 'workflow_dispatch' ||
+      inputs.execution_scope != 'source-return')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require source checks and the exact complete backend union
+        working-directory: ${{ runner.temp }}
+        env:
+          CHECKS_RESULT: ${{ needs.runtime-checks.result }}
+          SHARDS_RESULT: ${{ needs.backend-tests.result }}
+          COVERAGE_RESULT: ${{ needs.backend-coverage.result }}
+          RECOVERY_RESULT: ${{ needs.source-bound-recovery-return.result }}
+          RECOVERY_SCOPE: ${{ github.event_name == 'workflow_dispatch' &&
+            inputs.execution_scope == 'recovery-return' }}
+        run: |-
+          test "$CHECKS_RESULT" = success
+          if [ "$RECOVERY_SCOPE" = true ]; then
+            test "$RECOVERY_RESULT" = success
+            test "$SHARDS_RESULT" = skipped
+            test "$COVERAGE_RESULT" = skipped
+          else
+            test "$SHARDS_RESULT" = success
+            test "$COVERAGE_RESULT" = success
+            test "$RECOVERY_RESULT" = skipped
+          fi
+  browser-collection:
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope !=
+      'backend-source' && inputs.execution_scope != 'source-return' &&
+      inputs.execution_scope != 'recovery-return')
+    name: Full audit / Browser fixture collection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: "true"
+      LPC_SHARED_MATTER_OUTPUT: test-results/shared-matter
+      LPC_USE_BUILT_FRONTEND: "true"
+      LPC_SEARCH_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
+      LPC_HELP_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
+      LPC_HELP_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      LPC_SECURITY_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      LPC_PARA_CLOSURE_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Install browser engines and system dependencies
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Build production frontend for browser verification
+        run: npm run build:frontend
+      - name: Verify complete unique browser identity coverage
+        run: node scripts/run-critical-browser-group.js --verify-groups
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "browser-collection" --key
+          "" --artifact "browser-collection-${{ github.run_id }}-${{
+          github.run_attempt }}" --path
+          "backend/test-results/critical-group-verification/verified-union.json"
+          --record "${{ runner.temp }}/lpc-artifact-browser-collection--1.json"
+      - name: Upload browser collection evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-collection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/critical-group-verification/verified-union.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  browser-checks:
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope !=
+      'backend-source' && inputs.execution_scope != 'source-return' &&
+      inputs.execution_scope != 'recovery-return')
+    name: Full audit / Browser checks (${{ matrix.scope }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - scope: deterministic-and-lifecycle
+            command: npm run test:browser:contracts && npm run test:e2e
+          - scope: public-accessibility
+            command: npm run test:playwright:a11y
+          - scope: public-performance
+            command: npm run test:playwright:performance
+    env:
+      CI: "true"
+      LPC_SHARED_MATTER_OUTPUT: test-results/shared-matter
+      LPC_USE_BUILT_FRONTEND: "true"
+      LPC_SEARCH_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
+      LPC_HELP_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
+      LPC_HELP_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      LPC_SECURITY_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      LPC_PARA_CLOSURE_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: ${{ matrix.scope == 'deterministic-and-lifecycle' && '0' || '1' }}
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Install browser engines and system dependencies
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Build production frontend for browser verification
+        run: npm run build:frontend
+      - name: Run complete browser scope
+        run: ${{ matrix.command }}
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "browser-checks" --key "${{
+          matrix.scope }}" --artifact "browser-${{ matrix.scope }}-${{
+          github.run_id }}-${{ github.run_attempt }}" --path
+          "backend/test-results/junit" --record "${{ runner.temp
+          }}/lpc-artifact-browser-checks-${{ matrix.scope }}-1.json"
+      - name: Upload browser launch evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/junit
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Bound complete evidence before upload 2
+        id: evidence_limit_2
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "browser-checks" --key "${{
+          matrix.scope }}" --artifact "browser-failure-${{ matrix.scope }}-${{
+          github.run_id }}-${{ github.run_attempt }}" --path
+          "backend/test-results" --record "${{ runner.temp
+          }}/lpc-artifact-browser-checks-${{ matrix.scope }}-2.json"
+      - name: Upload complete raw browser evidence
+        if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-failure-${{ matrix.scope }}-${{ github.run_id }}-${{
+            github.run_attempt }}
+          path: backend/test-results
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  browser-role-journeys:
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope !=
+      'backend-source' && inputs.execution_scope != 'source-return' &&
+      inputs.execution_scope != 'recovery-return')
+    name: Full audit / Role journeys (${{ matrix.group }})
+    needs: browser-collection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        group:
+          - attorney-v2-actual-shared-1
+          - attorney-v2-actual-shared-2
+          - attorney-v2-actual-shared-3
+          - attorney-v2-actual-shared-4
+          - attorney-v2-declared-1
+          - attorney-v2-declared-2
+          - attorney-v2-declared-3
+          - attorney-v2-declared-4
+          - attorney-v2-declared-5
+          - attorney-v2-actual-notes-1
+          - attorney-v2-actual-work-1
+          - paralegal-support-declared-1
+          - paralegal-support-declared-2
+          - paralegal-support-declared-3
+          - paralegal-support-declared-4
+          - paralegal-support-declared-5
+          - paralegal-support-actual-shared-1
+          - support
+          - paralegal-financial-records
+          - director-commission
+          - control-room
+          - admin-financials
+          - frontend-hygiene
+          - workspace-session
+          - workspace-navigation
+          - admin-evidence
+          - financial-lifecycle
+          - shared-matter
+          - admin-solo
+          - director
+          - director-managed
+          - financial-model-claims
+    env:
+      CI: "true"
+      LPC_SHARED_MATTER_OUTPUT: test-results/shared-matter
+      LPC_USE_BUILT_FRONTEND: "true"
+      LPC_SEARCH_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
+      LPC_HELP_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
+      LPC_HELP_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      LPC_SECURITY_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      LPC_PARA_CLOSURE_FRONTEND_ROOT: ${{ github.workspace }}/.lpc-build/frontend
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Install browser engines and system dependencies
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Build production frontend for browser verification
+        run: npm run build:frontend
+      - name: Run complete fixture-compatible role group
+        run: npm run test:playwright:critical:group -- --group "${{ matrix.group }}"
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "browser-role-journeys"
+          --key "${{ matrix.group }}" --artifact "browser-${{ matrix.group
+          }}-${{ github.run_id }}-${{ github.run_attempt }}" --path
+          "backend/test-results/junit" --record "${{ runner.temp
+          }}/lpc-artifact-browser-role-journeys-${{ matrix.group }}-1.json"
+      - name: Upload browser launch evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/junit
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Bound complete evidence before upload 2
+        id: evidence_limit_2
+        if: always()
+        run: node scripts/guard-ci-artifact-budget.js --job "browser-role-journeys"
+          --key "${{ matrix.group }}" --artifact "browser-failure-${{
+          matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}" --path
+          "backend/test-results" --record "${{ runner.temp
+          }}/lpc-artifact-browser-role-journeys-${{ matrix.group }}-2.json"
+      - name: Upload complete raw browser evidence
+        if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-failure-${{ matrix.group }}-${{ github.run_id }}-${{
+            github.run_attempt }}
+          path: backend/test-results
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  browser-contracts:
+    name: Full audit / Browser contracts
+    needs:
+      - browser-collection
+      - browser-checks
+      - browser-role-journeys
+      - selected-native-return
+    if: always() && (github.event_name != 'workflow_dispatch' ||
+      (inputs.execution_scope != 'backend-source' && inputs.execution_scope !=
+      'source-return'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every original browser scope and role group
+        working-directory: ${{ runner.temp }}
+        env:
+          COLLECTION_RESULT: ${{ needs.browser-collection.result }}
+          CHECKS_RESULT: ${{ needs.browser-checks.result }}
+          ROLES_RESULT: ${{ needs.browser-role-journeys.result }}
+          SELECTED_RESULT: ${{ needs.selected-native-return.result }}
+          RECOVERY_SCOPE: ${{ github.event_name == 'workflow_dispatch' &&
+            inputs.execution_scope == 'recovery-return' }}
+        run: |
+          if [ "$RECOVERY_SCOPE" = true ]; then
+            test "$SELECTED_RESULT" = success
+            test "$COLLECTION_RESULT" = skipped
+            test "$CHECKS_RESULT" = skipped
+            test "$ROLES_RESULT" = skipped
+          else
+            test "$COLLECTION_RESULT" = success
+            test "$CHECKS_RESULT" = success
+            test "$ROLES_RESULT" = success
+            test "$SELECTED_RESULT" = skipped
+          fi
+  dependency-review:
+    name: Full audit / Dependency review
+    if: github.event_name == 'pull_request' || (github.event_name ==
+      'workflow_dispatch' && inputs.execution_scope == 'recovery-return')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Reject vulnerable dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          base-ref: ${{ github.event_name == 'workflow_dispatch' &&
+            '501cee87480df00ce5a1afe1d0488a4fed34d5d5' || '' }}
+          head-ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
+          fail-on-severity: moderate
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later
+  codeql:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope !=
+      'source-return'
+    name: Full audit / CodeQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@988661ebb5e81487b3fb31b2185d2856c0a10679
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - name: Analyze source
+        uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679
+  secrets:
+    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope !=
+      'source-return'
+    name: Full audit / Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Scan repository history
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_COMMENTS: "false"
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: >
+          node scripts/guard-ci-artifact-budget.js --job "secrets" --key ""
+          --artifact "secret-scan-evidence-${{ github.run_id }}-${{
+          github.run_attempt }}" --path "results.sarif" --record "${{
+          runner.temp }}/lpc-artifact-secrets--1.json"
+
+          node - <<'JS'
+
+          function verifyRecoveryArtifactAllocation(prefix, recordPath, options
+          = {}) {
+            const assert = require("node:assert/strict"), crypto = require("node:crypto");
+            const env = options.env || process.env, read = options.read || require("node:fs").readFileSync;
+            if (env.GITHUB_EVENT_NAME !== "workflow_dispatch") return { profile: "ordinary-allocation" };
+            const event = JSON.parse(read(env.GITHUB_EVENT_PATH));
+            if (event.inputs?.execution_scope !== "recovery-return") return { profile: "ordinary-allocation" };
+            const fixed = { "candidate-identity": ["runtime-checks", 4 * 1024 ** 2], "secret-scan-evidence": ["secrets", 8 * 1024 ** 2] };
+            assert(Object.hasOwn(fixed, prefix));
+            const approved = event.inputs.continuation_plan_sha256;
+            assert(/^[a-f0-9]{64}$/.test(approved || ""));
+            const bytes = read("tests/playwright/acceptance/native-continuation-plan.json");
+            assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), approved);
+            const plan = JSON.parse(bytes), rows = plan.cloudEvidence?.recoveryArtifacts;
+            assert.equal(plan.candidateCommit, "@checked-out-head");
+            assert.equal(plan.sourcePins?.["backend/tests/playwright/acceptance/native-continuation-plan.json"], "@approved-plan");
+            assert(Array.isArray(rows) && rows.length === 5);
+            const matches = rows.filter(row => row.prefix === prefix);
+            assert.equal(matches.length, 1);
+            const [job, maximum] = fixed[prefix], row = matches[0];
+            assert.equal(row.job, job); assert.equal(row.key, ""); assert.equal(row.maxBytes, maximum);
+            const record = JSON.parse(read(recordPath));
+            assert.equal(record.schemaVersion, 1); assert.equal(record.repository, "thegitsss/lets-para3");
+            assert.equal(record.repository, env.GITHUB_REPOSITORY); assert.equal(record.headSha, env.GITHUB_SHA);
+            assert.equal(record.runId, env.GITHUB_RUN_ID); assert.equal(record.attempt, env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.artifact?.job, job); assert.equal(record.artifact?.key, "");
+            assert.equal(record.artifact?.name, prefix + "-" + env.GITHUB_RUN_ID + "-" + env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.completeEvidence, true); assert.equal(record.retentionDays, 1); assert.equal(record.compressionLevel, 9);
+            assert(Number.isSafeInteger(record.upperBoundBytes) && record.upperBoundBytes > 0 && record.upperBoundBytes <= maximum);
+            return { profile: "recovery-return", maximum, upperBoundBytes: record.upperBoundBytes };
+          }
+
+          verifyRecoveryArtifactAllocation("secret-scan-evidence",
+          require("node:path").join(process.env.RUNNER_TEMP,
+          "lpc-artifact-secrets--1.json"));
+
+          JS
+      - name: Upload complete redacted secret scan evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: secret-scan-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: results.sarif
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  source-bound-backend-return:
+    if: github.event_name == 'workflow_dispatch' && inputs.execution_scope ==
+      'source-return'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/backend-acceptance-return.yml
+    with:
+      bridge_sha256: ${{ inputs.continuation_plan_sha256 }}
+  selected-native-return:
+    if: github.event_name == 'workflow_dispatch' && (inputs.execution_scope ==
+      'source-return' || inputs.execution_scope == 'recovery-return')
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/native-acceptance-return.yml
+    with:
+      bridge_sha256: ${{ inputs.continuation_plan_sha256 }}
+  source-bound-recovery-return:
+    if: github.event_name == 'workflow_dispatch' && inputs.execution_scope ==
+      'recovery-return'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/backend-single-file-return.yml
+    with:
+      bridge_sha256: ${{ inputs.continuation_plan_sha256 }}

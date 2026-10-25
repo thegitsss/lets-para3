@@ -1,0 +1,707 @@
+{
+  "config": {
+    "argv": [
+      "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/samanthasider/Desktop/lets-para3/backend/node_modules/playwright/cli.js",
+      "test",
+      "-c",
+      "tests/playwright/attorney-v2/playwright.config.js",
+      "private-discovery.spec.js",
+      "saved-paralegals.spec.js",
+      "--grep",
+      "directory filters|directory and authorized|authorized profile meets|completion save persists|failed list reads",
+      "--reporter=line,json",
+      "--output=../outputs/completion-2026-09-29/discovery-layout-final-artifacts"
+    ],
+    "configFile": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2/playwright.config.js",
+    "rootDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/support/global.setup.js",
+    "globalTeardown": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/global.teardown.js",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-layout-final-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-layout-final-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/discovery-layout-final-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/attorney-v2",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "**/*.spec.js"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node \"/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/control-room/webServer.js\"",
+      "cwd": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T",
+      "port": 5051,
+      "reuseExistingServer": false,
+      "timeout": 240000,
+      "env": {
+        "CODEX_CI": "1",
+        "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
+        "CODEX_PERMISSION_PROFILE": ":workspace",
+        "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+        "CODEX_SESSION_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_THREAD_ID": "01a0d3bc-d593-76d0-b859-c31a9aaba5d4",
+        "CODEX_VERSION": "0.155.0-alpha.16.3",
+        "COLORTERM": "",
+        "COMMAND_MODE": "unix2003",
+        "DEBUG": "release",
+        "ELECTRON_RUN_AS_NODE": "1",
+        "GH_PAGER": "cat",
+        "GIT_PAGER": "cat",
+        "HOME": "/Users/samanthasider",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.UTF-8",
+        "LOGNAME": "samanthasider",
+        "MACH_PORT_RENDEZVOUS_PEER_VALDATION": "1",
+        "MallocNanoZone": "0",
+        "NVM_CD_FLAGS": "-q",
+        "NVM_DIR": "/Users/samanthasider/.nvm",
+        "OLDPWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "PAGER": "cat",
+        "PATH": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Users/samanthasider/.codex/tmp/arg0/codex-arg0tbDf52:/Users/samanthasider/.local/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/Users/samanthasider/.vscode/extensions/openai.chatgpt-26.5917.62051-darwin-x64/bin/macos-x86_64",
+        "PWD": "/Users/samanthasider/Desktop/lets-para3/backend",
+        "RUST_LOG": "warn",
+        "SHELL": "/bin/zsh",
+        "SHLVL": "0",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.bG4A0cldCu/Listeners",
+        "TERM": "dumb",
+        "TMPDIR": "/var/folders/_6/79fs82qx7qx891tglnlxwhxr0000gn/T/",
+        "USER": "samanthasider",
+        "VSCODE_CODE_CACHE_PATH": "/Users/samanthasider/Library/Application Support/Code/CachedData/04c0d99f4fb0d8afe6ce4f0c58e31e183ac3e4b1",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE": "extensionHost",
+        "VSCODE_CWD": "/",
+        "VSCODE_ESM_ENTRYPOINT": "vs/workbench/api/node/extensionHostProcess",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS": "true",
+        "VSCODE_IPC_HOOK": "/Users/samanthasider/Library/Application Support/Code/1.13-main.sock",
+        "VSCODE_NLS_CONFIG": "{\"userLocale\":\"en-us\",\"osLocale\":\"en-us\",\"resolvedLanguage\":\"en\",\"defaultMessagesFile\":\"/Applications/Visual Studio Code.app/Contents/Resources/app/out/nls.messages.json\",\"locale\":\"en-us\",\"availableLanguages\":{}}",
+        "VSCODE_PID": "31738",
+        "XPC_FLAGS": "0x0",
+        "XPC_SERVICE_NAME": "application.com.microsoft.VSCode.177954642.177954648",
+        "__CFBundleIdentifier": "com.microsoft.VSCode",
+        "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+        "PLAYWRIGHT_JSON_OUTPUT_NAME": "../outputs/completion-2026-09-29/discovery-layout-final.json",
+        "_": "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+        "PLAYWRIGHT_BASE_URL": "http://127.0.0.1:5051",
+        "EMAIL_DISABLE": "true",
+        "OPENAI_API_KEY": "",
+        "DATA_ENCRYPTION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "PLAYWRIGHT_MONGO_REPLICA_SET": "true",
+        "PLAYWRIGHT_INITIALIZE_ATTORNEY_MODELS": "true",
+        "PLAYWRIGHT_MONGO_PORT": "5889",
+        "PORT": "5051",
+        "NODE_ENV": "test"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "private-discovery.spec.js",
+      "file": "private-discovery.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "directory filters, paging, profiles and Back preserve context without business writes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2428,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:30.174Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-8fbb5679ee79a2884bc3",
+          "file": "private-discovery.spec.js",
+          "line": 197,
+          "column": 1
+        },
+        {
+          "title": "directory and authorized profile meet automated AA with long content and narrow layout",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3941,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:32.826Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-a843e64bea1a4ada6ab9",
+          "file": "private-discovery.spec.js",
+          "line": 288,
+          "column": 1
+        },
+        {
+          "title": "authorized profile meets dark-theme automated AA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2565,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:36.781Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-05a37128a50697f6deea",
+          "file": "private-discovery.spec.js",
+          "line": 308,
+          "column": 1
+        },
+        {
+          "title": "directory filters, paging, profiles and Back preserve context without business writes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5284,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:46.223Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-edd9f502bb7978554648",
+          "file": "private-discovery.spec.js",
+          "line": 197,
+          "column": 1
+        },
+        {
+          "title": "directory and authorized profile meet automated AA with long content and narrow layout",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3805,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:52.726Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-ffd244ac273ad69eb067",
+          "file": "private-discovery.spec.js",
+          "line": 288,
+          "column": 1
+        },
+        {
+          "title": "authorized profile meets dark-theme automated AA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2816,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:56.557Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-11e9050ac6ccbaa9170f",
+          "file": "private-discovery.spec.js",
+          "line": 308,
+          "column": 1
+        },
+        {
+          "title": "directory filters, paging, profiles and Back preserve context without business writes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5518,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:12:08.844Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-38df6944028726e1b488",
+          "file": "private-discovery.spec.js",
+          "line": 197,
+          "column": 1
+        },
+        {
+          "title": "directory and authorized profile meet automated AA with long content and narrow layout",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3822,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:12:14.739Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-68b917fdc1047f6f64aa",
+          "file": "private-discovery.spec.js",
+          "line": 288,
+          "column": 1
+        },
+        {
+          "title": "authorized profile meets dark-theme automated AA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3094,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:12:18.573Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "218ab4a02345b3329ef0-568740944ec5f8041f69",
+          "file": "private-discovery.spec.js",
+          "line": 308,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "saved-paralegals.spec.js",
+      "file": "saved-paralegals.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "completion save persists, opens the profile, and supports removal on desktop and mobile",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4135,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:39.364Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-3ed68ce17b963044eb50",
+          "file": "saved-paralegals.spec.js",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "failed list reads show Retry rather than an empty saved list",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1662,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:43.511Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-34cdab347a5462aa5543",
+          "file": "saved-paralegals.spec.js",
+          "line": 54,
+          "column": 1
+        },
+        {
+          "title": "completion save persists, opens the profile, and supports removal on desktop and mobile",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5516,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:11:59.391Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-3d18c5ee85c16cc2a85e",
+          "file": "saved-paralegals.spec.js",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "failed list reads show Retry rather than an empty saved list",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2345,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:12:04.919Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-6be6169fc58f597c883a",
+          "file": "saved-paralegals.spec.js",
+          "line": 54,
+          "column": 1
+        },
+        {
+          "title": "completion save persists, opens the profile, and supports removal on desktop and mobile",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5986,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:12:21.685Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-8619490f08187ee87a3b",
+          "file": "saved-paralegals.spec.js",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "failed list reads show Retry rather than an empty saved list",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2376,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T19:12:27.685Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e2ad930fb4fe15ac0cfc-45249e4051ca03ad654e",
+          "file": "saved-paralegals.spec.js",
+          "line": 54,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T19:10:31.394Z",
+    "duration": 118816.52299999999,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

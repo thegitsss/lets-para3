@@ -1753,41 +1753,41 @@ body.support-drawer-open .support-drawer { transform: translate3d(0, 0, 0); }
 :is(html, body).theme-dark .support-message--assistant .support-message-bubble { border: 0; background: transparent; }
 
 /* Compact assistant: explicit icon geometry isolates controls from host-page styles. */
-.support-drawer{font-size:14px;line-height:1.5}
+.support-drawer{font-size:calc(14 * var(--lpc-reading-unit, 1px));line-height:1.5}
 .support-drawer .support-drawer-header{min-height:54px;padding:10px 14px;gap:6px}
-.support-drawer .support-drawer-title{font-size:16px;line-height:1.3;margin:0}
-.support-drawer .support-drawer-subtitle{font-size:12px;line-height:1.4}
+.support-drawer .support-drawer-title{font-size:calc(16 * var(--lpc-reading-unit, 1px));line-height:1.3;margin:0}
+.support-drawer .support-drawer-subtitle{font-size:calc(12 * var(--lpc-reading-unit, 1px));line-height:1.4}
 .support-drawer .support-drawer-mark{width:28px;height:28px;min-width:28px}
 .support-drawer .support-drawer-mark svg{width:18px;height:18px}
 .support-drawer :is(.support-drawer-menu-trigger,.support-drawer-pin,.support-drawer-close,.support-message-utility){display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border-radius:5px}
 .support-drawer :is(.support-message-utility,.support-drawer-menu-trigger,.support-drawer-pin,.support-drawer-close) svg{display:block;flex:none;width:16px;height:16px;min-width:16px;max-width:16px;min-height:16px;max-height:16px}
 .support-drawer .support-thread{padding:16px;gap:16px}
 .support-drawer .support-message{gap:4px;max-width:94%}
-.support-drawer .support-message-bubble{font-size:14px;line-height:1.55;padding:9px 12px;border-radius:8px}
+.support-drawer .support-message-bubble{font-size:calc(14 * var(--lpc-reading-unit, 1px));line-height:1.55;padding:9px 12px;border-radius:8px}
 .support-drawer .support-message--assistant .support-message-bubble{padding:0;border-radius:0}
 .support-drawer .support-message-bubble :is(p,li){font-size:inherit;line-height:inherit}
 .support-drawer .support-message-bubble p{margin:0 0 8px}
 .support-drawer .support-message-bubble p:last-child{margin-bottom:0}
-.support-drawer .support-message-meta{font-size:11px;line-height:1.4}
+.support-drawer .support-message-meta{font-size:calc(11 * var(--lpc-reading-unit, 1px));line-height:1.4}
 .support-drawer .support-message-actions{gap:4px;margin-top:2px}
 .support-drawer .support-message-utilities{gap:2px}
-.support-drawer :is(.support-message-action,.support-suggested-reply,.support-quick-prompt,.support-escalation-button,.support-drawer-menu-item){min-height:32px;font-size:13px;line-height:1.4;padding:6px 10px}
+.support-drawer :is(.support-message-action,.support-suggested-reply,.support-quick-prompt,.support-escalation-button,.support-drawer-menu-item){min-height:32px;font-size:calc(13 * var(--lpc-reading-unit, 1px));line-height:1.4;padding:6px 10px}
 .support-drawer .support-quick-prompts{padding:0 16px 14px;gap:6px}
-.support-drawer .support-thread:empty::before{font-size:18px}
-.support-drawer .support-thread:empty::after{font-size:13px}
+.support-drawer .support-thread:empty::before{font-size:calc(18 * var(--lpc-reading-unit, 1px))}
+.support-drawer .support-thread:empty::after{font-size:calc(13 * var(--lpc-reading-unit, 1px))}
 .support-drawer .support-composer{padding:10px 12px 12px}
 .support-drawer .support-composer-shell{min-height:48px;border-radius:8px}
-.support-drawer .support-composer textarea{font-size:14px;min-height:48px;max-height:140px;padding:12px 50px 12px 12px;line-height:1.5}
-.support-drawer .support-composer-prompt{inset:13px 50px auto 12px;font-size:14px}
+.support-drawer .support-composer textarea{font-size:calc(14 * var(--lpc-reading-unit, 1px));min-height:48px;max-height:140px;padding:12px 50px 12px 12px;line-height:1.5}
+.support-drawer .support-composer-prompt{inset:13px 50px auto 12px;font-size:calc(14 * var(--lpc-reading-unit, 1px))}
 .support-drawer .support-send{width:32px;height:32px;min-width:32px;min-height:32px;right:8px;bottom:8px;padding:0}
 .support-drawer .support-send svg{width:16px;height:16px}
-.support-drawer .support-composer-hint{font-size:11px;margin-top:6px}
+.support-drawer .support-composer-hint{font-size:calc(11 * var(--lpc-reading-unit, 1px));margin-top:6px}
 .support-drawer .support-escalation-card{padding:10px 12px;border-radius:6px}
 @media(pointer:coarse),(max-width:680px){
  .support-drawer :is(.support-drawer-menu-trigger,.support-drawer-pin,.support-drawer-close,.support-message-utility,.support-send){width:44px;height:44px;min-width:44px;min-height:44px}
  .support-drawer :is(.support-message-action,.support-suggested-reply,.support-quick-prompt,.support-escalation-button,.support-drawer-menu-item){min-height:44px}
- .support-drawer .support-composer textarea{font-size:16px;min-height:60px;padding-right:60px}
- .support-drawer .support-composer-prompt{inset:14px 60px auto 12px;font-size:16px}
+ .support-drawer .support-composer textarea{font-size:calc(16 * var(--lpc-reading-unit, 1px));min-height:60px;padding-right:60px}
+ .support-drawer .support-composer-prompt{inset:14px 60px auto 12px;font-size:calc(16 * var(--lpc-reading-unit, 1px))}
  .support-drawer .support-composer{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 }
 .support-drawer .support-message-utility{color:var(--support-muted,#65738a)}

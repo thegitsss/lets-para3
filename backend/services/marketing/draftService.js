@@ -1,6 +1,7 @@
 const ApprovalTask = require("../../models/ApprovalTask");
 const MarketingBrief = require("../../models/MarketingBrief");
 const MarketingDraftPacket = require("../../models/MarketingDraftPacket");
+const { MARKETING_ACTIVE_WORKFLOW_TYPES } = require("./constants");
 const { buildMarketingContext } = require("../knowledge/retrievalService");
 const { publishEventSafe } = require("../lpcEvents/publishEventService");
 const { buildLinkedInCompanyPacketStrategy } = require("./linkedinCompanyStrategy");
@@ -92,12 +93,6 @@ function buildCtaOptions(workflowType, brief) {
           "Prompt readers to learn how LPC works before making claims about outcomes.",
           "Keep the CTA restrained and fit-focused.",
         ]
-      : workflowType === "facebook_page_post"
-        ? [
-            "Invite readers to learn more in a measured, factual way.",
-            "Keep the CTA restrained and informational.",
-            "Avoid hype or urgency language.",
-          ]
       : [
           "Invite readers to review the update in a measured, factual way.",
           "Keep the CTA operational, not hype-driven.",
@@ -134,7 +129,7 @@ function buildWhatNeedsSamantha(brief = {}) {
     "Select the final hook and CTA.",
     "Approve the final founder-voice framing.",
   ];
-  if (brief.workflowType === "linkedin_company_post" || brief.workflowType === "facebook_page_post") {
+  if (brief.workflowType === "linkedin_company_post") {
     items.push("Confirm the final company/page-safe framing before any publish action is taken.");
   }
   if (brief.workflowType === "platform_update_announcement") {
@@ -189,7 +184,7 @@ function buildLinkedInDraft({ brief, context, hooks, ctas }) {
   };
 }
 
-function buildLinkedInCompanyDraft({ brief, strategy }) {
+function buildLinkedInCompanyDraft({ strategy }) {
   const body = uniqueList([
     strategy.primaryHook,
     strategy.coreMessage,
@@ -212,23 +207,6 @@ function buildLinkedInCompanyDraft({ brief, strategy }) {
     closingCta: strategy.ctaOptions[0] || "",
     approvedPositioningBlocksUsed: strategy.approvedPositioningBlocksUsed,
     whyThisHelpsPageGrowth: strategy.whyThisHelpsPageGrowth,
-  };
-}
-
-function buildFacebookDraft({ brief, context, hooks, ctas }) {
-  const opening = hooks[0] || "LPC is built for a specific kind of professional work.";
-  const detail = context.distinctivenessCards[0]?.statement || context.positioningCards[0]?.statement || "";
-  const value = pickValueStatement(context.valueCards);
-  const fact = context.factCards[0]?.statement || "";
-
-  return {
-    channel: "facebook_page",
-    format: "page_post_packet",
-    openingHook: opening,
-    body: uniqueList([opening, detail, value, fact])
-      .filter(Boolean)
-      .join("\n\n"),
-    closingCta: ctas[0] || "",
   };
 }
 
@@ -331,6 +309,11 @@ async function generateDraftPacket({ briefId, actor = {} } = {}) {
   if (!brief) {
     throw new Error("Marketing brief not found.");
   }
+  if (!MARKETING_ACTIVE_WORKFLOW_TYPES.includes(brief.workflowType)) {
+    const error = new Error("This historical marketing workflow is read-only and cannot generate new drafts.");
+    error.statusCode = 409;
+    throw error;
+  }
 
   const context = await buildMarketingContext({
     workflowType: brief.workflowType,
@@ -377,10 +360,8 @@ async function generateDraftPacket({ briefId, actor = {} } = {}) {
   const channelDraft =
     brief.workflowType === "platform_update_announcement"
       ? buildAnnouncementDraft({ brief, context, hooks, ctas })
-      : brief.workflowType === "facebook_page_post"
-        ? buildFacebookDraft({ brief, context, hooks, ctas })
       : brief.workflowType === "linkedin_company_post"
-        ? buildLinkedInCompanyDraft({ brief, strategy: linkedinCompanyStrategy })
+        ? buildLinkedInCompanyDraft({ strategy: linkedinCompanyStrategy })
       : buildLinkedInDraft({ brief, context, hooks, ctas });
   const claimsToAvoid = uniqueList([
     ...flattenCardClaims(context.claimGuardrails),
@@ -391,7 +372,7 @@ async function generateDraftPacket({ briefId, actor = {} } = {}) {
   const packet = await MarketingDraftPacket.create({
     briefId: brief._id,
     workflowType: brief.workflowType,
-    channelKey: brief.channelKey || (brief.workflowType === "facebook_page_post" ? "facebook_page" : "linkedin_company"),
+    channelKey: brief.channelKey || "linkedin_company",
     packetVersion,
     approvalState: "pending_review",
     briefSummary: brief.briefSummary,
@@ -432,9 +413,7 @@ async function generateDraftPacket({ briefId, actor = {} } = {}) {
     packetSummary:
       brief.workflowType === "platform_update_announcement"
         ? "Draft platform update announcement packet awaiting Samantha review."
-        : brief.workflowType === "facebook_page_post"
-          ? "Draft Facebook Page post packet awaiting Samantha review."
-          : brief.workflowType === "linkedin_company_post"
+        : brief.workflowType === "linkedin_company_post"
             ? "Draft LinkedIn company post packet awaiting Samantha review."
         : "Draft founder LinkedIn packet awaiting Samantha review.",
     metadata: {
@@ -443,7 +422,7 @@ async function generateDraftPacket({ briefId, actor = {} } = {}) {
         note:
           brief.workflowType === "linkedin_company_post"
             ? "Run publish readiness before any LinkedIn company publish."
-            : "Facebook Page publishing is not implemented yet.",
+            : "This workflow creates an approval packet and has no direct publishing action.",
       },
     },
   });
@@ -465,22 +444,29 @@ async function generateDraftPacket({ briefId, actor = {} } = {}) {
 }
 
 async function ensureDraftPacketForBrief({ briefId, actor = {} } = {}) {
+  const brief = await MarketingBrief.findById(briefId).lean();
+  if (!brief) {
+    throw new Error("Marketing brief not found.");
+  }
+  if (!MARKETING_ACTIVE_WORKFLOW_TYPES.includes(brief.workflowType)) {
+    const error = new Error("This historical marketing workflow is read-only and cannot generate new drafts.");
+    error.statusCode = 409;
+    throw error;
+  }
+
   const existing = await MarketingDraftPacket.findOne({ briefId })
     .sort({ packetVersion: -1, createdAt: -1 })
     .lean();
   if (existing) {
-    const brief = await MarketingBrief.findById(briefId).lean();
-    if (brief) {
-      await createMarketingApprovalTask({
-        packet: existing,
-        brief,
-        actor: {
-          actorType: actor.actorType || "system",
-          userId: actor.userId || null,
-          label: actor.label || "Marketing Draft Service",
-        },
-      });
-    }
+    await createMarketingApprovalTask({
+      packet: existing,
+      brief,
+      actor: {
+        actorType: actor.actorType || "system",
+        userId: actor.userId || null,
+        label: actor.label || "Marketing Draft Service",
+      },
+    });
     return existing;
   }
 

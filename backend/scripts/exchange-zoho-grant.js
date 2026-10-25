@@ -1,13 +1,41 @@
+const fs = require("fs");
 const https = require("https");
 const path = require("path");
 const readline = require("readline");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
-const DIRECTOR_KEY = "SKYLER";
 const accountsBaseUrl = String(process.env.ZOHO_ACCOUNTS_BASE_URL || "https://accounts.zoho.com").replace(/\/+$/, "");
-const clientId = process.env[`DIRECTOR_ZOHO_${DIRECTOR_KEY}_CLIENT_ID`];
-const clientSecret = process.env[`DIRECTOR_ZOHO_${DIRECTOR_KEY}_CLIENT_SECRET`];
+const clientId = process.env.ZOHO_MAIL_CLIENT_ID;
+const clientSecret = process.env.ZOHO_MAIL_CLIENT_SECRET;
+const repositoryRoot = path.resolve(__dirname, "..", "..");
+
+function secureOutputPath(value) {
+  const raw = String(value || "").trim();
+  if (!raw || !path.isAbsolute(raw)) {
+    throw new Error("ZOHO_REFRESH_TOKEN_OUTPUT must be an absolute path outside the LPC repository.");
+  }
+  const resolved = path.resolve(raw);
+  if (resolved === repositoryRoot || resolved.startsWith(`${repositoryRoot}${path.sep}`)) {
+    throw new Error("ZOHO_REFRESH_TOKEN_OUTPUT must remain outside the LPC repository.");
+  }
+  return resolved;
+}
+
+function writeRefreshToken(refreshToken, outputPath) {
+  const target = secureOutputPath(outputPath);
+  const parent = path.dirname(target);
+  if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) {
+    throw new Error("The ZOHO_REFRESH_TOKEN_OUTPUT parent directory must already exist.");
+  }
+  fs.writeFileSync(target, `ZOHO_MAIL_REFRESH_TOKEN=${String(refreshToken || "").trim()}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+  fs.chmodSync(target, 0o600);
+  return target;
+}
 
 function ask(question) {
   const rl = readline.createInterface({
@@ -58,12 +86,20 @@ function postToken(params) {
 
 async function main() {
   if (!clientId || !clientSecret) {
-    console.error(`Missing DIRECTOR_ZOHO_${DIRECTOR_KEY}_CLIENT_ID or DIRECTOR_ZOHO_${DIRECTOR_KEY}_CLIENT_SECRET in backend/.env.`);
+    console.error("Missing ZOHO_MAIL_CLIENT_ID or ZOHO_MAIL_CLIENT_SECRET in backend/.env.");
     process.exit(1);
   }
 
-  console.log("This exchanges Skyler's temporary Zoho grant code for a refresh token.");
-  console.log("It reads the client ID/secret from backend/.env and does not print them.");
+  let outputPath;
+  try {
+    outputPath = secureOutputPath(process.env.ZOHO_REFRESH_TOKEN_OUTPUT);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  console.log("This exchanges a temporary Zoho grant code for the LPC Mail refresh token.");
+  console.log("Credentials and provider token payloads are never printed. The new file must not already exist.");
   const grantCode = await ask("Paste Zoho grant code: ");
   if (!grantCode) {
     console.error("No grant code entered.");
@@ -81,16 +117,24 @@ async function main() {
 
   const result = await postToken(params);
   if (!result.payload?.refresh_token) {
-    console.error("Zoho did not return a refresh token.");
-    console.error(JSON.stringify(result.payload, null, 2));
+    const providerCode = String(result.payload?.error || "unknown_error").replace(/[^a-z0-9_.-]/gi, "_").slice(0, 80);
+    console.error(`Zoho token exchange failed (HTTP ${Number(result.statusCode) || 0}, code ${providerCode}).`);
     process.exit(1);
   }
 
-  console.log("\nAdd this value to backend/.env and Render:");
-  console.log(`DIRECTOR_ZOHO_${DIRECTOR_KEY}_REFRESH_TOKEN=${result.payload.refresh_token}`);
+  const writtenPath = writeRefreshToken(result.payload.refresh_token, outputPath);
+  console.log(`Refresh token written once to ${writtenPath} with mode 0600.`);
+  console.log("Move it to the approved secret stores, then securely delete the file.");
 }
 
-main().catch((err) => {
-  console.error(err?.message || err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err?.message || "Zoho token exchange failed.");
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  secureOutputPath,
+  writeRefreshToken,
+};

@@ -43,7 +43,17 @@ function publishCaseEvent(caseId, event, payload = {}) {
   }
 }
 
+// A delete change may not include the deleted record's Matter ID unless Mongo
+// pre-images are enabled. In that rare case, invalidate only currently open
+// workspaces. Their normal authorized fetch decides what remains visible.
+function publishAllCaseEvents(event, payload = {}) {
+  [...subscribers.keys()].forEach((caseId) => {
+    publishCaseEvent(caseId, event, payload);
+  });
+}
+
 module.exports = {
   addSubscriber,
+  publishAllCaseEvents,
   publishCaseEvent,
 };

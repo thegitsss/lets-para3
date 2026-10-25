@@ -33,7 +33,7 @@ function assertCcoAutonomyHarnessEnabled(env = process.env) {
   }
 }
 
-function requireCcoAutonomyHarnessEnabled(req, res, next) {
+function requireCcoAutonomyHarnessEnabled(_req, res, next) {
   if (!isCcoAutonomyHarnessEnabled(process.env)) {
     return res.status(404).json({ error: "Not found" });
   }

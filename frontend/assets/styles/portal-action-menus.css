@@ -1,0 +1,36 @@
+body.lpc-v2 {
+  --ref-surface:#fff; --ref-soft:#f0f2f5; --ref-hover:#e7ebf0;
+  --ref-ink:#263347; --ref-muted:#637087; --ref-line:#dce1e8;
+  --ref-accent:#365f9c; --ref-primary:#10243f; --ref-on-primary:#fff;
+  --ref-shadow:0 0 0 1px #1526400a,0 12px 40px #15264020;
+}
+:root.theme-dark body.lpc-v2 {
+  --ref-surface:#202226; --ref-soft:#2c3036; --ref-hover:#343a43;
+  --ref-ink:#e0e4eb; --ref-muted:#a7b0bf; --ref-line:#424954;
+  --ref-accent:#b2c8f5; --ref-primary:#b2c8f5; --ref-on-primary:#18283f;
+  --ref-shadow:0 0 0 1px #ffffff12,0 12px 40px #00000055;
+}
+
+:root body.lpc-v2 .lpc-profile-photo-menu { position:relative; }
+:root body.lpc-v2 .lpc-profile-photo-menu > summary { display:grid; place-items:center; width:28px; height:28px; list-style:none; cursor:pointer; border-radius:4px; }
+:root body.lpc-v2 .lpc-profile-photo-menu > summary::-webkit-details-marker { display:none; }
+:root body.lpc-v2 .lpc-profile-photo-menu > div { position:absolute; z-index:20; top:100%; left:0; }
+/* Menus are compact action rows, not collections of large standalone buttons. */
+:root body.lpc-v2 :is(.v2-profile-document-menu-items,.lpc-profile-photo-menu > div) {
+  width:176px; min-width:0; padding:4px; gap:0; border:1px solid var(--ref-line);
+  border-radius:7px; background:var(--ref-surface); box-shadow:var(--ref-shadow);
+}
+:root body.lpc-v2 :is(.v2-profile-document-menu-items,.lpc-profile-photo-menu > div) > :is(button,a) {
+  display:flex; align-items:center; justify-content:flex-start; text-decoration:none !important; width:100%; min-width:0; min-height:32px !important; margin:0;
+  padding:6px 8px; border:0; border-radius:3px; background:transparent; box-shadow:none;
+  color:var(--ref-ink); font:400 calc(14 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; font-weight:400 !important; text-align:left;
+}
+:root body.lpc-v2 :is(.v2-profile-document-menu-items,.lpc-profile-photo-menu > div) > :is(button,a):hover { background:var(--ref-soft); }
+:root body.lpc-v2 :is(.v2-profile-document-menu-items,.lpc-profile-photo-menu > div) > :is(button,a):focus-visible { outline:2px solid var(--ref-accent); outline-offset:-2px; background:var(--ref-soft); }
+
+
+:root body.lpc-v2 :is(.v2-profile-document-menu-items,.lpc-profile-photo-menu > div) > :is(button,a):disabled { opacity:.45; cursor:default; }
+:root body.lpc-v2 :is(.v2-profile-document-menu > summary,.lpc-profile-photo-menu > summary):focus-visible { outline:2px solid var(--ref-accent); outline-offset:2px; }
+:root body.lpc-v2 .lpc-profile-photo-menu > div > button:last-child { color:#b32635; }
+:root.theme-dark body.lpc-v2 .lpc-profile-photo-menu > div > button:last-child { color:#ff9ba5; }
+@media(pointer:coarse) { :root body.lpc-v2 :is(.v2-profile-document-menu-items,.lpc-profile-photo-menu > div) > :is(button,a) { min-height:40px !important; } }

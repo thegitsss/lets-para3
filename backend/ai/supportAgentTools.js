@@ -9,6 +9,7 @@ const Payout = require("../models/Payout");
 const User = require("../models/User");
 const { decryptCaseFilePayload } = require("../utils/dataEncryption");
 const { normalizeCaseStatus } = require("../utils/caseState");
+const { resolveMatterDeadlineDate } = require("../utils/businessDate");
 const { isBlockedBetween } = require("../utils/blocks");
 const { retrieveSupportKnowledge } = require("../services/knowledge/retrievalService");
 const {
@@ -72,14 +73,14 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_my_case_overview",
     description:
-      "Get exact, live counts and recent summaries of cases visible to the signed-in user. Use for totals, completed cases, open cases, workload, and status questions.",
+      "Get exact, live counts and recent summaries of Matters visible to the signed-in user. Use for totals, completed Matters, open Matters, workload, and status questions.",
     parameters: {
       type: "object",
       properties: {
         status_scope: {
           type: "string",
           enum: ["all", "active", "completed"],
-          description: "Which cases to include in the recent-case list. Counts for every status are always returned.",
+          description: "Which Matters to include in the recent-Matter list. Counts for every status are always returned.",
         },
       },
       required: ["status_scope"],
@@ -91,13 +92,13 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_case_details",
     description:
-      "Resolve a case the user can access and return its live status, deadline, task counts, applicant count, and workspace state. Never use for a different user's case.",
+      "Resolve a Matter the user can access and return its live status, deadline, task counts, applicant count, and workspace state. Never use this for another user's Matter.",
     parameters: {
       type: "object",
       properties: {
         case_reference: {
           type: "string",
-          description: "Case ID, case title, or the user's natural-language reference such as 'the Smith matter'.",
+          description: "Matter ID, Matter title, or the user's natural-language reference such as 'the Smith matter'.",
         },
       },
       required: ["case_reference"],
@@ -109,13 +110,13 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_attorney_case_financials",
     description:
-      "Get the exact financial breakdown for one of the signed-in attorney's matters: matter amount, attorney platform fee, total attorney charge, paralegal platform fee, and actual or calculated net paralegal payout. Use for direct amount questions and follow-ups such as 'how much was that for?', 'both', 'what was I charged?', or 'what did the paralegal receive?'. Resolve pronouns from conversation history and pass the previously discussed case title or ID.",
+      "Get the exact financial breakdown for one of the signed-in attorney's Matters: Matter amount, attorney platform fee, total attorney charge, paralegal platform fee, and actual or calculated net paralegal payout. Use for direct amount questions and follow-ups such as 'how much was that for?', 'both', 'what was I charged?', or 'what did the paralegal receive?'. Resolve pronouns from conversation history and pass the previously discussed Matter title or ID.",
     parameters: {
       type: "object",
       properties: {
         case_reference: {
           type: "string",
-          description: "Case ID or case title. For a follow-up, reuse the case identified in the earlier conversation turn.",
+          description: "Matter ID or Matter title. For a follow-up, reuse the Matter identified in the earlier conversation turn.",
         },
       },
       required: ["case_reference"],
@@ -133,7 +134,7 @@ const TOOL_DEFINITIONS = Object.freeze({
       properties: {
         case_reference: {
           type: "string",
-          description: "Case ID or title. For a follow-up, reuse the case identified in conversation history.",
+          description: "Matter ID or title. For a follow-up, reuse the Matter identified in conversation history.",
         },
       },
       required: ["case_reference"],
@@ -160,7 +161,7 @@ const TOOL_DEFINITIONS = Object.freeze({
   get_next_deadline: {
     type: "function",
     name: "get_next_deadline",
-    description: "Get the signed-in attorney or paralegal's next live upcoming case deadline.",
+    description: "Get the signed-in attorney or paralegal's next live upcoming Matter deadline.",
     parameters: EMPTY_PARAMETERS,
     strict: true,
   },
@@ -168,7 +169,7 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_pending_paralegal_activity",
     description:
-      "For an attorney, check every active case for activity explicitly attributable to a paralegal, including invitations, pre-engagement responses, and message replies. Unassigned embedded scope tasks are intentionally excluded.",
+      "For an attorney, check every active Matter for activity explicitly attributable to a paralegal, including invitations, pre-engagement responses, and message replies. Unassigned embedded scope tasks are intentionally excluded.",
     parameters: EMPTY_PARAMETERS,
     strict: true,
   },
@@ -176,7 +177,7 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_attorney_application_activity",
     description:
-      "For an attorney, return exact pending application counts and recent applicant names for the attorney's cases. Use for who applied, new applicants, and applications awaiting review.",
+      "For an attorney, return exact pending application counts and recent applicant names for the attorney's Matters. Use for who applied, new applicants, and applications awaiting review.",
     parameters: EMPTY_PARAMETERS,
     strict: true,
   },
@@ -184,7 +185,7 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_attorney_message_activity",
     description:
-      "For an attorney, check all active case conversations for unread paralegal messages, threads awaiting the attorney's reply, and threads awaiting a paralegal reply.",
+      "For an attorney, check all active Matter conversations for unread paralegal messages, threads awaiting the attorney's reply, and threads awaiting a paralegal reply.",
     parameters: EMPTY_PARAMETERS,
     strict: true,
   },
@@ -232,7 +233,7 @@ const TOOL_DEFINITIONS = Object.freeze({
       properties: {
         case_reference: {
           type: "string",
-          description: "An owned case ID or title. Reuse the verified conversation matter for a follow-up.",
+          description: "An owned Matter ID or title. Reuse the verified Matter from the conversation for a follow-up.",
         },
       },
       required: ["case_reference"],
@@ -267,13 +268,13 @@ const TOOL_DEFINITIONS = Object.freeze({
     type: "function",
     name: "get_messaging_state",
     description:
-      "Check whether messaging is available in a case, whether the user can send, and the latest message activity. Use for message access and response-state questions.",
+      "Check whether messaging is available in a Matter, whether the user can send, and the latest message activity. Use for message access and response-state questions.",
     parameters: {
       type: "object",
       properties: {
         case_reference: {
           type: "string",
-          description: "Case ID, title, or natural-language case reference. Use an empty string only when current page context identifies the case.",
+          description: "Matter ID, title, or natural-language Matter reference. Use an empty string only when current page context identifies the Matter.",
         },
       },
       required: ["case_reference"],
@@ -360,28 +361,28 @@ const ROLE_TOOL_NAMES = Object.freeze({
 
 const NAVIGATION_BY_ROLE = Object.freeze({
   attorney: {
-    cases: { ctaLabel: "My cases", ctaHref: "dashboard-attorney.html#cases" },
-    completed_cases: { ctaLabel: "My cases", ctaHref: "dashboard-attorney.html#cases" },
-    create_case: { ctaLabel: "Post a case", ctaHref: "create-case.html" },
-    billing: { ctaLabel: "Billing & payments", ctaHref: "dashboard-attorney.html#billing" },
-    messages: { ctaLabel: "My cases", ctaHref: "dashboard-attorney.html#cases" },
+    cases: { ctaLabel: "Matters", ctaHref: "dashboard-attorney.html#cases" },
+    completed_cases: { ctaLabel: "Matters", ctaHref: "dashboard-attorney.html#cases" },
+    create_case: { ctaLabel: "Post a Matter", ctaHref: "create-case.html" },
+    billing: { ctaLabel: "Payments", ctaHref: "dashboard-attorney.html#funds" },
+    messages: { ctaLabel: "Matters", ctaHref: "dashboard-attorney.html#cases" },
     profile: { ctaLabel: "Profile settings", ctaHref: "profile-settings.html" },
     support: { ctaLabel: "Help center", ctaHref: "help.html" },
     contact: { ctaLabel: "Contact Us", ctaHref: "contact.html" },
   },
   paralegal: {
-    cases: { ctaLabel: "My cases", ctaHref: "dashboard-paralegal.html#cases" },
-    completed_cases: { ctaLabel: "Completed cases", ctaHref: "dashboard-paralegal.html#cases-completed" },
+    cases: { ctaLabel: "My Matters & Applications", ctaHref: "dashboard-paralegal.html#cases" },
+    completed_cases: { ctaLabel: "Completed Matters", ctaHref: "dashboard-paralegal.html#cases-completed" },
     applications: { ctaLabel: "My applications", ctaHref: "dashboard-paralegal.html#cases" },
-    browse_cases: { ctaLabel: "Browse cases", ctaHref: "browse-jobs.html" },
+    browse_cases: { ctaLabel: "Browse Matters", ctaHref: "browse-jobs.html" },
     payouts: { ctaLabel: "Payout settings", ctaHref: "profile-settings.html" },
-    messages: { ctaLabel: "My cases", ctaHref: "dashboard-paralegal.html#cases" },
+    messages: { ctaLabel: "My Matters & Applications", ctaHref: "dashboard-paralegal.html#cases" },
     profile: { ctaLabel: "Profile settings", ctaHref: "profile-settings.html" },
     support: { ctaLabel: "Help center", ctaHref: "help.html" },
     contact: { ctaLabel: "Contact Us", ctaHref: "contact.html" },
   },
   admin: {
-    cases: { ctaLabel: "Case operations", ctaHref: "admin-dashboard.html#overview" },
+    cases: { ctaLabel: "Matter operations", ctaHref: "admin-dashboard.html#overview" },
     support: { ctaLabel: "Support Ops", ctaHref: "admin-dashboard.html#support-ops" },
     knowledge: { ctaLabel: "Knowledge Studio", ctaHref: "admin-dashboard.html#knowledge-studio" },
     users: { ctaLabel: "User management", ctaHref: "admin-dashboard.html#user-management" },
@@ -464,7 +465,7 @@ function buildSafeCaseSummary(caseDoc = {}) {
     caseId: normalizeId(caseDoc._id),
     title: String(caseDoc.title || "Untitled matter"),
     status: normalizeCaseStatus(caseDoc.status),
-    deadline: serializeDate(caseDoc.deadline),
+    deadline: resolveMatterDeadlineDate(caseDoc) || null,
     incompleteTaskCount: incompleteTasks,
     pendingApplicationCount: pendingApplications,
     updatedAt: serializeDate(caseDoc.updatedAt),
@@ -477,7 +478,7 @@ async function getMyCaseOverview(user = {}, statusScope = "all") {
     return { available: false, reason: "unsupported_role" };
   }
   const cases = await Case.find(buildCaseAccessQuery(user))
-    .select("_id title status deadline tasks applicants updatedAt")
+    .select("_id title status deadline deadlineDate tasks applicants updatedAt")
     .sort({ updatedAt: -1, _id: -1 })
     .lean();
   const byStatus = {};
@@ -772,7 +773,7 @@ function sanitizeCaseSnapshot(snapshot = {}) {
     reason: String(snapshot.reason || ""),
     title: String(snapshot.title || ""),
     status: normalizeCaseStatus(snapshot.status),
-    deadline: serializeDate(snapshot.deadline),
+    deadline: resolveMatterDeadlineDate(snapshot) || null,
     readOnly: snapshot.readOnly === true,
     paymentReleased: snapshot.paymentReleased === true,
     paidOutAt: serializeDate(snapshot.paidOutAt),
@@ -821,16 +822,16 @@ function buildCaseClarification(resolution = {}) {
   };
 }
 
-function buildContextualCaseReference(caseReference = "", conversationHistory = []) {
+function buildContextualCaseReference(caseReference = "") {
   // History identifies intent but is not an entity query. Mixing old case names
   // into a fresh lookup can silently select the wrong owned matter.
   return String(caseReference || "").trim().slice(0, 1000);
 }
 
-async function getCaseDetails({ user, caseReference, pageContext, previousState, conversationHistory = [] }) {
+async function getCaseDetails({ user, caseReference, pageContext, previousState }) {
   const resolution = await resolveCaseForTool({
     user,
-    caseReference: buildContextualCaseReference(caseReference, conversationHistory),
+    caseReference: buildContextualCaseReference(caseReference),
     pageContext,
     previousState,
   });
@@ -884,14 +885,13 @@ async function getAttorneyCaseWorkspace({
   caseReference,
   pageContext,
   previousState,
-  conversationHistory = [],
 }) {
   if (normalizeRole(user) !== "attorney") {
     return { available: false, reason: "attorney_access_required" };
   }
   const resolution = await resolveCaseForTool({
     user,
-    caseReference: buildContextualCaseReference(caseReference, conversationHistory),
+    caseReference: buildContextualCaseReference(caseReference),
     pageContext,
     previousState,
   });
@@ -957,7 +957,7 @@ async function getAttorneyCaseWorkspace({
     title: String(caseDoc.title || "Untitled matter"),
     practiceArea: String(caseDoc.practiceArea || ""),
     status: normalizeCaseStatus(caseDoc.status),
-    deadline: serializeDate(caseDoc.deadline),
+    deadline: resolveMatterDeadlineDate(caseDoc) || null,
     readOnly: caseDoc.readOnly === true,
     workspaceAccessible: snapshot.accessible === true,
     assignedParalegal: assignedParalegalId
@@ -1153,12 +1153,11 @@ async function getAttorneyCaseFinancials({
   caseReference,
   pageContext,
   previousState,
-  conversationHistory = [],
 }) {
   if (normalizeRole(user) !== "attorney") {
     return { available: false, reason: "attorney_access_required" };
   }
-  const contextualCaseReference = buildContextualCaseReference(caseReference, conversationHistory);
+  const contextualCaseReference = buildContextualCaseReference(caseReference);
   const resolution = await resolveCaseForTool({
     user,
     caseReference: contextualCaseReference,
@@ -1306,7 +1305,7 @@ function sanitizePendingParalegalSnapshot(snapshot = {}) {
       caseId: String(item.caseId || ""),
       title: String(item.title || ""),
       status: normalizeCaseStatus(item.status),
-      deadline: serializeDate(item.deadline),
+      deadline: resolveMatterDeadlineDate(item) || null,
       reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
       incompleteTaskCount: item.incompleteTaskCount == null ? null : Number(item.incompleteTaskCount),
       taskResponsibilityState: String(item.taskResponsibilityState || ""),
@@ -1481,10 +1480,7 @@ async function getAttorneyWorkflowReadiness(user = {}, pageContext = {}) {
         allScopeTasksCompleteRequired: policy.complete_and_release.allScopeTasksComplete === true,
         verifiedFundingRequired: policy.complete_and_release.verifiedFundingRequired === true,
         paralegalPayoutSetupRequired: policy.complete_and_release.paralegalPayoutSetupRequired === true,
-        bankDepositEstimateBusinessDays: {
-          minimum: Number(policy.complete_and_release.bankDepositEstimateBusinessDays?.minimum || 0),
-          maximum: Number(policy.complete_and_release.bankDepositEstimateBusinessDays?.maximum || 0),
-        },
+        bankDepositTimingSource: String(policy.complete_and_release.bankDepositTimingSource || ""),
         bankDepositTimingDependsOn: [...(policy.complete_and_release.bankDepositTimingDependsOn || [])],
         resultingMatterStatus: String(policy.complete_and_release.resultingMatterStatus || ""),
         paymentReleased: policy.complete_and_release.paymentReleased === true,
@@ -1564,14 +1560,13 @@ async function getAttorneyMatterReadiness({
   caseReference,
   pageContext,
   previousState,
-  conversationHistory = [],
 }) {
   if (normalizeRole(user) !== "attorney") {
     return { available: false, reason: "attorney_access_required" };
   }
   const resolution = await resolveCaseForTool({
     user,
-    caseReference: buildContextualCaseReference(caseReference, conversationHistory),
+    caseReference: buildContextualCaseReference(caseReference),
     pageContext,
     previousState,
     task: "FACT_LOOKUP",
@@ -1694,7 +1689,6 @@ async function executeAuthorizedSupportManagerTool(name, args = {}, context = {}
           caseReference: args.case_reference,
           pageContext: context.pageContext,
           previousState: context.conversationState,
-          conversationHistory: context.conversationHistory,
         })),
       };
     case "get_attorney_case_financials":
@@ -1705,7 +1699,6 @@ async function executeAuthorizedSupportManagerTool(name, args = {}, context = {}
           caseReference: args.case_reference,
           pageContext: context.pageContext,
           previousState: context.conversationState,
-          conversationHistory: context.conversationHistory,
         })),
       };
     case "get_attorney_case_workspace":
@@ -1716,7 +1709,6 @@ async function executeAuthorizedSupportManagerTool(name, args = {}, context = {}
           caseReference: args.case_reference,
           pageContext: context.pageContext,
           previousState: context.conversationState,
-          conversationHistory: context.conversationHistory,
         })),
       };
     case "get_attorney_receipt_history":
@@ -1754,7 +1746,6 @@ async function executeAuthorizedSupportManagerTool(name, args = {}, context = {}
           caseReference: args.case_reference,
           pageContext: context.pageContext,
           previousState: context.conversationState,
-          conversationHistory: context.conversationHistory,
         })),
       };
     case "get_attorney_billing_summary":
@@ -1781,7 +1772,7 @@ async function executeAuthorizedSupportManagerTool(name, args = {}, context = {}
     case "get_messaging_state": {
       const resolution = await resolveCaseForTool({
         user: context.user,
-        caseReference: buildContextualCaseReference(args.case_reference, context.conversationHistory),
+        caseReference: buildContextualCaseReference(args.case_reference),
         pageContext: context.pageContext,
         previousState: context.conversationState,
         task: "TROUBLESHOOT",

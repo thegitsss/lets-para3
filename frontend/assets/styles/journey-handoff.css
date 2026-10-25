@@ -1,0 +1,14 @@
+.lpc-journey-handoff { display:block; padding:16px 0; border-bottom:1px solid var(--av2-line,var(--v2-border,var(--border-color,#dce2e8))); color:inherit; max-width:100%; }
+.lpc-journey-handoff .lpc-journey-owner { margin:0 0 4px; font-size:12px; opacity:.75; }
+.lpc-journey-handoff h2 { margin:0 0 6px; font:inherit; font-size:16px; }
+.lpc-journey-handoff p { margin:0 0 8px; line-height:1.5; overflow-wrap:anywhere; }
+.lpc-journey-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 20px; }
+.lpc-journey-actions a,.lpc-journey-actions button { color:inherit; font:inherit; font-size:13px; text-decoration:underline; text-underline-offset:3px; }
+.lpc-journey-actions button { background:transparent; border:0; padding:8px 0; cursor:pointer; }
+.lpc-journey-actions :focus-visible { outline:2px solid currentColor; outline-offset:4px; }
+@media(max-width:520px) { .lpc-journey-actions a,.lpc-journey-actions button { display:inline-flex; align-items:center; min-height:44px; } }
+
+.av2-journey-row { width:100%; min-width:0; }
+.av2-journey-row:empty { display:none; }
+
+.lpc-journey-draft-notice { margin:0 0 10px; color:inherit; font:inherit; font-size:13px; line-height:1.45; overflow-wrap:anywhere; }

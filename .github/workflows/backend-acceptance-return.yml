@@ -1,0 +1,47 @@
+name: Source-bound backend acceptance return
+
+on:
+  workflow_call:
+    inputs:
+      bridge_sha256:
+        description: Externally reviewed shared acceptance plan SHA-256
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  source-bound-backend-return:
+    name: Source-bound backend acceptance return
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact dispatched source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - name: Verify pinned Node and npm runtimes
+        run: node backend/scripts/verify-runtime.js
+      - name: Verify actual original source-bound backend evidence
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LPC_BACKEND_RETURN_BRIDGE_SHA256: ${{ inputs.bridge_sha256 }}
+        run: node backend/scripts/verify-source-bound-backend-return.js
+      - name: Require source checks and the exact complete backend union
+        if: always()
+        working-directory: ${{ runner.temp }}
+        env:
+          CHECKS_RESULT: ${{ steps.verify.outputs.checks_result }}
+          SHARDS_RESULT: ${{ steps.verify.outputs.shards_result }}
+          COVERAGE_RESULT: ${{ steps.verify.outputs.coverage_result }}
+        run: |-
+          test "$CHECKS_RESULT" = success
+          test "$SHARDS_RESULT" = success
+          test "$COVERAGE_RESULT" = success

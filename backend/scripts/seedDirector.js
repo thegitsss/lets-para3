@@ -1,85 +1,151 @@
-const path = require("path");
 const fs = require("fs");
+const path = require("path");
 const mongoose = require("mongoose");
 
-require("dotenv").config({ path: path.join(__dirname, "../.env") });
+require("dotenv").config({ path: path.join(__dirname, "../.env"), quiet: true });
 
+const AuditLog = require("../models/AuditLog");
 const DirectorProfile = require("../models/DirectorProfile");
 const User = require("../models/User");
+const { revokeAllUserSessions } = require("../services/authSessionService");
+const { validateNewPassword } = require("../utils/passwordPolicy");
+const {
+  MONGO_OPERATION_OPTIONS,
+  requireMongoUri,
+} = require("../utils/mongooseOperationPolicy");
 
-const raw = process.env.MONGO_URI || "";
-const MONGO = /<cluster>/.test(raw) || !raw ? "mongodb://127.0.0.1:27017/lets-para" : raw;
-const DIRECTOR_EMAIL = String(process.env.DIRECTOR_EMAIL || "skyler@lets-paraconnect.com").trim().toLowerCase();
-const DIRECTOR_PASSWORD = process.env.DIRECTOR_PASSWORD || "";
-const DIRECTOR_FIRST_NAME = String(process.env.DIRECTOR_FIRST_NAME || "Skyler").trim();
-const DIRECTOR_LAST_NAME = String(process.env.DIRECTOR_LAST_NAME || "Director").trim();
-const DIRECTOR_ACTIVE_STATE = String(process.env.DIRECTOR_ACTIVE_STATE || "TX").trim().toUpperCase();
-const DIRECTOR_OUTREACH_SUBJECT = String(
-  process.env.DIRECTOR_OUTREACH_SUBJECT || "for matters that need an extra hand next"
-).trim();
-const DIRECTOR_OUTREACH_TEMPLATE_TEXT = String(process.env.DIRECTOR_OUTREACH_TEMPLATE_TEXT || "").trim();
-const DIRECTOR_OUTREACH_TEMPLATE_FILE = String(process.env.DIRECTOR_OUTREACH_TEMPLATE_FILE || "").trim();
+const MAX_TEMPLATE_BYTES = 256 * 1024;
 
-function readTemplateHtml() {
-  const inlineHtml = String(process.env.DIRECTOR_OUTREACH_TEMPLATE_HTML || "").trim();
+function readTemplateHtml(env = process.env) {
+  const inlineHtml = String(env.DIRECTOR_OUTREACH_TEMPLATE_HTML || "").trim();
   if (inlineHtml) return inlineHtml;
-  if (!DIRECTOR_OUTREACH_TEMPLATE_FILE) return "";
-  const filePath = path.resolve(DIRECTOR_OUTREACH_TEMPLATE_FILE);
-  const html = fs.readFileSync(filePath, "utf8").trim();
-  return html.replace(/&lt;p&gt;Hi\s+\{\{attorneyName\}\},&lt;\/p&gt;/i, "<p>Hi {{attorneyName}},</p>");
+  const configuredPath = String(env.DIRECTOR_OUTREACH_TEMPLATE_FILE || "").trim();
+  if (!configuredPath) return "";
+
+  const filePath = path.resolve(configuredPath);
+  const stat = fs.lstatSync(filePath);
+  if (!stat.isFile() || stat.isSymbolicLink()) {
+    throw new Error("DIRECTOR_OUTREACH_TEMPLATE_FILE must identify a regular, non-symlink file.");
+  }
+  if (stat.size > MAX_TEMPLATE_BYTES) {
+    throw new Error(`DIRECTOR_OUTREACH_TEMPLATE_FILE must not exceed ${MAX_TEMPLATE_BYTES} bytes.`);
+  }
+  return fs
+    .readFileSync(filePath, "utf8")
+    .trim()
+    .replace(/&lt;p&gt;Hi\s+\{\{attorneyName\}\},&lt;\/p&gt;/i, "<p>Hi {{attorneyName}},</p>");
 }
 
-const DIRECTOR_OUTREACH_TEMPLATE_HTML = readTemplateHtml();
+function directorSeedConfiguration(env = process.env) {
+  const mongoUri = requireMongoUri(env.MONGO_URI);
+  const email = String(env.DIRECTOR_EMAIL || "").trim().toLowerCase();
+  const confirmationEmail = String(env.SEED_DIRECTOR_CONFIRM_EMAIL || "").trim().toLowerCase();
+  const firstName = String(env.DIRECTOR_FIRST_NAME || "Director").trim();
+  const lastName = String(env.DIRECTOR_LAST_NAME || "User").trim();
+  const activeState = String(env.DIRECTOR_ACTIVE_STATE || "").trim().toUpperCase();
+  const passwordPolicy = validateNewPassword(env.DIRECTOR_PASSWORD || "", {
+    user: { email, firstName, lastName },
+  });
 
-async function seedDirector() {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Set DIRECTOR_EMAIL to the exact director email address.");
+  }
+  if (confirmationEmail !== email) {
+    throw new Error("SEED_DIRECTOR_CONFIRM_EMAIL must exactly match DIRECTOR_EMAIL.");
+  }
+  if (!passwordPolicy.ok) throw new Error(passwordPolicy.error);
+  if (!/^[A-Z]{2}$/.test(activeState)) {
+    throw new Error("DIRECTOR_ACTIVE_STATE must be a two-letter US state abbreviation.");
+  }
+
+  return {
+    mongoUri,
+    email,
+    password: passwordPolicy.password,
+    firstName,
+    lastName,
+    activeState,
+    outreachSubject: String(
+      env.DIRECTOR_OUTREACH_SUBJECT || "for matters that need an extra hand next"
+    ).trim(),
+    outreachTemplateText: String(env.DIRECTOR_OUTREACH_TEMPLATE_TEXT || "").trim(),
+    outreachTemplateHtml: readTemplateHtml(env),
+  };
+}
+
+async function seedDirector({ env = process.env } = {}) {
+  const config = directorSeedConfiguration(env);
   try {
-    await mongoose.connect(MONGO);
+    await mongoose.connect(config.mongoUri, MONGO_OPERATION_OPTIONS);
 
-    let user = await User.findOne({ email: DIRECTOR_EMAIL }).select("+password");
-    if (!user) {
-      if (!DIRECTOR_PASSWORD || DIRECTOR_PASSWORD.length < 8) {
-        throw new Error("Set DIRECTOR_PASSWORD in backend/.env or the shell before creating a director account.");
-      }
-      user = new User({ email: DIRECTOR_EMAIL });
-    }
+    let user = await User.findOne({ email: config.email }).select("+password +authVersion");
+    const created = !user;
+    if (!user) user = new User({ email: config.email });
 
-    user.firstName = DIRECTOR_FIRST_NAME || "Director";
-    user.lastName = DIRECTOR_LAST_NAME || "User";
+    const roleChanged = user.role !== "director";
+    const passwordChanged = created ? true : !(await user.comparePassword(config.password));
+    user.firstName = config.firstName;
+    user.lastName = config.lastName;
     user.role = "director";
     user.status = "approved";
     user.emailVerified = true;
     if (!user.approvedAt) user.approvedAt = new Date();
-    if (DIRECTOR_PASSWORD) {
-      if (DIRECTOR_PASSWORD.length < 8) throw new Error("DIRECTOR_PASSWORD must be at least 8 characters.");
-      user.password = DIRECTOR_PASSWORD;
+    if (passwordChanged) user.password = config.password;
+    if (!created && (passwordChanged || roleChanged)) {
+      user.authVersion = Number(user.authVersion || 0) + 1;
     }
-
     await user.save();
 
     await DirectorProfile.findOneAndUpdate(
       { userId: user._id },
       {
         $set: {
-          email: DIRECTOR_EMAIL,
-          zohoEmail: DIRECTOR_EMAIL,
+          email: config.email,
+          zohoEmail: config.email,
           displayName: `${user.firstName} ${user.lastName}`.trim(),
-          activeState: DIRECTOR_ACTIVE_STATE || "TX",
+          activeState: config.activeState,
           status: "active",
-          outreachSubject: DIRECTOR_OUTREACH_SUBJECT,
-          ...(DIRECTOR_OUTREACH_TEMPLATE_TEXT ? { outreachTemplateText: DIRECTOR_OUTREACH_TEMPLATE_TEXT } : {}),
-          ...(DIRECTOR_OUTREACH_TEMPLATE_HTML ? { outreachTemplateHtml: DIRECTOR_OUTREACH_TEMPLATE_HTML } : {}),
+          outreachSubject: config.outreachSubject,
+          ...(config.outreachTemplateText
+            ? { outreachTemplateText: config.outreachTemplateText }
+            : {}),
+          ...(config.outreachTemplateHtml
+            ? { outreachTemplateHtml: config.outreachTemplateHtml }
+            : {}),
         },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
 
-    console.log(`Director ready (${DIRECTOR_EMAIL}).`);
+    if (!created && (passwordChanged || roleChanged)) {
+      await revokeAllUserSessions(user._id, "privileged_seed_change");
+    }
+    await AuditLog.create({
+      actorRole: "system",
+      action: "director.seed",
+      targetType: "user",
+      targetId: String(user._id),
+      meta: { created, roleChanged, passwordChanged },
+    });
+    console.log(JSON.stringify({ ok: true, email: config.email, created, roleChanged, passwordChanged }));
+    return { user, created, roleChanged, passwordChanged };
   } catch (err) {
-    console.error("Failed to seed director:", err);
-    process.exitCode = 1;
+    console.error("Failed to seed director:", err?.message || err);
+    throw err;
   } finally {
     await mongoose.connection.close().catch(() => {});
   }
 }
 
-seedDirector();
+if (require.main === module) {
+  seedDirector().catch(() => {
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  MAX_TEMPLATE_BYTES,
+  directorSeedConfiguration,
+  readTemplateHtml,
+  seedDirector,
+};

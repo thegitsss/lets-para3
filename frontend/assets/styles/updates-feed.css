@@ -1,0 +1,64 @@
+/* The shared Updates destination; shell typography and navigation stay inherited. */
+.lpc-updates-page { box-sizing: border-box; width: 100%; min-width: 0; padding: 28px 40px 48px; }
+.lpc-updates-page .lpc-updates-back { display: inline-block; margin: 0 0 20px; color: var(--nc-accent); font-size: 14px; text-decoration: none; }
+.lpc-updates-page h1 { margin: 0 0 24px; font-family: inherit; font-size: 28px; line-height: 36px; font-weight: 200; color: var(--nc-ink); }
+.lpc-updates-page .lpc-updates-toolbar { gap: 8px 16px; padding: 0 0 16px; border-bottom: 1px solid var(--nc-line); }
+.lpc-updates-page .lpc-notification-filters { gap: 4px; }
+.lpc-updates-page .lpc-notification-filters button { padding-inline: 14px; font-weight: inherit; }
+.lpc-updates-page .lpc-notification-filters button[aria-pressed="true"] { font-weight: inherit; background: #edf3fc; color: #285fae; border-color: #d9e5f6; }
+.lpc-updates-page select { max-width: 100%; min-height: 44px; padding: 0 32px 0 12px; font: inherit; font-size: 14px; line-height: 20px; color: var(--nc-ink); border: 1px solid var(--nc-line); border-radius: 6px; background-color: var(--nc-bg); }
+.lpc-updates-page .lpc-updates-date { margin: 28px 0 8px; padding: 0 12px; color: var(--nc-muted); font-size: 13px; line-height: 20px; font-weight: inherit; }
+.lpc-updates-page .v2-notification { grid-template-columns: minmax(0,1fr) 44px; align-items: center; }
+.lpc-updates-page .lpc-update-link { display: grid; grid-template-columns: 36px minmax(0,1fr) 6px; align-items: start; gap: 14px; width: 100%; min-height: 92px; padding: 16px 12px; box-sizing: border-box; border-radius: 6px; }
+.lpc-updates-page .lpc-update-icon { display: grid; place-items: center; width: 36px; height: 36px; background: #f2f6fc; color: #5275a4; border-radius: 8px; }
+.lpc-updates-page .lpc-update-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.lpc-updates-page .lpc-update-copy { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.lpc-updates-page .lpc-update-copy strong { font: inherit; font-size: 16px; line-height: 22px; color: var(--nc-ink); }
+.lpc-updates-page .lpc-update-event, .lpc-updates-page .lpc-update-detail { font-size: 14px; line-height: 20px; color: var(--nc-ink); }
+.lpc-updates-page .lpc-update-meta { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--nc-muted); font-size: 13px; line-height: 20px; }
+.lpc-updates-page .lpc-update-link > .v2-notification-dot { margin-top: 8px; }
+.lpc-updates-page .lpc-notification-row-options { align-self: center; }
+.lpc-updates-page .v2-notifications-empty { min-height: 160px; text-align: left; justify-items: start; padding: 24px 12px; }
+.lpc-updates-page .v2-notifications-loading { margin: 24px 12px; }
+.lpc-notification-center .lpc-all-updates { font-size: 14px; color: var(--nc-accent); text-decoration: none; padding: 8px 0; }
+@media(max-width:600px) {
+  .lpc-updates-page { padding: 24px 16px 32px; }
+  .lpc-updates-page h1 { margin-bottom: 20px; }
+  .lpc-updates-page .lpc-updates-toolbar { gap: 8px; }
+  .lpc-updates-page .lpc-notification-filters { flex: 1 0 calc(100% - 44px); }
+  .lpc-updates-page .lpc-update-link { grid-template-columns: 28px minmax(0,1fr) 6px; padding: 14px 4px; gap: 10px; }
+  .lpc-updates-page .lpc-update-icon { width: 28px; height: 32px; background: transparent; }
+  .lpc-updates-page .lpc-updates-date { padding-inline: 4px; }
+  .lpc-updates-page select { flex: 1; width: 0; min-width: 0; }
+}
+/* The route outlet already owns page gutters; avoid a second inset. */
+:root body.lpc-v2 .v2-view:has(> .lpc-updates-page),
+:root body.av2 .av2-main:has(> .lpc-updates-page) { padding: 28px 40px 48px; }
+:root body .lpc-updates-page { padding: 0; }
+:root body .lpc-updates-page h1 { font-weight: 200 !important; }
+.lpc-updates-page .lpc-notification-options { position: relative; flex: 0 0 44px; }
+.lpc-updates-page .lpc-notification-row-options { justify-self: end; width: 44px; }
+.lpc-updates-page :is(.lpc-notification-options,.lpc-notification-row-options) > summary { display: grid; place-items: center; box-sizing: border-box; width: 44px; height: 44px; padding: 0; list-style: none; cursor: pointer; color: var(--nc-muted); border-radius: 6px; font-size: 20px; }
+.lpc-updates-page summary::-webkit-details-marker { display: none; }
+.lpc-updates-page summary::marker { content: ''; }
+.lpc-updates-page .lpc-notification-options svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.lpc-updates-page .lpc-notification-options-content,
+.lpc-updates-page .lpc-notification-row-menu { display: grid; width: 180px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 5px; border: 1px solid var(--nc-line); border-radius: 7px; background: var(--nc-bg); box-shadow: 0 6px 20px #00000014; z-index: 30; }
+.lpc-updates-page .lpc-notification-options-content { position: absolute; top: 48px; right: 0; }
+.lpc-updates-page .lpc-notification-row-menu { position: fixed; }
+.lpc-updates-page .lpc-notification-options:not([open]) .lpc-notification-options-content,
+.lpc-updates-page .lpc-notification-row-options:not([open]) .lpc-notification-row-menu { display: none; }
+.lpc-updates-page .lpc-notification-options-content button,
+.lpc-updates-page .lpc-notification-row-menu button { min-height: 44px; text-align: left; white-space: normal; }
+.lpc-updates-page .lpc-notification-row-menu button { padding: 8px 10px; border: 0; background: transparent; border-radius: 5px; color: var(--nc-ink); font: inherit; font-size: 14px; cursor: pointer; }
+.lpc-updates-page :is(.lpc-notification-options-content,.lpc-notification-row-menu) button:hover { background: var(--nc-soft); }
+@media(max-width:600px) {
+  :root body.lpc-v2 .v2-view:has(> .lpc-updates-page),
+  :root body.av2 .av2-main:has(> .lpc-updates-page) { padding: 24px 16px 32px; }
+}
+@media(max-width:600px) {
+  .lpc-updates-page .lpc-updates-toolbar { display: grid; grid-template-columns: minmax(0,1fr) 44px; align-items: center; }
+  .lpc-updates-page .lpc-notification-filters { grid-column: 1 / -1; }
+  .lpc-updates-page select { grid-column: 1; grid-row: 2; width: 100%; box-sizing: border-box; }
+  .lpc-updates-page .lpc-notification-options { grid-column: 2; grid-row: 2; }
+}

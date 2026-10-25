@@ -1,0 +1,35 @@
+const {test}=require('../assistant-completion/shell-fixture');
+const {expect}=require('playwright/test');
+const {fixture,OWNER}=require('../assistant-completion/fixture');
+const {installSettingsProjection,USER_ID}=require('./settings-fixtures');
+for(const role of ['attorney','paralegal'])for(const width of [1440,390,320])test(`${role} learned shortcuts ${width}`,async({page},info)=>{
+ await page.setViewportSize({width,height:1000});const a=role==='attorney',ownerId=a?OWNER:USER_ID,key=`lpc-shortcuts:v1:${role}:${ownerId}`;
+ if(a)await fixture(page,role,{hash:'/help'});else{await installSettingsProjection(page);await page.goto('/paralegal-v2.html#/settings?tab=profile');await expect(page.locator('#v2-settings-profile')).toBeVisible();}
+ const section=page.locator('.lpc-shortcuts');await expect(section).toBeHidden();
+ await page.evaluate(({key,ownerId,role})=>{const now=Date.now();localStorage.setItem(key,JSON.stringify({version:1,ownerId,role,visits:{'/help':[3,2,1].map(n=>now-n*3600000)}}));}, {key,ownerId,role});
+ await page.goto(`/${role}-v2.html#/help`);if(a)await page.reload();await expect(page.getByRole('heading',{name:a?'Help for Attorneys':'Help for Paralegals',exact:true}).first()).toBeVisible();
+ const open=async()=>{if(width<901&&!await page.locator(a?'#av2-navigation-dialog':'#v2-navigation-dialog').isVisible())await page.locator(a?'[data-av2-nav-toggle]':'[data-v2-mobile-menu]').click();};
+ await open();await expect(section).toBeVisible();const link=section.getByRole('link',{name:'Help',exact:true});await expect(link).toHaveAttribute('href',`/${role}-v2.html#/help`);await expect(link).toHaveAttribute('aria-current','page');expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).visits['/help'].length,key)).toBe(4);
+ await page.screenshot({path:info.outputPath(`${role}-${width}-shortcuts.png`)});await page.reload();await expect(page.locator(a?'html':'body')).toHaveAttribute(a?'data-attorney-state':'data-v2-session','ready');await open();await expect(section).toBeVisible();expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).visits['/help'].length,key)).toBe(4);
+ if(width<901)expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);await link.focus();await page.keyboard.press('Enter');await expect(page).toHaveURL(/#\/help$/);
+ // Another account's valid-looking history never enters the signed-in user's section.
+ await page.evaluate(({key,role})=>localStorage.setItem(key,JSON.stringify({version:1,role,ownerId:'222222222222222222222222',visits:{'/help':Array.from({length:8},(_,i)=>Date.now()-3600000-i)}})),{key,role});await page.reload();await expect(page.locator(a?'html':'body')).toHaveAttribute(a?'data-attorney-state':'data-v2-session','ready');await open();await expect(section).toBeHidden();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('cooldown, storage failure and identity switching',async({page})=>{
+ await fixture(page,'attorney',{hash:'/help'});const result=await page.evaluate(async()=>{
+  const {createFrequentShortcuts}=await import('/assets/scripts/utils/frequent-shortcuts.mjs');const host=document.createElement('nav');let time=Date.now();const owner={id:'111111111111111111111111',role:'attorney'},other={id:'222222222222222222222222',role:'attorney'};const c=createFrequentShortcuts({role:'attorney',host,now:()=>time,storage:{getItem(){throw Error('blocked')},setItem(){throw Error('blocked')}}});c.scopeToIdentity(owner);
+  const visit=()=>{history.replaceState(null,'','#/home');c.record();history.replaceState(null,'','#/help');c.record();};for(let i=0;i<20;i++)visit();const premature=!host.querySelector('section').hidden;for(let i=0;i<3;i++){time+=11*60000;visit();}const earned=!host.querySelector('section').hidden;c.scopeToIdentity(other);const hiddenAfterSwitch=host.querySelector('section').hidden;c.clear();return{premature,earned,hiddenAfterSwitch};
+ });expect(result).toEqual({premature:false,earned:true,hiddenAfterSwitch:true});
+});
+for(const role of ['attorney','paralegal'])for(const width of [1440,390])test(`${role} individual Matter shortcuts ${width}`,async({page},info)=>{
+ const a=role==='attorney',id='333333333333333333333333',ownerId=a?OWNER:USER_ID,matterKey=a?`/matters/${id}/overview`:`/matter/${id}`,storageKey=`lpc-shortcuts:v1:${role}:${ownerId}`;let denied=false,name='Synthetic discovery Matter';await page.setViewportSize({width,height:1000});
+ const {matterFixture}=require('./rebuild-matter-fixture');const {workspaceMatter}=require('../assistant-completion/fixture');
+ const install=async()=>page.route(url=>url.pathname===`/api/cases/${id}`,route=>{expect(new URL(route.request().url()).searchParams.get('expectedOwnerId')).toBe(ownerId);return route.fulfill({status:denied?403:200,contentType:'application/json',body:JSON.stringify(denied?{error:'Access unavailable'}:a?{...workspaceMatter(),title:name}:matterFixture({_id:id,id,title:name,matterExperience:{...matterFixture().matterExperience,header:{...matterFixture().matterExperience.header,title:name}}}))});});
+ if(a)await fixture(page,role,{hash:'/help',setup:install});else{await installSettingsProjection(page);await install();await page.goto('/paralegal-v2.html#/help');await expect(page.getByRole('heading',{name:'Help for Paralegals',exact:true})).toBeVisible();}
+ await page.evaluate(({key,ownerId,role,matterKey})=>localStorage.setItem(key,JSON.stringify({version:1,ownerId,role,visits:{[matterKey]:[3,2,1].map(n=>Date.now()-n*3600000)}})),{key:storageKey,ownerId,role,matterKey});
+ await page.goto(`/${role}-v2.html#${matterKey}`);const section=page.locator('.lpc-shortcuts');const open=async()=>{if(width<901&&!await page.locator(a?'#av2-navigation-dialog':'#v2-navigation-dialog').isVisible())await page.locator(a?'[data-av2-nav-toggle]':'[data-v2-mobile-menu]').click();};await open();await expect(section.getByRole('link',{name,exact:true})).toBeVisible();expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey)).toMatchObject({visits:{[matterKey]:expect.any(Array)}});expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).visits[Object.keys(JSON.parse(localStorage.getItem(key)).visits).find(x=>x.includes('333333'))].length,storageKey)).toBe(4);
+ expect(await page.evaluate(key=>localStorage.getItem(key),storageKey)).not.toContain(name);await page.screenshot({path:info.outputPath(`${role}-${width}-matter-shortcut.png`)});
+ await page.goto(`/${role}-v2.html#/help`);await open();await section.getByRole('link',{name,exact:true}).click();await expect(page).toHaveURL(new RegExp('#'+matterKey+'$'));await expect(page.locator(a?'#av2-page-title':'#v2-matter-title')).toHaveText(name);
+ name='Renamed synthetic Matter';await page.goto(`/${role}-v2.html#/help`);await open();await expect(section.getByRole('link',{name,exact:true})).toBeVisible();
+ denied=true;await page.reload();await expect(page.locator(a?'html':'body')).toHaveAttribute(a?'data-attorney-state':'data-v2-session','ready');await open();await expect(section.getByRole('link',{name,exact:true})).toHaveCount(0);
+});

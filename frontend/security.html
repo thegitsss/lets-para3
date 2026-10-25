@@ -20,42 +20,47 @@
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
   <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
-  <link href="assets/styles/homepage-public-chrome.css?v=20261007-approved-header" rel="stylesheet" />
-  <script src="assets/scripts/public-site-chrome.js?v=20260924-responsive-fixes" defer></script>
+  <link href="assets/styles/public-site-chrome.css?v=20261019-footer-stable" rel="stylesheet" />
+  <script src="assets/scripts/public-site-chrome.js?v=20261019-static-footer" defer></script>
   <link rel="stylesheet" href="assets/styles/legal-documents.css?v=20260828-shared-legal" />
-  <link href="assets/styles/admission-hero.css?v=20260925-faq-match" rel="stylesheet" />
-  <link href="assets/styles/security-page.css?v=20261007" rel="stylesheet" />
+  <link href="assets/styles/admission-hero.legal-20261019.css?v=20260925-faq-match" rel="stylesheet" />
+  <link href="assets/styles/terms-page.legal-20261019.css?v=20261019-footer-parity" rel="stylesheet" />
 
-  <link rel="stylesheet" href="assets/styles/legal-text-alignment.css?v=20261006" />
+  <link rel="stylesheet" href="assets/styles/legal-text-alignment.css?v=20261019-address" />
+  <link rel="stylesheet" href="/assets/styles/brand-lockup.legal-20261019.css?v=20261016-mountain" />
 </head>
-<body class="utility-page utility-page--inset admission-page security-page">
+<body class="public-site-chrome utility-page utility-page--inset admission-page security-page">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="utility-header" data-utility-header data-public-header>
-    <div class="utility-header__inner">
-      <nav class="utility-header__nav" aria-label="Primary navigation">
-        <a href="index.html#how">How It Works</a>
-        <a href="attorney-faq.html">For Attorneys</a>
-        <a href="paralegal-faq.html">For Paralegals</a>
-        <a href="browse-paralegals.html">Browse Paralegals</a>
-      </nav>
-      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
-      <div class="utility-header__actions">
-        <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
-        <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
-        <a class="utility-header__button" href="signup.html" data-utility-signup>Create an account</a>
+  <header class="home-header" data-home-header data-public-header>
+      <div class="home-header__inner">
+        <a class="home-brand lpc-brand-lockup" href="/index.html" aria-label="Let’s-ParaConnect home"><svg class="home-brand__mountain" viewBox="7 20 50 22" fill="none" stroke="currentColor" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9.25 39.63C13 39 16.8 34.1 20.1 31.5S23.9 30.4 25.2 30.2C27 29.9 30.4 25.2 32.63 22.38C35 24.3 37.8 29.3 39.2 30.6S42.9 31.5 44.7 33.4S47.7 34.8 49.9 36.7S52.9 38.9 54.8 39.4" /></svg><span class="home-brand__name">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</span></a>
+        <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
+          <a href="/index.html#how">How It Works</a>
+          <a href="/attorney-faq.html">For Attorneys</a>
+          <a href="/paralegal-faq.html">For Paralegals</a>
+          <a href="/browse-paralegals.html">Browse Paralegals</a>
+        </nav>
+        <div class="home-header__actions">
+          <a class="header-signin" href="/login.html" data-auth-action data-public-action="text">Sign in</a>
+          <button class="header-signout" type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
+          <a class="button button--small button--ink" href="/signup.html" data-signup-action data-public-action="primary" data-action-shape="pill" data-action-size="compact">Create an account</a>
+          <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="Open navigation" data-mobile-nav-toggle data-public-action="icon"><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
+        </div>
       </div>
-      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
-    </div>
-    <nav class="utility-header__mobile" id="utilityMenu" aria-label="Mobile navigation" data-utility-menu hidden>
-      <a href="index.html#how">How It Works</a>
-      <a href="attorney-faq.html">For Attorneys</a>
-      <a href="paralegal-faq.html">For Paralegals</a>
-        <a href="browse-paralegals.html">Browse Paralegals</a>
-      <a href="login.html" data-utility-auth>Sign In</a>
-      <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Create an account</a>
-    </nav>
-  </header>
+      <div class="mobile-nav" id="mobileNav" aria-hidden="true" inert data-mobile-nav>
+        <nav aria-label="Mobile navigation">
+          <a href="/index.html#how">How It Works</a>
+          <a href="/attorney-faq.html">For Attorneys</a>
+          <a href="/paralegal-faq.html">For Paralegals</a>
+          <a href="/browse-paralegals.html">Browse Paralegals</a>
+        </nav>
+        <div class="mobile-nav__actions">
+          <a href="/login.html" data-auth-action data-public-action="text">Sign in</a>
+          <button type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
+          <a class="button button--ink" href="/signup.html" data-signup-action data-public-action="primary" data-action-shape="pill">Create an account</a>
+        </div>
+      </div>
+    </header>
 
   <section class="hero-banner utility-hero utility-hero--text-only admission-hero security-hero" aria-labelledby="page-title">
     <div class="utility-hero__inner">
@@ -63,7 +68,6 @@
         <div class="security-hero__heading-row">
           <h1 id="page-title">Security &amp; Confidentiality</h1>
         </div>
-        <p class="utility-hero__description">Understand who can access your documents, how sharing works, and what stays under your control.</p>
       </div>
     </div>
   </section>
@@ -137,22 +141,24 @@
       <p>For access, correction, or deletion of personal information, mark the subject “Privacy request.” LPC may need to verify your identity and authority. Some records may need to be retained for legal, security, transactional, or dispute-related reasons; account deactivation and clearing browser storage do not substitute for a deletion request. <a href="privacy.html#choices">Section 10 of the Privacy Policy</a> explains the available request and appeal process.</p>
     </section>
   </main>
-  <footer class="home-footer" data-public-footer>
-    <div class="home-footer__inner">
-      <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
-      <nav class="home-footer__directory" aria-label="Footer navigation">
-        <details open><summary>Platform</summary><div class="home-footer__links"><a href="index.html#how">How It Works</a><a href="attorney-faq.html">For Attorneys</a><a href="paralegal-faq.html">For Paralegals</a><a href="browse-paralegals.html">Browse Paralegals</a></div></details>
-        <details open><summary>For Attorneys</summary><div class="home-footer__links"><a href="signup.html?role=attorney">Post a Matter</a><a href="attorney-faq.html">Attorney FAQ</a><a href="contact.html">Contact</a></div></details>
-        <details open><summary>For Paralegals</summary><div class="home-footer__links"><a href="signup.html?role=paralegal">Apply to Join</a><a href="paralegal-faq.html">Paralegal FAQ</a><a href="paralegal-admission.html">Our Application Review</a></div></details>
-        <details open><summary>Legal</summary><div class="home-footer__links"><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="security.html">Security &amp; Confidentiality</a><a href="accessibility.html">Accessibility</a></div></details>
-      </nav>
-      <div class="home-footer__bottom">
-        <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
-        <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z"></path></svg><span>Accessibility</span></button>
+  <footer class="home-footer" data-public-footer data-footer-static="current">
+      <div class="home-footer__inner">
+        <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
+        <nav class="home-footer__directory" aria-label="Footer navigation">
+          <details open><summary>Platform</summary><div class="home-footer__links"><a href="/index.html#how">How It Works</a><a href="/attorney-faq.html">For Attorneys</a><a href="/paralegal-faq.html">For Paralegals</a><a href="/browse-paralegals.html">Browse Paralegals</a></div></details>
+          <details open><summary>For Attorneys</summary><div class="home-footer__links"><a href="/signup.html?role=attorney">Post a Matter</a><a href="/attorney-faq.html">Attorney FAQ</a><a href="/contact.html">Contact</a></div></details>
+          <details open><summary>For Paralegals</summary><div class="home-footer__links"><a href="/signup.html?role=paralegal">Apply to Join</a><a href="/paralegal-faq.html">Paralegal FAQ</a><a href="/paralegal-admission.html">Our Application Review</a></div></details>
+          <details open><summary>Legal</summary><div class="home-footer__links"><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/security.html">Security &amp; Confidentiality</a><a href="/accessibility.html">Accessibility</a></div></details>
+        </nav>
+        <div class="home-footer__bottom">
+          <div class="home-footer__identity">
+            <a class="home-footer__brand lpc-brand-lockup" href="/index.html" aria-label="Let’s-ParaConnect home"><svg class="home-brand__mountain" viewBox="7 20 50 22" fill="none" stroke="currentColor" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9.25 39.63C13 39 16.8 34.1 20.1 31.5S23.9 30.4 25.2 30.2C27 29.9 30.4 25.2 32.63 22.38C35 24.3 37.8 29.3 39.2 30.6S42.9 31.5 44.7 33.4S47.7 34.8 49.9 36.7S52.9 38.9 54.8 39.4" /></svg><span class="home-brand__name">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</span></a>
+            <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+          </div>
+          <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode" data-public-action="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z"></path></svg><span>Accessibility</span></button>
+        </div>
       </div>
-    </div>
-  </footer>
+    </footer><script data-footer-initial-state>if (matchMedia("(max-width: 900px)").matches) document.querySelectorAll(".home-footer__directory details").forEach(function (item) { item.open = false; });</script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

@@ -58,7 +58,7 @@ async function ensureCollections() {
             isActive: true,
           },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
       );
       collectionsByKey.set(definition.key, collection);
     })
@@ -101,7 +101,7 @@ async function ensureKnowledgeSource(sourceDef = {}) {
         },
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
   );
 }
 

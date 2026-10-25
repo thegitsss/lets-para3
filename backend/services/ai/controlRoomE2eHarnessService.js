@@ -2,6 +2,9 @@ const crypto = require("crypto");
 
 const ApprovalTask = require("../../models/ApprovalTask");
 const AutonomousAction = require("../../models/AutonomousAction");
+const Case = require("../../models/Case");
+const ChecklistTask = require("../../models/ChecklistTask");
+const DirectorProfile = require("../../models/DirectorProfile");
 const FAQCandidate = require("../../models/FAQCandidate");
 const Incident = require("../../models/Incident");
 const IncidentApproval = require("../../models/IncidentApproval");
@@ -15,24 +18,27 @@ const SupportMessage = require("../../models/SupportMessage");
 const SupportTicket = require("../../models/SupportTicket");
 const User = require("../../models/User");
 const { logAction } = require("./autonomousActionService");
-const { assertControlRoomE2eHarnessEnabled } = require("../../utils/controlRoomE2eHarnessAccess");
+const {
+  assertControlRoomE2eHarnessEnabled,
+  isStagingEnvironment,
+} = require("../../utils/controlRoomE2eHarnessAccess");
+const { recordSignupPolicyAcknowledgement } = require("../../utils/legalDocuments");
+const { validateNewPassword } = require("../../utils/passwordPolicy");
 
 const DEFAULT_ADMIN_EMAIL = "control-room.e2e.admin@lets-paraconnect.dev";
 const DEFAULT_ADMIN_PASSWORD = "ControlRoomHarness123!";
 const DEFAULT_SUPPORT_ATTORNEY_EMAIL = "support.cr.e2e.attorney@lets-paraconnect.dev";
 const DEFAULT_SUPPORT_PARALEGAL_EMAIL = "support.cr.e2e.paralegal@lets-paraconnect.dev";
+const DEFAULT_DIRECTOR_EMAIL = "director.cr.e2e@lets-paraconnect.dev";
 const SUPPORT_USER_PASSWORD = "ControlRoomSupport123!";
-const APPLICANT_PASSWORD = "ControlRoomApplicant123!";
+const DIRECTOR_USER_PASSWORD = "ControlRoomDirector123!";
 const HARNESS_RUN_KEY_PATTERN = /^cr-e2e-/i;
 const HARNESS_INCIDENT_FEATURE_PATTERN = /^control-room-e2e-/i;
 const HARNESS_ACTION_DEDUPE_PATTERN = /^control-room-e2e:/i;
 const HARNESS_SUPPORT_SUBJECT_PATTERN = /^Control Room autonomous reopen cr-e2e-/i;
 const HARNESS_MARKETING_BRIEF_PATTERN = /^Control Room marketing brief cr-e2e-/i;
-const HARNESS_USER_EMAIL_PATTERN = /^(support|admissions)\.cr\.e2e\..*@lets-paraconnect\.dev$/i;
+const HARNESS_USER_EMAIL_PATTERN = /^(support|admissions|director)\.cr\.e2e(?:\.[^@]+)?@lets-paraconnect\.dev$/i;
 
-function compactText(value = "", max = 240) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
-}
 
 function createRunKey() {
   const datePart = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -40,29 +46,63 @@ function createRunKey() {
   return `cr-e2e-${datePart}-${randomPart}`;
 }
 
-function resolveAdminCredentials() {
-  return {
-    email: String(process.env.CONTROL_ROOM_E2E_ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase(),
-    password: String(process.env.CONTROL_ROOM_E2E_ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD),
-  };
+function randomHarnessPassword() {
+  return crypto.randomBytes(32).toString("base64url");
 }
 
-function resolveSupportAttorneyCredentials() {
-  return {
-    email: String(process.env.CONTROL_ROOM_E2E_SUPPORT_ATTORNEY_EMAIL || DEFAULT_SUPPORT_ATTORNEY_EMAIL)
-      .trim()
-      .toLowerCase(),
-    password: String(process.env.CONTROL_ROOM_E2E_SUPPORT_ATTORNEY_PASSWORD || SUPPORT_USER_PASSWORD),
-  };
+function resolveHarnessCredentials(env, { emailKey, passwordKey, defaultEmail, defaultPassword, label }) {
+  const email = String(env[emailKey] || defaultEmail).trim().toLowerCase();
+  const configuredPassword = String(env[passwordKey] || "");
+  if (!/@lets-paraconnect\.dev$/i.test(email)) {
+    throw new Error(`${label} must use an isolated @lets-paraconnect.dev harness email.`);
+  }
+  if (isStagingEnvironment(env) && !configuredPassword) {
+    throw new Error(`${passwordKey} is required when the harness is enabled in staging.`);
+  }
+  const password = configuredPassword || defaultPassword;
+  const passwordPolicy = validateNewPassword(password, { user: { email } });
+  if (!passwordPolicy.ok) throw new Error(`${passwordKey}: ${passwordPolicy.error}`);
+  return { email, password: passwordPolicy.password };
 }
 
-function resolveSupportParalegalCredentials() {
-  return {
-    email: String(process.env.CONTROL_ROOM_E2E_SUPPORT_PARALEGAL_EMAIL || DEFAULT_SUPPORT_PARALEGAL_EMAIL)
-      .trim()
-      .toLowerCase(),
-    password: String(process.env.CONTROL_ROOM_E2E_SUPPORT_PARALEGAL_PASSWORD || SUPPORT_USER_PASSWORD),
-  };
+function resolveAdminCredentials(env = process.env) {
+  return resolveHarnessCredentials(env, {
+    emailKey: "CONTROL_ROOM_E2E_ADMIN_EMAIL",
+    passwordKey: "CONTROL_ROOM_E2E_ADMIN_PASSWORD",
+    defaultEmail: DEFAULT_ADMIN_EMAIL,
+    defaultPassword: DEFAULT_ADMIN_PASSWORD,
+    label: "Control Room admin",
+  });
+}
+
+function resolveSupportAttorneyCredentials(env = process.env) {
+  return resolveHarnessCredentials(env, {
+    emailKey: "CONTROL_ROOM_E2E_SUPPORT_ATTORNEY_EMAIL",
+    passwordKey: "CONTROL_ROOM_E2E_SUPPORT_ATTORNEY_PASSWORD",
+    defaultEmail: DEFAULT_SUPPORT_ATTORNEY_EMAIL,
+    defaultPassword: SUPPORT_USER_PASSWORD,
+    label: "Control Room support attorney",
+  });
+}
+
+function resolveSupportParalegalCredentials(env = process.env) {
+  return resolveHarnessCredentials(env, {
+    emailKey: "CONTROL_ROOM_E2E_SUPPORT_PARALEGAL_EMAIL",
+    passwordKey: "CONTROL_ROOM_E2E_SUPPORT_PARALEGAL_PASSWORD",
+    defaultEmail: DEFAULT_SUPPORT_PARALEGAL_EMAIL,
+    defaultPassword: SUPPORT_USER_PASSWORD,
+    label: "Control Room support paralegal",
+  });
+}
+
+function resolveDirectorCredentials(env = process.env) {
+  return resolveHarnessCredentials(env, {
+    emailKey: "CONTROL_ROOM_E2E_DIRECTOR_EMAIL",
+    passwordKey: "CONTROL_ROOM_E2E_DIRECTOR_PASSWORD",
+    defaultEmail: DEFAULT_DIRECTOR_EMAIL,
+    defaultPassword: DIRECTOR_USER_PASSWORD,
+    label: "Control Room director",
+  });
 }
 
 function buildHarnessEmail(localPart = "") {
@@ -128,6 +168,7 @@ async function upsertHarnessAdmin() {
     admin.twoFactorEnabled = false;
   }
 
+  recordSignupPolicyAcknowledgement(admin);
   await admin.save();
   return {
     admin,
@@ -175,12 +216,34 @@ async function upsertHarnessSupportAttorney(options = {}) {
   if (forceFreshApproval) {
     attorney.approvedAt = new Date();
     attorney.lastLoginAt = null;
+    attorney.practiceAreas = [];
+    attorney.publications = [];
+    attorney.practiceDescription = "";
+    attorney.bio = "";
+    attorney.lawFirm = "";
+    attorney.linkedInURL = null;
+    attorney.firmWebsite = "";
+    attorney.languages = [];
+    attorney.yearsExperience = undefined;
     attorney.onboarding = {
       ...(attorney.onboarding || {}),
       attorneyTourCompleted: false,
+      attorneyProfileCompleted: false,
     };
+  } else {
+    attorney.lastLoginAt = attorney.lastLoginAt || new Date();
+    attorney.onboarding = {
+      ...(attorney.onboarding || {}),
+      attorneyTourCompleted: true,
+    };
+    attorney.lawFirm = "Harness Legal Group";
+    attorney.bio = "Civil litigation attorney focused on clear scopes, responsive collaboration, and practical outcomes.";
+    attorney.practiceAreas = ["Civil Litigation"];
+    attorney.languages = ["English"];
+    attorney.yearsExperience = 8;
   }
 
+  recordSignupPolicyAcknowledgement(attorney);
   await attorney.save();
   return {
     attorney,
@@ -224,11 +287,134 @@ async function upsertHarnessSupportParalegal() {
     paralegal.twoFactorEnabled = false;
   }
 
+  recordSignupPolicyAcknowledgement(paralegal);
+  paralegal.bio = "Experienced litigation paralegal supporting discovery, document review, and trial preparation.";
+  paralegal.skills = ["Discovery", "Document review", "Trial preparation"];
+  paralegal.practiceAreas = ["Civil Litigation"];
+  paralegal.bestFor = ["Discovery support", "Document organization"];
+  paralegal.resumeURL = "harness/resume.pdf";
+  paralegal.profileImage = `profile-photos/${paralegal._id}/profile-1700000000000.jpg`;
+  paralegal.avatarURL = paralegal.profileImage;
+  paralegal.profilePhotoStatus = "approved";
+  paralegal.pendingProfileImage = "";
+  paralegal.availability = "Available this week";
+  paralegal.yearsExperience = 6;
+  paralegal.languages = ["English"];
+  paralegal.onboarding = {
+    ...(paralegal.onboarding || {}),
+    paralegalTourCompleted: true,
+    paralegalProfileTourCompleted: true,
+  };
+  paralegal.stripeAccountId = "acct_control_room_support_paralegal";
+  paralegal.stripeOnboarded = true;
+  paralegal.stripePayoutsEnabled = true;
+  paralegal.stripeChargesEnabled = true;
   await paralegal.save();
   return {
     paralegal,
     credentials,
   };
+}
+
+async function upsertHarnessAttorneyMatter(attorney, { resetWorkflow = false } = {}) {
+  assertControlRoomE2eHarnessEnabled();
+  if (!attorney?._id) throw new Error("Harness attorney is required to seed a Matter.");
+  const matter = await Case.findOneAndUpdate(
+    { attorneyId: attorney._id, title: "Harness Contract Review" },
+    {
+      $setOnInsert: {
+        attorney: attorney._id,
+        attorneyId: attorney._id,
+        title: "Harness Contract Review",
+        practiceArea: "Civil Litigation",
+        details: "Review a commercial services agreement, organize the relevant clauses, and prepare a concise issue summary.",
+        state: "CA",
+        locationState: "CA",
+        status: "open",
+        totalAmount: 80000,
+        currency: "usd",
+        tasks: [
+          { title: "Review agreement", completed: false },
+          { title: "Prepare issue summary", completed: false },
+        ],
+        updates: [{ date: new Date(), text: "Matter posted", by: attorney._id }],
+      },
+    },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+  );
+  if (!resetWorkflow) return matter;
+  matter.status = "open";
+  matter.paralegal = null;
+  matter.paralegalId = null;
+  matter.pendingParalegalId = null;
+  matter.pendingParalegalInvitedAt = null;
+  matter.invites = [];
+  matter.applicants = [];
+  matter.lockedTotalAmount = null;
+  matter.amountLockedAt = null;
+  matter.escrowIntentId = null;
+  matter.escrowSessionId = null;
+  matter.paymentIntentId = null;
+  matter.escrowStatus = null;
+  matter.tasksLocked = false;
+  await matter.save();
+  return matter;
+}
+
+async function upsertHarnessDirector() {
+  assertControlRoomE2eHarnessEnabled();
+  const credentials = resolveDirectorCredentials();
+  let director = await User.findOne({ email: credentials.email });
+
+  if (!director) {
+    director = new User({
+      firstName: "Drew",
+      lastName: "Harness",
+      email: credentials.email,
+      password: credentials.password,
+      role: "director",
+      status: "approved",
+      state: "TX",
+      location: "Texas",
+      emailVerified: true,
+      termsAccepted: true,
+      approvedAt: new Date(),
+      lastLoginAt: new Date(),
+      twoFactorEnabled: false,
+    });
+  } else {
+    director.firstName = director.firstName || "Drew";
+    director.lastName = director.lastName || "Harness";
+    director.password = credentials.password;
+    director.role = "director";
+    director.status = "approved";
+    director.state = director.state || "TX";
+    director.location = director.location || "Texas";
+    director.emailVerified = true;
+    director.termsAccepted = true;
+    director.approvedAt = director.approvedAt || new Date();
+    director.lastLoginAt = director.lastLoginAt || new Date();
+    director.disabled = false;
+    director.deleted = false;
+    director.twoFactorEnabled = false;
+  }
+
+  recordSignupPolicyAcknowledgement(director);
+  await director.save();
+  await DirectorProfile.findOneAndUpdate(
+    { userId: director._id },
+    {
+      $set: {
+        email: credentials.email,
+        zohoEmail: credentials.email,
+        displayName: "Drew Harness",
+        activeState: "TX",
+        status: "active",
+      },
+    },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+  );
+  return { director, credentials };
 }
 
 async function cleanupHarnessFixtures() {
@@ -251,6 +437,9 @@ async function cleanupHarnessFixtures() {
 
   await Promise.all([
     ApprovalTask.deleteMany({ "metadata.harnessRunKey": { $regex: HARNESS_RUN_KEY_PATTERN } }),
+    ChecklistTask.deleteMany({ owner: { $in: supportUserIds } }),
+    Case.deleteMany({ attorneyId: { $in: supportUserIds } }),
+    DirectorProfile.deleteMany({ userId: { $in: supportUserIds } }),
     FAQCandidate.deleteMany({ key: HARNESS_RUN_KEY_PATTERN }),
     MarketingDraftPacket.deleteMany({ "metadata.harnessRunKey": { $regex: HARNESS_RUN_KEY_PATTERN } }),
     MarketingBrief.deleteMany({ title: HARNESS_MARKETING_BRIEF_PATTERN }),
@@ -287,7 +476,7 @@ async function createSupportUser({ runKey }) {
     firstName: "Avery",
     lastName: `Support ${nameKey.slice(-8)}`,
     email: buildHarnessEmail(`support.${nameKey}`),
-    password: SUPPORT_USER_PASSWORD,
+    password: randomHarnessPassword(),
     role: "attorney",
     status: "approved",
     approvedAt: new Date(),
@@ -303,7 +492,7 @@ async function createAdmissionsApplicant({ runKey }) {
     firstName: "Adriana",
     lastName: "Lane",
     email: buildHarnessEmail(`admissions.${runKey}`),
-    password: APPLICANT_PASSWORD,
+    password: randomHarnessPassword(),
     role: "attorney",
     status: "pending",
     emailVerified: true,
@@ -593,7 +782,7 @@ async function seedCaoDecision({ runKey }) {
   };
 }
 
-async function seedAutonomousSupportItem({ runKey, admin, now }) {
+async function seedAutonomousSupportItem({ runKey, now }) {
   const user = await createSupportUser({ runKey });
   const conversation = await SupportConversation.create({
     userId: user._id,
@@ -778,7 +967,7 @@ async function seedControlRoomFixtureSet({ adminUser = {}, decisionCounts = {} }
       seedCsoDecision({ runKey, admin, now }),
       seedCtoDecision({ runKey, now }),
       seedCaoDecision({ runKey }),
-      seedAutonomousSupportItem({ runKey, admin, now }),
+      seedAutonomousSupportItem({ runKey, now }),
       seedOperationalInfoItem({ runKey, now }),
     ]);
 
@@ -803,11 +992,16 @@ async function seedControlRoomFixtureSet({ adminUser = {}, decisionCounts = {} }
 module.exports = {
   DEFAULT_ADMIN_EMAIL,
   DEFAULT_ADMIN_PASSWORD,
+  DEFAULT_DIRECTOR_EMAIL,
+  randomHarnessPassword,
   resolveAdminCredentials,
+  resolveDirectorCredentials,
   resolveSupportAttorneyCredentials,
   resolveSupportParalegalCredentials,
   seedControlRoomFixtureSet,
   upsertHarnessAdmin,
+  upsertHarnessAttorneyMatter,
+  upsertHarnessDirector,
   upsertHarnessSupportAttorney,
   upsertHarnessSupportParalegal,
 };

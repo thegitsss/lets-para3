@@ -334,3 +334,47 @@ describe("paralegal semantic response validator", () => {
     expect(extractDateClaims("August 10th, 2026 and 2026-08-10")).toEqual(["2026-08-10"]);
   });
 });
+
+
+describe("approved knowledge fee percentage evidence", () => {
+  function knowledge(overrides = {}) {
+    return { name: "search_lpc_knowledge", result: {
+      ok: true, available: true, authorized: true, evidenceState: "verified",
+      evidence: { capabilityId: "P31_product_knowledge", authorized: true, policyOrLiveState: "policy",
+        facts: [{ key: "results[0].answer", value: "LPC deducts an 18% paralegal platform fee from completed, paid work." }] },
+      ...overrides,
+    } };
+  }
+  const question = "What is the paralegal platform fee?";
+  const audit = (toolOutputs, reply = "The paralegal platform fee is 18%.", evidencePlan = {}) => auditParalegalSemanticResponse({ reply, messageText: question, toolOutputs, evidencePlan });
+  test("accepts an exact rate from a verified authorized policy answer", () => {
+    expect(audit([knowledge()])).toEqual([]);
+    expect(audit([knowledge()], "The paralegal platform fee is 18.0%.")).toEqual([]);
+  });
+  test("rejects a different rate even when the policy answer is available", () => {
+    expect(audit([knowledge()], "The paralegal platform fee is 25%.")).toContain("unsupported_fee_claim");
+    expect(audit([knowledge()], "The paralegal platform fee is 118%.")).toContain("unsupported_fee_claim");
+  });
+  test.each([
+    { ok: false }, { available: false }, { authorized: false }, { evidenceState: "temporarily_unavailable" },
+  ])("unavailable or unauthorized policy cannot support a fee: %j", patch => {
+    expect(audit([knowledge(patch)])).toContain("unsupported_fee_claim");
+  });
+  test.each(["results[0].title", "results[0].href", "results[0].other"]) (
+    "does not infer a fee from %s", key => {
+      const item = knowledge(); item.result.evidence.facts[0].key = key;
+      expect(audit([item])).toContain("unsupported_fee_claim");
+    });
+  test("requires both the knowledge capability and explicit policy scope", () => {
+    for (const patch of [{ capabilityId: "P17_matter_financials" }, { policyOrLiveState: "live_state" }]) {
+      const item = knowledge(); Object.assign(item.result.evidence, patch);
+      expect(audit([item])).toContain("unsupported_fee_claim");
+    }
+    const item = knowledge(); item.name = "get_paralegal_account_snapshot";
+    expect(audit([item])).toContain("unsupported_fee_claim");
+  });
+  test("current policy cannot substitute for a Matter financial snapshot", () => {
+    expect(audit([knowledge()], "The paralegal platform fee is 18%.", { requirements: [{ key: "matter_financials" }] })).toContain("unsupported_fee_claim");
+    expect(audit([financialOutput, knowledge()])).toContain("unsupported_fee_claim");
+  });
+});

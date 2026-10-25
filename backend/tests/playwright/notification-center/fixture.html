@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notification controller acceptance fixture</title>
+  <link rel="stylesheet" href="/assets/styles/fonts.css">
+  <link rel="stylesheet" href="/assets/styles/paralegal-v2.css">
+  <link rel="stylesheet" href="/assets/styles/paralegal-v2-global.css">
+  <link rel="stylesheet" href="/assets/styles/notification-center.css">
+  <style>
+    body { margin: 0; padding: 16px; color: var(--v2-ink); background: var(--v2-canvas); font-family: var(--v2-font-sans); }
+    main { max-width: 48rem; margin: 0 auto; }
+    h1 { font-size: 1.2rem; }
+    header { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    #panel { width: 100%; border: 1px solid var(--v2-line); background: var(--v2-white); padding: 12px; }
+    #content { max-height: 62vh; overflow: auto; }
+    button { min-height: 32px; }
+    #toast { min-height: 1.5em; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Notification controller acceptance fixture</h1>
+    <header>
+      <button id="trigger" type="button">Notifications <span id="badge" hidden></span></button>
+      <button id="leave" type="button">Leave this Matter</button>
+    </header>
+    <section id="panel" aria-label="Notifications">
+      <h2>Notifications</h2>
+      <div id="actions"></div>
+      <div id="content" aria-live="polite"></div>
+    </section>
+    <p id="toast" role="status"></p>
+  </main>
+  <script type="module" src="/__fixture__/fixture.mjs"></script>
+</body>
+</html>

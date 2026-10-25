@@ -1,4 +1,5 @@
 export const ROUTES = Object.freeze([
+  Object.freeze({ name: "updates", pattern: /^\/updates\/?$/, title: "Updates" }),
   Object.freeze({ name: "payouts", pattern: /^\/payouts\/?$/, title: "Payouts" }),
   Object.freeze({ name: "conversations", pattern: /^\/conversations\/?$/, title: "Messages" }),
   Object.freeze({ name: "home", pattern: /^\/home\/?$/, title: "Home" }),
@@ -31,6 +32,14 @@ export function parseRouteHash(hash) {
     if (!match) continue;
     const params = definition.parameter ? { [definition.parameter]: safeDecode(match[1]) } : {};
     const query = new URLSearchParams(queryString);
+    if (definition.name === "home" && ["inbox", "pulse"].includes(query.get("view"))) {
+      query.delete("view");
+      return Object.freeze({name:"updates",title:"Updates",pathname:"/updates",params:Object.freeze({}),query,key:`/updates${query.size ? `?${query}` : ""}`,found:true});
+    }
+    if (definition.name === "home" && query.get("view") === "board") {
+      query.delete("view"); query.set("layout", "board"); query.set("section", "active");
+      return Object.freeze({name:"work",title:"Matters",pathname:"/work",params:Object.freeze({}),query,key:`/work?${query}`,found:true});
+    }
     if (definition.name === "home" && query.get("view") === "history") {
       query.delete("view");
       return Object.freeze({ name: "payouts", title: "Payouts", pathname: "/payouts", params: Object.freeze({}), query, key: `/payouts${query.size ? `?${query}` : ""}`, found: true });
@@ -187,15 +196,16 @@ export function createRouter({ windowObject = window, scrollElement, render }) {
 
 // Return context is a list address, never an external or recursively nested URL.
 export function safeMatterReturn(value) {
-  if (typeof value !== 'string' || value.length > 4000 || /[\\#\x00-\x20\x7f]/.test(value) || !/^\/(home|work)(?:\?|$)/.test(value)) return null;
+  if (typeof value !== 'string' || value.length > 4000 || /[\\#\x00-\x20\x7f]/.test(value) || !/^\/(home|work|payouts)(?:\?|$)/.test(value)) return null;
   const [path, query = ''] = value.split('?');
   const input = new URLSearchParams(query), output = new URLSearchParams();
-  const keys = path === '/home' ? ['view','item','tab'] : ['section','appQuery','appStatus','appPractice','appRange','appSort','appPage','highlightCase','matterId','applicationId','appId','jobId'];
+  const keys = path === '/home' ? ['view','item','tab'] : path === '/payouts' ? ['section'] : ['section','appQuery','appStatus','appPractice','appRange','appSort','appPage','highlightCase','matterId','applicationId','appId','jobId'];
   for (const key of keys) {
     const text = input.get(key);
     if (input.getAll(key).length !== 1 || !text || text.length > 200 || /[\x00-\x1f\x7f]/.test(text)) continue;
     if (['highlightCase','matterId','applicationId','appId','jobId'].includes(key) && !/^[a-f0-9]{24}$/i.test(text)) continue;
     if (key === 'appPage' && !/^[1-9]\d{0,5}$/.test(text)) continue;
+    if (path === '/payouts' && !['overview','records','attention','account'].includes(text)) continue;
     output.set(key,text);
   }
   return path + (output.size ? '?' + output : '');

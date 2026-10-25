@@ -150,7 +150,9 @@ describe("Permissions / ACL", () => {
     ).toBe(false);
   });
 
-  test("Attorney can still invite from a legacy case when attorney and attorneyId drift", async () => {
+  test.each([
+    ['body', 'primary'], ['body', 'alias'], ['path', 'primary'], ['path', 'alias'],
+  ])('%s invitation rejects conflicting ownership for the %s attorney without changing the Matter', async (shape, actorField) => {
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Stone",
@@ -172,11 +174,14 @@ describe("Permissions / ACL", () => {
     const paralegal = await User.create({
       firstName: "Priya",
       lastName: "Ng",
-      email: "samanthasider+paralegal@gmail.com",
+      email: "paralegal.alias-conflict@lets-paraconnect.test",
       password: "Password123!",
       role: "paralegal",
       status: "approved",
       state: "CA",
+      stripeAccountId: 'acct_synthetic_alias_conflict',
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
     });
 
     const caseDoc = await Case.create({
@@ -191,22 +196,38 @@ describe("Permissions / ACL", () => {
     });
 
     await Case.updateOne({ _id: caseDoc._id }, { $set: { attorneyId: staleAttorney._id } });
+    const before = await Case.collection.findOne({ _id: caseDoc._id });
+    const actor = actorField === 'primary' ? attorney : staleAttorney;
 
     const activeRes = await request(app)
       .get("/api/cases/my-active")
-      .set("Cookie", authCookieFor(attorney));
+      .set("Cookie", authCookieFor(actor));
 
-    expect(activeRes.status).toBe(200);
-    expect(Array.isArray(activeRes.body?.items)).toBe(true);
-    expect(activeRes.body.items.some((item) => String(item.id || item._id) === String(caseDoc._id))).toBe(true);
+    expect(activeRes.status).toBe(409);
 
     const inviteRes = await request(app)
-      .post(`/api/cases/${caseDoc._id}/invite`)
-      .set("Cookie", authCookieFor(attorney))
+      .post(`/api/cases/${caseDoc._id}/invite${shape === 'path' ? '/' + paralegal._id : ''}`)
+      .set("Cookie", authCookieFor(actor))
       .send({ paralegalId: paralegal._id.toString() });
 
-    expect(inviteRes.status).toBe(200);
-    expect(inviteRes.body?.success).toBe(true);
+    const after = await Case.collection.findOne({ _id: caseDoc._id });
+    expect({ status: inviteRes.status, aliases: [String(after.attorney), String(after.attorneyId)], invitations: after.invites.length }).toEqual({ status: 409, aliases: [String(attorney._id), String(staleAttorney._id)], invitations: 0 });
+    expect(inviteRes.body.error).toBe(shape === 'body'
+      ? 'Matter participant records need review before continuing.'
+      : 'Matter ownership needs review before invitations can be sent.');
+    expect(inviteRes.body.code).toBe(shape === 'body' ? 'CASE_IDENTITY_CONFLICT' : 'INVITATION_CONFLICT');
+    expect(after).toEqual(before);
+  });
+
+  test.each(['body', 'path'])('%s invitation retains a legacy record with one valid owner alias', async shape => {
+    const attorney = await User.create({ firstName: 'Alex', lastName: 'Stone', email: 'single-owner@lets-paraconnect.test', password: 'Password123!', role: 'attorney', status: 'approved', state: 'CA' });
+    const paralegal = await User.create({ firstName: 'Priya', lastName: 'Ng', email: 'single-owner-paralegal@lets-paraconnect.test', password: 'Password123!', role: 'paralegal', status: 'approved', state: 'CA', stripeAccountId: 'acct_synthetic_single_owner', stripeOnboarded: true, stripePayoutsEnabled: true });
+    const matter = await Case.create({ title: 'Single legacy owner', details: 'Synthetic legacy alias preservation.', attorney: attorney._id, attorneyId: attorney._id, status: 'open', totalAmount: 100000, currency: 'usd', tasks: [{ title: 'Review file' }] });
+    await Case.collection.updateOne({ _id: matter._id }, { $unset: { attorneyId: '' } });
+    const res = await request(app).post(`/api/cases/${matter._id}/invite${shape === 'path' ? '/' + paralegal._id : ''}`).set('Cookie', authCookieFor(attorney)).send({ paralegalId: String(paralegal._id) });
+    expect(res.status).toBe(200);
+    const after = await Case.collection.findOne({ _id: matter._id }); expect(after.invites).toHaveLength(1); expect(String(after.attorney)).toBe(String(attorney._id));
+    expect([after.attorney, after.attorneyId].filter(Boolean).every(owner => String(owner) === String(attorney._id))).toBe(true); expect(after.totalAmount).toBe(100000);
   });
 
   test("Attorney cannot access another attorney's case files", async () => {
@@ -333,6 +354,8 @@ describe("Permissions / ACL", () => {
       attorneyId: attorney._id,
       paralegal: paralegal._id,
       paralegalId: paralegal._id,
+      escrowIntentId: "pi_assigned_file_acl",
+      escrowStatus: "funded",
       totalAmount: 100000,
       currency: "usd",
     });

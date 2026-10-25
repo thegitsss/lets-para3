@@ -13,6 +13,7 @@
   const deadline = film.querySelector('#matter-deadline');
   const feedback = film.querySelector('[data-feedback]');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const shortLandscape = matchMedia('(max-width: 1024px) and (max-height: 500px) and (orientation: landscape) and (hover: none) and (pointer: coarse)');
   const status = ['YOUR STARTING POINT', 'YOUR NOTES → YOUR MATTER', ''];
   const actions = ['Build my Matter', 'Preview', 'Post Matter'];
   let stage = 0, frame = 0, scrollStart = 0, scrollDistance = 1;
@@ -196,7 +197,7 @@
     frame = 0;
     const progress = Math.max(0, Math.min(1, (scrollY - scrollStart) / scrollDistance));
 
-    if (reduced.matches) return;
+    if (reduced.matches || shortLandscape.matches) return;
     let next = progress < .26 ? 0 : progress < .64 ? 1 : 2;
     if (next === 2 && !validate()) next = 1;
     transitionTo(next);
@@ -274,6 +275,7 @@
   function goTo(next) {
     if (next === 2 && !validate()) next = 1;
     if (reduced.matches) { setStage(next); return; }
+    if (shortLandscape.matches) { transitionTo(next); return; }
     const target = scrollStart + scrollDistance * [0, .43, .83][next];
     scrollTo({top:target, behavior:reduced.matches ? 'instant' : 'smooth'});
   }
@@ -307,6 +309,7 @@
   });
   [amount, deadline].forEach(input => input.addEventListener('input', validate));
   addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(updateFromScroll); }, {passive:true});
+  shortLandscape.addEventListener('change', () => requestAnimationFrame(measure));
   let layoutWidth = innerWidth;
   addEventListener('resize', () => {
     if (innerWidth <= 767 && innerWidth === layoutWidth) return;
@@ -320,7 +323,8 @@
     // Measure after all preference handlers have applied their layouts.
     requestAnimationFrame(measure);
   });
-  new ResizeObserver(measure).observe(film);
+  // Defer parent-height writes beyond ResizeObserver delivery.
+  new ResizeObserver(() => requestAnimationFrame(measure)).observe(film);
   new ResizeObserver(() => { if (!builder.hidden) setStyle(film, '--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`); }).observe(builder);
   setStage(0); measure();
   document.fonts.ready.then(measure);

@@ -1,0 +1,233 @@
+{
+  "config": {
+    "argv": [
+      "/Users/samanthasider/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/samanthasider/Desktop/lets-para3/backend/node_modules/playwright/cli.js",
+      "test",
+      "-c",
+      "tests/playwright/paralegal-payouts/payouts.config.js",
+      "navigation.spec.js",
+      "--grep",
+      "Matters opens the full inventory",
+      "--output",
+      "../outputs/completion-2026-09-29/matters-mobile-index-artifacts",
+      "--reporter=line,json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/paralegal-payouts/payouts.config.js",
+    "rootDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/paralegal-payouts",
+    "failOnFlakyTests": true,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/matters-mobile-index-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/paralegal-payouts",
+        "testIgnore": [],
+        "testMatch": [
+          "*.spec.js"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/matters-mobile-index-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/paralegal-payouts",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "*.spec.js"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/samanthasider/Desktop/lets-para3/outputs/completion-2026-09-29/matters-mobile-index-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/samanthasider/Desktop/lets-para3/backend/tests/playwright/paralegal-payouts",
+        "testIgnore": [
+          "**/*.chromium.spec.js"
+        ],
+        "testMatch": [
+          "*.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node tests/playwright/attorney-v2/security-static-server.js",
+      "cwd": "/Users/samanthasider/Desktop/lets-para3/backend",
+      "port": 5287,
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "navigation.spec.js",
+      "file": "navigation.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Matters opens the full inventory and exposes each lifecycle view directly",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3117,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:27:52.250Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ce7c070a851ea64285fd-22f5cdfa2f37b1d5f947",
+          "file": "navigation.spec.js",
+          "line": 63,
+          "column": 1
+        },
+        {
+          "title": "Matters opens the full inventory and exposes each lifecycle view directly",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7165,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:27:56.461Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ce7c070a851ea64285fd-419ec59a6337cfb975b3",
+          "file": "navigation.spec.js",
+          "line": 63,
+          "column": 1
+        },
+        {
+          "title": "Matters opens the full inventory and exposes each lifecycle view directly",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3545,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-29T16:28:08.627Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ce7c070a851ea64285fd-7c508b38d4a807f36ed0",
+          "file": "navigation.spec.js",
+          "line": 63,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T16:27:51.535Z",
+    "duration": 21359.191,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

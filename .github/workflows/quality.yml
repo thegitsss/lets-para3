@@ -1,0 +1,166 @@
+name: V2 first-stage release
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: v2-stage1-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    working-directory: backend
+jobs:
+  deployment-blueprint:
+    name: Deployment Blueprint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify runtime
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependencies
+        run: npm ci --include=dev
+      - run: npm run check:deploy
+  runtime:
+    name: Runtime, dependency, and test gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify runtime
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependencies
+        run: npm ci --include=dev
+      - run: npm run check:syntax && npm run check:api-contract && npm run check:secrets
+          && npm run check:install-scripts && npm run build:frontend
+      - run: node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand
+          --runTestsByPath tests/retainedProfileCompatibility.test.js
+          tests/paralegalOnboardingOwnership.test.js
+          tests/accountThemeMigration.test.js
+          tests/accountWriteConcurrency.test.js tests/profilePersistence.test.js
+          tests/retainedAccountPersistence.test.js
+          tests/workspaceReleaseClient.test.js
+          tests/workspaceReleasePolicy.test.js tests/productionOrigin.test.js
+          tests/uploadQuarantine.test.js tests/profileDraftProtection.test.js
+          tests/stripeWebhookProtection.test.js tests/stripeWebhookSignature.test.js
+          tests/webhookHandling.test.js
+      - run: npm audit --omit=dev --audit-level=moderate
+  browser:
+    name: Browser contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify runtime
+        run: node scripts/verify-runtime.js
+      - name: Install exact dependencies
+        run: npm ci --include=dev
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run build:frontend
+      - run: npx playwright test -c playwright.v2-stage1-release.config.cjs
+          --fail-on-flaky-tests
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    name: Dependency review
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Reject vulnerable dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          fail-on-severity: moderate
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@988661ebb5e81487b3fb31b2185d2856c0a10679
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_COMMENTS: "false"

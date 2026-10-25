@@ -1,3 +1,19 @@
+// Only known Home paging state can be used as a return destination.
+export function safeHomeReturn(value) {
+  if (value === '1') return '#/home';
+  if (typeof value !== 'string' || value.length > 500 || /[\\\x00-\x20\x7f]/.test(value)) return null;
+  const [path, query = ''] = value.split('?');
+  if (path !== '#/home') return null;
+  const input = new URLSearchParams(query), output = new URLSearchParams();
+  for (const key of ['attentionPage', 'deadlinePage']) {
+    if (!input.has(key)) continue;
+    const page = input.get(key);
+    if (input.getAll(key).length !== 1 || !/^[1-9]\d{0,5}$/.test(page || '')) return null;
+    output.set(key, page);
+  }
+  return '#/home' + (output.size ? '?' + output : '');
+}
+
 const objectId = value => /^[a-f0-9]{24}$/i.test(value || "");
 const choices = {
   view: ["active", "draft", "applications", "archived", "inquiries"],
@@ -44,13 +60,50 @@ export function safeMatterReturn(value) {
 }
 
 export function matterReturnHref(route, fallback = "#/matters") {
-  return safeMatterReturn(route?.query?.get("returnTo")) || safeMatterReturn(fallback) || "#/matters";
+  return safeMatterReturn(route?.query?.get("returnTo")) || safeHomeReturn(route?.query?.get("returnHome")) || safeMatterReturn(fallback) || "#/matters";
 }
 
 export function withMatterReturn(href, route) {
   const target = route?.name === "matters" ? safeMatterReturn(`#/matters${route.query?.size ? `?${route.query}` : ""}`) : safeMatterReturn(route?.query?.get("returnTo"));
-  if (!target || typeof href !== "string" || !/^#\/matters(?:\/|\?|$)/.test(href)) return href;
+  if (typeof href !== "string" || !/^#\/(?:matters|tasks|payments|conversations|help)(?:\/|\?|$)/.test(href)) return href;
   const [path, ...parts] = href.split("?"), query = new URLSearchParams(parts.join("?"));
-  query.set("returnTo", target);
-  return `${path}?${query}`;
+  if (target) query.set("returnTo", target);
+  if (safeHomeReturn(route?.query?.get("returnHome"))) query.set("returnHome", route.query.get("returnHome"));
+  const origin = matterOriginHref(route);
+  const sameMatter = path.match(/^#\/matters\/([a-f0-9]{24})\//i);
+  if (origin && sameMatter && sameMatter[1].toLowerCase() === route?.caseId?.toLowerCase()) {
+    const carried = new URLSearchParams(origin.split('?').slice(1).join('?'));
+    for (const [key,value] of carried) if (key !== 'returnTo' && !query.has(key)) query.set(key,value);
+  }
+  if (origin && (!path.startsWith('#/matters/') || /\/(?:receipt|export|archive)$/.test(path))) query.set('matterOrigin', origin);
+  return `${path}${query.size ? `?${query}` : ''}`;
+}
+
+// A separate bounded origin lets adjacent tools return to the actual Matter
+// tab. The nested list return remains restricted to the existing list grammar.
+export function safeMatterOrigin(value) {
+  if (typeof value !== 'string' || value.length > 6000 || /[\\\x00-\x20\x7f]/.test(value)) return null;
+  const [path, ...parts] = value.split('?');
+  if (!/^#\/matters\/[a-f0-9]{24}\/(?:overview|applications|work|files|messages|deadlines|activity|financials|invitations)$/i.test(path)) return null;
+  const input = new URLSearchParams(parts.join('?')), output = new URLSearchParams();
+  for (const key of ['fileId','eventId','taskId','messageId','applicantId','applicationId']) if (input.getAll(key).length === 1 && objectId(input.get(key))) output.set(key,input.get(key));
+  const earlier=input.get('earlierFileId');if(input.getAll('earlierFileId').length===1 && /^[a-f0-9]{64}$/.test(earlier || ''))output.set('earlierFileId',earlier);
+  const taskIndex=input.get('taskIndex');if(input.getAll('taskIndex').length===1 && /^(0|[1-9]\d{0,3})$/.test(taskIndex || ''))output.set('taskIndex',taskIndex);
+  for (const key of ['appSearch','appStatus','appSort','appPage','fileSearch','fileStatus','fileSort','invStatus','invSearch','invSort','invPage']) {
+    const text = input.get(key);
+    if (input.getAll(key).length === 1 && text && text.length <= 200 && !/[\x00-\x1f\x7f]/.test(text)) output.set(key,text);
+  }
+  if (input.getAll('returnHome').length === 1 && safeHomeReturn(input.get('returnHome'))) output.set('returnHome', input.get('returnHome'));
+  const list = safeMatterReturn(input.get('returnTo')); if (list) output.set('returnTo',list);
+  return path + (output.size ? `?${output}` : '');
+}
+export function matterOriginHref(route) {
+  if (!route?.caseId || !objectId(route.caseId)) return safeMatterOrigin(route?.query?.get('matterOrigin'));
+  const rawTab = route.tab || ({'matter-invitations':'invitations','matter-management':'overview','matter-receipt':'financials','matter-export':'financials','matter-archive':'overview'})[route.name];
+  const tab = ({receipt:'financials',export:'financials',archive:'overview',manage:'overview'})[rawTab] || rawTab;
+  if (!tab) return safeMatterOrigin(route.query?.get('matterOrigin'));
+  return safeMatterOrigin(route.query?.get('matterOrigin')) || safeMatterOrigin(`#/matters/${route.caseId}/${tab}${route.query?.size ? `?${route.query}` : ''}`);
+}
+export function matterToolReturnHref(route, fallback) {
+  return safeMatterOrigin(route?.query?.get('matterOrigin')) || fallback || matterReturnHref(route);
 }

@@ -1,0 +1,162 @@
+{
+  "formats": [
+    {
+      "name": "Local blank template.doc",
+      "mimeType": "application/msword",
+      "bytes": 23040,
+      "sha256": "6e3bb3fbd18612011a3361b2aeb27686ca4cb827be155dd1bad9a0dead1797dc",
+      "provenance": "Unmodified blank document template bundled with locally installed Microsoft Outlook; no user records; used only in private local fixtures.",
+      "validation": {
+        "type": "OLE/CFB full directory chain",
+        "requiredStream": "WordDocument",
+        "streamNames": [
+          "Root Entry",
+          "1Table",
+          "WordDocument",
+          "\u0005SummaryInformation",
+          "\u0005DocumentSummaryInformation",
+          "\u0001CompObj"
+        ]
+      }
+    },
+    {
+      "name": "Local blank template.xls",
+      "mimeType": "application/vnd.ms-excel",
+      "bytes": 23552,
+      "sha256": "9738f1ff6e8f482a4499afe7d8e5899afadeb35018af47003030f33e1afda83d",
+      "provenance": "Unmodified blank document template bundled with locally installed Microsoft Outlook; no user records; used only in private local fixtures.",
+      "validation": {
+        "type": "OLE/CFB full directory chain",
+        "requiredStream": "Workbook",
+        "streamNames": [
+          "Root Entry",
+          "Workbook",
+          "\u0005SummaryInformation",
+          "\u0005DocumentSummaryInformation"
+        ]
+      }
+    },
+    {
+      "name": "Local blank template.ppt",
+      "mimeType": "application/vnd.ms-powerpoint",
+      "bytes": 76288,
+      "sha256": "f3e2c0d35fe7836a190fab114bdec8d74f3f3abf663d1960ae9a0d4d8155b58d",
+      "provenance": "Unmodified blank document template bundled with locally installed Microsoft Outlook; no user records; used only in private local fixtures.",
+      "validation": {
+        "type": "OLE/CFB full directory chain",
+        "requiredStream": "PowerPoint Document",
+        "streamNames": [
+          "Root Entry",
+          "PowerPoint Document",
+          "\u0005SummaryInformation",
+          "\u0005DocumentSummaryInformation",
+          "Current User"
+        ]
+      }
+    },
+    {
+      "name": "Synthetic local review.docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "bytes": 1180,
+      "sha256": "d01d80eb255df5563003fc4fe75ac6526fbc68d924d085e18edb127a4376092a",
+      "provenance": "Generated self-contained OOXML package with synthetic review content; ZIP and every XML part parsed locally. No Office application rendering claim.",
+      "validation": {
+        "type": "OOXML zip and XML",
+        "mainPart": "word/document.xml",
+        "parts": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "word/document.xml"
+        ],
+        "applicationRenderVerified": false
+      }
+    },
+    {
+      "name": "Synthetic local review.xlsx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "bytes": 2166,
+      "sha256": "cce3c3dde5950512f2a3a534eeabbbf4f8dbd7a154f52fde677d0ff624730e62",
+      "provenance": "Generated self-contained OOXML package with synthetic review content; ZIP and every XML part parsed locally. No Office application rendering claim.",
+      "validation": {
+        "type": "OOXML zip and XML",
+        "mainPart": "xl/workbook.xml",
+        "parts": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml",
+          "xl/_rels/workbook.xml.rels"
+        ],
+        "applicationRenderVerified": false
+      }
+    },
+    {
+      "name": "Synthetic local review.pptx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "bytes": 2567,
+      "sha256": "810382d288e0035f306f89d45293fc6eda6d24cafdc7781be67cf8ababb87b36",
+      "provenance": "Generated self-contained OOXML package with synthetic review content; ZIP and every XML part parsed locally. No Office application rendering claim.",
+      "validation": {
+        "type": "OOXML zip and XML",
+        "mainPart": "ppt/presentation.xml",
+        "parts": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "ppt/presentation.xml",
+          "ppt/slides/slide1.xml",
+          "ppt/_rels/presentation.xml.rels"
+        ],
+        "applicationRenderVerified": false
+      }
+    },
+    {
+      "name": "Synthetic valid review.pdf",
+      "mimeType": "application/pdf",
+      "bytes": 1475,
+      "sha256": "4b1c3837641b5dbb1ff6bc93613639c11ffb4d5d93cf044f51834494f50d3a93",
+      "provenance": "Existing accepted valid one-page LPC PDF fixture, unchanged. Prior documents/photo18 valid fixture credit retained.",
+      "validation": "PDF full xref/pages fixture; no fake header-only body."
+    },
+    {
+      "name": "Synthetic review.txt",
+      "mimeType": "text/plain",
+      "bytes": 60,
+      "sha256": "ced5d29c4636065680be3f4a7755a9acae52b8b7b2ea6ef5f0f1bcce08fc5daa",
+      "provenance": "Generated valid UTF-8 synthetic review text.",
+      "validation": "UTF-8 decode and no NUL"
+    },
+    {
+      "name": "Synthetic review.csv",
+      "mimeType": "text/csv",
+      "bytes": 54,
+      "sha256": "89b4d06b043e3ea548a90f38f08cf11a57cdc4235c9344e4f5acf826c7ea336a",
+      "provenance": "Generated valid UTF-8 synthetic review text.",
+      "validation": "UTF-8 decode and no NUL"
+    },
+    {
+      "name": "Synthetic review.png",
+      "mimeType": "image/png",
+      "bytes": 349,
+      "sha256": "4f63e490a5b50c38f37cef90dd48b092d7796c8271173c37de20af657d68f778",
+      "provenance": "Existing LPC sixteen-pixel PNG asset, private fixture copy.",
+      "validation": "Native browser decode asserted in callback"
+    },
+    {
+      "name": "Synthetic review.jpg",
+      "mimeType": "image/jpeg",
+      "bytes": 493776,
+      "sha256": "6ad014af9318e8d002b9746359ab874c9aea6ce016c6f1a44272e8ad5fa236c4",
+      "provenance": "Existing LPC JPEG asset, private fixture copy.",
+      "validation": "Native browser decode asserted in callback"
+    },
+    {
+      "name": "Synthetic review.gif",
+      "mimeType": "image/gif",
+      "bytes": 42,
+      "sha256": "ef1955ae757c8b966c83248350331bd3a30f658ced11f387f8ebf05ab3368629",
+      "provenance": "Valid one-pixel GIF89a synthetic image.",
+      "validation": "Native browser decode asserted in callback"
+    }
+  ],
+  "providerBoundary": "Local storage bytes/signatures only; external scan/encryption/storage/native Office applications are not exercised."
+}
