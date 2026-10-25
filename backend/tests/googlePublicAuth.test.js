@@ -104,7 +104,7 @@ test("Google login accepts an approved account with its linked provider identity
   verifiedProfile.mockResolvedValue({ sub: "google-sub-2", email: "pat@example.com", email_verified: true, nonce });
   const callback = await agent.get(`/api/auth/google/callback?state=${encodeURIComponent(state)}&code=test-code`);
   expect(callback.status).toBe(302);
-  expect(callback.headers.location).toBe("/dashboard-paralegal.html");
+  expect(callback.headers.location).toBe("/paralegal-v2.html#/home");
   expect(callback.headers["set-cookie"].some(value => value.startsWith("token="))).toBe(true);
 });
 
