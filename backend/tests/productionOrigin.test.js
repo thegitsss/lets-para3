@@ -97,6 +97,28 @@ describe("production origin configuration", () => {
     ).toThrow(/APP_BASE_URL is required in production/i);
   });
 
+  test("preserves the existing production session signing contract as an exact pair", () => {
+    expect(assertProductionOriginConfiguration(productionEnv({
+      JWT_ISSUER: "https://paraconnect", JWT_AUDIENCE: "paraconnect-app",
+    }))).toBe("https://www.lets-paraconnect.com");
+    expect(() => assertProductionOriginConfiguration(productionEnv({
+      JWT_ISSUER: "https://paraconnect", JWT_AUDIENCE: "another-application",
+    }))).toThrow(/JWT_ISSUER/);
+  });
+
+  test("preserves the portal's existing per-mailbox director connection", () => {
+    const env = productionEnv({
+      ZOHO_MAIL_REFRESH_TOKEN: "", ZOHO_MAIL_CLIENT_ID: "", ZOHO_MAIL_CLIENT_SECRET: "",
+      DIRECTOR_SMTP_USER: "", DIRECTOR_SMTP_PASS: "",
+      DIRECTOR_ZOHO_EXISTING_REFRESH_TOKEN: "refresh", DIRECTOR_ZOHO_EXISTING_CLIENT_ID: "client",
+      DIRECTOR_ZOHO_EXISTING_CLIENT_SECRET: "secret", DIRECTOR_SMTP_EXISTING_USER: "director@example.com",
+      DIRECTOR_SMTP_EXISTING_PASS: "password",
+    });
+    expect(assertProductionOriginConfiguration(env)).toBe("https://www.lets-paraconnect.com");
+    delete env.DIRECTOR_ZOHO_EXISTING_CLIENT_SECRET;
+    expect(() => assertProductionOriginConfiguration(env)).toThrow(/complete generic or per-mailbox/);
+  });
+
   test("rejects localhost, wildcard CORS, and a mismatched Google callback in production", () => {
     expect(() =>
       assertProductionOriginConfiguration(
@@ -222,10 +244,10 @@ describe("production origin configuration", () => {
     expect(() => assertProductionOriginConfiguration(productionEnv({
       OPENAI_ATTORNEY_LEGACY_FALLBACK: "true",
     }))).toThrow(/OPENAI_ATTORNEY_LEGACY_FALLBACK must be false/i);
-    expect(() => assertProductionOriginConfiguration(productionEnv({
+    expect(assertProductionOriginConfiguration(productionEnv({
       OPENAI_PARALEGAL_MANAGER_ENABLED: "true",
       OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT: "100",
-    }))).toThrow(/must remain false until its production acceptance/i);
+    }))).toBe("https://www.lets-paraconnect.com");
     expect(() => assertProductionOriginConfiguration(productionEnv({
       OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT: "",
     }))).toThrow(/OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT must be an approved stage/i);

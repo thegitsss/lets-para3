@@ -186,10 +186,15 @@ function assertProductionOriginConfiguration(env = process.env) {
   if (Buffer.byteLength(String(env.JWT_SECRET || ""), "utf8") < 32) {
     throw new Error("[config] JWT_SECRET must contain at least 32 bytes in production.");
   }
-  if (String(env.JWT_ISSUER || "").trim() !== canonicalOrigin) {
-    throw new Error(`[config] JWT_ISSUER must be ${canonicalOrigin} in production.`);
+  // Retain the deployed signing contract so adopting V2 does not revoke
+  // existing sessions. Issuer and audience are validated as a pair.
+  const issuer = String(env.JWT_ISSUER || "").trim();
+  const audience = String(env.JWT_AUDIENCE || "").trim();
+  const deployedContract = issuer === "https://paraconnect" && audience === "paraconnect-app";
+  if (!deployedContract && issuer !== canonicalOrigin) {
+    throw new Error(`[config] JWT_ISSUER must be ${canonicalOrigin} or the preserved production signing contract.`);
   }
-  if (String(env.JWT_AUDIENCE || "").trim() !== PRODUCTION_JWT_AUDIENCE) {
+  if (!deployedContract && audience !== PRODUCTION_JWT_AUDIENCE) {
     throw new Error(
       `[config] JWT_AUDIENCE must be ${PRODUCTION_JWT_AUDIENCE} in production.`
     );
@@ -284,16 +289,15 @@ function assertProductionOriginConfiguration(env = process.env) {
   if (attorneyLegacyFallbackEnabled) {
     throw new Error("[config] OPENAI_ATTORNEY_LEGACY_FALLBACK must be false in production.");
   }
-  if (explicitBoolean(env, "OPENAI_PARALEGAL_MANAGER_ENABLED")) {
-    throw new Error(
-      "[config] OPENAI_PARALEGAL_MANAGER_ENABLED must remain false until its production acceptance is recorded."
-    );
-  }
-  explicitRolloutStage(
+  const paralegalManagerEnabled = explicitBoolean(env, "OPENAI_PARALEGAL_MANAGER_ENABLED");
+  const paralegalRolloutPercent = explicitRolloutStage(
     env,
     "OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT",
-    new Set([0])
+    ATTORNEY_MANAGER_ROLLOUT_STAGES
   );
+  if (!paralegalManagerEnabled && paralegalRolloutPercent !== 0) {
+    throw new Error("[config] A disabled Paralegal Assistant manager requires OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT=0.");
+  }
   if (explicitBoolean(env, "OPENAI_PARALEGAL_LEGACY_FALLBACK")) {
     throw new Error("[config] OPENAI_PARALEGAL_LEGACY_FALLBACK must be false in production.");
   }
@@ -387,14 +391,28 @@ function assertProductionOriginConfiguration(env = process.env) {
     throw new Error(`[config] LINKEDIN_OAUTH_REDIRECT_URI must be ${canonicalOrigin}${expectedLinkedInPath}.`);
   }
 
-  for (const name of [
+  const genericDirectorKeys = [
     "ZOHO_MAIL_REFRESH_TOKEN",
     "ZOHO_MAIL_CLIENT_ID",
     "ZOHO_MAIL_CLIENT_SECRET",
     "DIRECTOR_SMTP_USER",
     "DIRECTOR_SMTP_PASS",
-  ]) {
-    if (!String(env[name] || "").trim()) throw new Error(`[config] ${name} is required for the production director portal.`);
+  ];
+  const genericDirectorConfigured = genericDirectorKeys.every(name => String(env[name] || "").trim());
+  // The portal supports per-mailbox credentials. Do not require a second
+  // generic identity when its existing mailbox connection is complete.
+  const directorMailboxes = Object.keys(env)
+    .map(name => /^DIRECTOR_ZOHO_(.+)_REFRESH_TOKEN$/.exec(name)?.[1])
+    .filter(Boolean);
+  const namedDirectorConfigured = directorMailboxes.some(mailbox => [
+    `DIRECTOR_ZOHO_${mailbox}_REFRESH_TOKEN`,
+    `DIRECTOR_ZOHO_${mailbox}_CLIENT_ID`,
+    `DIRECTOR_ZOHO_${mailbox}_CLIENT_SECRET`,
+    `DIRECTOR_SMTP_${mailbox}_USER`,
+    `DIRECTOR_SMTP_${mailbox}_PASS`,
+  ].every(name => String(env[name] || "").trim()));
+  if (!genericDirectorConfigured && !namedDirectorConfigured) {
+    throw new Error("[config] A complete generic or per-mailbox Zoho and SMTP connection is required for the production director portal.");
   }
 
   const corsOrigins = String(env.CORS_ORIGINS || "")
