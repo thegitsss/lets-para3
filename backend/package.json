@@ -180,8 +180,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@babel/parser": "8.0.4",
-    "@babel/traverse": "8.0.4",
+    "@babel/parser": "8.0.7",
+    "@babel/traverse": "8.0.7",
     "ajv": "8.20.0",
     "clean-css": "5.3.3",
     "jest": "^30.4.2",
@@ -190,7 +190,7 @@
     "playwright": "^1.58.2",
     "supertest": "^7.0.0",
     "terser": "5.51.2",
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   },
   "overrides": {
     "follow-redirects": "^1.15.6",
