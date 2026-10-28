@@ -201,6 +201,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
         ? /^page\.reload: NS_BINDING_ABORTED(?:; maybe frame was detached\?)?$/.test(message)
         : info.project.name === 'chromium'
           ? message === 'page.reload: Protocol error (Page.reload): Not attached to an active page'
+            || /^page\.reload: net::ERR_ABORTED(?:; maybe frame was detached\?)?$/.test(message)
           : info.project.name === 'webkit' && message === 'page.reload: Navigation canceled by policy check';
       if (!suspendedNavigation) throw error;
       navigationInterruptions.push({ action: 'suspension reload', engine: info.project.name, message, at: Date.now() });
