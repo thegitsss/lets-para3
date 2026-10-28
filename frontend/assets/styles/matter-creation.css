@@ -9,7 +9,7 @@
 .av2-creation-surface:not([data-step=describe]) { width:min(1180px,100%); height:100%; }
 .av2-creation-heading { height:52px; border-bottom:1px solid var(--av2-line); display:flex; align-items:center; justify-content:space-between; padding:0 20px; }
 .av2-creation-heading h2 { margin:0; font-size:calc(14 * var(--lpc-reading-unit, 1px)); font-weight:600; color:var(--av2-ink); }
-.av2 .av2-creation-close { border:0; background:transparent; color:var(--av2-muted); cursor:pointer; width:32px; height:32px; font:400 calc(22 * var(--lpc-reading-unit, 1px))/1 "Sarabun",sans-serif; }
+.av2 .av2-creation-close { border:0; background:transparent; color:var(--av2-muted); cursor:pointer; width:32px; height:32px; font:400 calc(22 * var(--lpc-reading-unit, 1px))/1 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 .av2 .av2-creation-close:hover { color:var(--av2-ink); }
 .av2-creation-content { height:calc(100% - 52px); overflow:auto; overscroll-behavior:contain; }
 .av2 .av2-creation-content .av2-living-canvas { width:100%; max-width:none; margin:0; padding:0; }
@@ -18,7 +18,7 @@
 .av2 .av2-creation-content .av2-compose-intro { padding:26px; display:flex; flex-direction:column; gap:0; min-width:0; }
 .av2 .av2-creation-content .av2-compose-intro h2 { margin:0; font-size:calc(22 * var(--lpc-reading-unit, 1px)); font-weight:500; line-height:1.3; color:var(--av2-ink); }
 .av2 .av2-creation-content .av2-compose-intro > label { font-size:.875rem; line-height:calc(20 * var(--lpc-reading-unit, 1px)); color:var(--av2-muted); margin:7px 0 16px; }
-.av2 .av2-creation-content #av2-compose-brief { width:100%; height:145px; min-height:145px; padding:16px; border:1px solid var(--av2-line); border-radius:8px; font:400 calc(14 * var(--lpc-reading-unit, 1px))/1.6 "Sarabun",sans-serif; color:var(--av2-muted); resize:vertical; background:var(--av2-bg); }
+.av2 .av2-creation-content #av2-compose-brief { width:100%; height:145px; min-height:145px; padding:16px; border:1px solid var(--av2-line); border-radius:8px; font:400 calc(14 * var(--lpc-reading-unit, 1px))/1.6 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; color:var(--av2-muted); resize:vertical; background:var(--av2-bg); }
 .av2 .av2-creation-content #av2-compose-brief:focus { outline:2px solid #6495ed33; border-color:#6495ed; }
 .av2 .av2-creation-content .av2-compose-examples { gap:6px 18px; margin-top:13px; }
 .av2 .av2-creation-content .av2-compose-example { font-size:.8125rem; color:var(--av2-muted); text-align:left; }
@@ -47,7 +47,7 @@
 .av2 .av2-creation-content .av2-compose-requirements h2 { font-size:.75rem; font-weight:400; letter-spacing:.07em; text-transform:uppercase; color:var(--av2-muted); }
 .av2 .av2-creation-content .av2-draft-field-title { border:0; padding:0; margin-bottom:24px; }
 .av2-creation-content .av2-draft-field-title > label { display:none; }
-.av2 .av2-creation-content .av2-canvas-value { display:block; width:100%; border:0; border-radius:4px; padding:0; margin:0; background:transparent; text-align:left; color:#4d5968; font:400 .875rem/1.5 "Sarabun",sans-serif; cursor:text; white-space:pre-wrap; overflow-wrap:anywhere; }
+.av2 .av2-creation-content .av2-canvas-value { display:block; width:100%; border:0; border-radius:4px; padding:0; margin:0; background:transparent; text-align:left; color:#4d5968; font:400 .875rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; cursor:text; white-space:pre-wrap; overflow-wrap:anywhere; }
 .av2 .av2-creation-content .av2-canvas-value:hover { color:var(--av2-ink); }
 .av2 .av2-creation-content .av2-canvas-value.is-empty { color:var(--av2-accent); cursor:pointer; }
 .av2 .av2-creation-content .av2-draft-field-title .av2-canvas-value { font-size:calc(19 * var(--lpc-reading-unit, 1px)); line-height:calc(26 * var(--lpc-reading-unit, 1px)); font-weight:500; color:var(--av2-ink); }
@@ -121,7 +121,7 @@
 .av2 .av2-creation-options:hover { color:var(--av2-ink); }
 .av2-creation-menu,.av2-creation-restart { position:absolute; right:0; top:calc(100% + 8px); z-index:5; border:1px solid #e6eaef; border-radius:8px; background:var(--av2-bg); box-shadow:0 8px 28px #10243f1a; }
 .av2-creation-menu { width:175px; padding:5px; }
-.av2 .av2-creation-menu-item { display:block; width:100%; border:0; border-radius:4px; padding:9px 10px; background:transparent; color:var(--av2-ink); font:400 .875rem/1.5 "Sarabun",sans-serif; text-align:left; cursor:pointer; }
+.av2 .av2-creation-menu-item { display:block; width:100%; border:0; border-radius:4px; padding:9px 10px; background:transparent; color:var(--av2-ink); font:400 .875rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; text-align:left; cursor:pointer; }
 .av2 .av2-creation-menu-item:hover,.av2 .av2-creation-menu-item:focus-visible { background:var(--av2-soft); }
 .av2 .av2-creation-menu-item:disabled { opacity:.45; cursor:default; }
 .av2-creation-restart { width:min(300px,calc(100vw - 70px)); padding:18px; }
@@ -156,9 +156,9 @@
 .av2-creation-surface[data-step=describe] .av2-creation-heading { position:absolute; top:28px; right:28px; height:32px; padding:0; border:0; z-index:3; }
 .av2-creation-surface[data-step=describe] .av2-creation-content { height:auto; min-height:0; }
 .av2 .av2-creation-surface[data-step=describe] .av2-compose-intro { padding:32px; }
-.av2 .av2-creation-surface[data-step=describe] .av2-compose-intro > h2 { margin:0; padding-right:80px; font:600 1.75rem/1.25 "Sarabun",sans-serif; letter-spacing:-.025em; color:var(--av2-ink); }
-.av2 .av2-creation-surface[data-step=describe] .av2-compose-intro > label { margin:8px 0 24px; font:400 .875rem/1.5 "Sarabun",sans-serif; color:var(--av2-muted); }
-.av2 .av2-creation-surface[data-step=describe] #av2-compose-brief { height:108px; min-height:108px; padding:12px 14px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-bg); color:var(--av2-ink); font:400 .9375rem/1.6 "Sarabun",sans-serif; resize:none; overflow:hidden; }
+.av2 .av2-creation-surface[data-step=describe] .av2-compose-intro > h2 { margin:0; padding-right:80px; font:600 1.75rem/1.25 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; letter-spacing:-.025em; color:var(--av2-ink); }
+.av2 .av2-creation-surface[data-step=describe] .av2-compose-intro > label { margin:8px 0 24px; font:400 .875rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; color:var(--av2-muted); }
+.av2 .av2-creation-surface[data-step=describe] #av2-compose-brief { height:108px; min-height:108px; padding:12px 14px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-bg); color:var(--av2-ink); font:400 .9375rem/1.6 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; resize:none; overflow:hidden; }
 .av2 .av2-creation-surface[data-step=describe] .av2-compose-intro > [role=status]:empty { display:none; }
 .av2 .av2-creation-surface[data-step=describe] .av2-compose-intro > .av2-actions { margin-top:16px; }
 .av2 .av2-creation-surface[data-step=describe] .av2-button { min-height:36px; padding:7px 12px; border-radius:5px; font-size:.8125rem; font-weight:500; }
@@ -239,7 +239,7 @@
 .av2 .av2-creation-content .av2-compose-requirement-list:empty,
 .av2 .av2-creation-content .av2-compose-requirements > [role=status]:empty { display:none; }
 .av2 .av2-creation-content .av2-requirement-entry { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:8px; width:min(100%,440px); margin-top:9px; }
-.av2 .av2-creation-content .av2-requirement-entry input { width:100%; min-width:0; height:38px; min-height:38px; margin:0; padding:8px 10px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-bg); font:400 .875rem/1.5 'Sarabun',sans-serif; }
+.av2 .av2-creation-content .av2-requirement-entry input { width:100%; min-width:0; height:38px; min-height:38px; margin:0; padding:8px 10px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-bg); font:400 .875rem/1.5 var(--lpc-portal-font-sans, 'Sarabun'),sans-serif; }
 .av2 .av2-creation-content .av2-requirement-entry input:focus-visible { border-color:#6495ed; outline:2px solid #6495ed33; outline-offset:1px; }
 .av2 .av2-creation-content .av2-requirement-entry > button { min-height:38px; padding:7px 9px; font-size:.8125rem; line-height:calc(20 * var(--lpc-reading-unit, 1px)); }
 .av2 .av2-creation-content .av2-compose-requirements .av2-compose-requirements-note { margin-top:8px; font-size:.8125rem; line-height:1.4; }

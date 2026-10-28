@@ -1,0 +1,9 @@
+/* Portal UI only. Shared components retain their existing font elsewhere. */
+:root:has(body.lpc-v2) {
+  --lpc-portal-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+body.lpc-v2 {
+  font-family: var(--lpc-portal-font-sans);
+}

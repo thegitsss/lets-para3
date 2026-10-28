@@ -1,7 +1,7 @@
 /* Approved Security page controls. Dialogs and the navigation shell are excluded. */
 :root body.lpc-v2 main :is(.av2-security,#v2-settings-security) :is(.av2-button,.av2-secondary,.pv2-button,.pv2-secondary,.av2-refresh,.pv2-refresh,.v2-settings-primary,.v2-settings-secondary):not(dialog *) {
   box-sizing:border-box; min-height:32px !important; height:auto; max-width:100%; padding:6px 12px; border-radius:4px;
-  font:500 calc(14 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; letter-spacing:0; text-transform:none; text-decoration:none; box-shadow:none;
+  font:500 calc(14 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) var(--lpc-portal-font-sans, "Sarabun"),sans-serif; letter-spacing:0; text-transform:none; text-decoration:none; box-shadow:none;
 }
 :root body.lpc-v2 main :is(.av2-security,#v2-settings-security) :is(.av2-secondary,.pv2-secondary,.av2-refresh,.pv2-refresh,.v2-settings-secondary):not(dialog *) {
   border:1px solid var(--ref-line); background:var(--ref-surface); color:var(--ref-ink);

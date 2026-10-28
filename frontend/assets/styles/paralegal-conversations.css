@@ -1,5 +1,5 @@
 /* Role-local bridge to the approved shared Conversations visual system. */
-.pv2-conversations {--av2-bg:#fff;--av2-soft:#f6f8fb;--av2-ink:#27364c;--av2-muted:#5c6d85;--av2-line:#e4e9f1;--av2-accent:#4775b4;--av2-selected:#edf3fc;height:100%;min-height:480px;color:var(--av2-ink);font-family:Sarabun,sans-serif}
+.pv2-conversations {--av2-bg:#fff;--av2-soft:#f6f8fb;--av2-ink:#27364c;--av2-muted:#5c6d85;--av2-line:#e4e9f1;--av2-accent:#4775b4;--av2-selected:#edf3fc;height:100%;min-height:480px;color:var(--av2-ink);font-family:var(--lpc-portal-font-sans, Sarabun),sans-serif}
 :root.theme-dark .pv2-conversations {--av2-bg:var(--v2-white);--av2-soft:var(--v2-soft);--av2-ink:var(--v2-ink);--av2-muted:var(--v2-muted);--av2-line:var(--v2-line);--av2-accent:var(--v2-blue);--av2-selected:var(--v2-soft)}
 .pv2-conversations * {box-sizing:border-box}
 .pv2-conversations [hidden] {display:none!important}
@@ -43,7 +43,7 @@
 .pv2-conversations .v2-matter-message-file .v2-matter-message-meta {font-size:0.6875rem;margin:0 0 4px;justify-content:flex-start;gap:12px}
 html[data-lpc-v2-route=conversations] [data-v2-route-outlet] {padding:28px 32px;overflow:hidden}
 @media(max-width:760px){html[data-lpc-v2-route=conversations] [data-v2-route-outlet]{padding:18px 12px}.pv2-conversations{min-height:0}.pv2-conversations .av2-view-header h1{font-size:1.5rem}.pv2-conversations .v2-matter-message-meta{flex-direction:row}.pv2-conversations .v2-matter-message-attachments li{flex-direction:row}}
-:root body.lpc-v2 .v2-view .pv2-conversations h1 {font-family:Sarabun,sans-serif;font-size:1.75rem;line-height:1.2;font-weight:500;letter-spacing:-.025em}
+:root body.lpc-v2 .v2-view .pv2-conversations h1 {font-family:var(--lpc-portal-font-sans, Sarabun),sans-serif;font-size:1.75rem;line-height:1.2;font-weight:500;letter-spacing:-.025em}
 .pv2-conversations {font-weight:400;flex:1;min-height:0}
 html[data-lpc-v2-route=conversations] [data-v2-route-outlet] {display:flex;flex-direction:column;gap:0}
 html[data-lpc-v2-route=conversations] [data-v2-route-outlet] > .v2-route-state {flex:none;margin-bottom:16px}

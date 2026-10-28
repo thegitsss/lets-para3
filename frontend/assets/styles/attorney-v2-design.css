@@ -267,7 +267,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 
 /* Matters adopts Home's quiet hierarchy without changing its record controls. */
 .av2-matters-index > .av2-view-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0; border:0; }
-.av2-matters-index h1 { margin:0; font:600 1.75rem/1.25 "Sarabun",sans-serif; letter-spacing:-.025em; }
+.av2-matters-index h1 { margin:0; font:600 1.75rem/1.25 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; letter-spacing:-.025em; }
 .av2-matters-index > .av2-view-header .av2-matters-create { min-height:36px; padding:7px 12px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-soft); color:var(--av2-accent); font-size:.8125rem; }
 .av2-matters-index > .av2-view-header .av2-matters-create:hover { background:var(--av2-selected); filter:none; }
 .av2-matters-index .av2-categories { gap:6px 18px; margin:24px 0; padding-bottom:0; border:0; }
@@ -334,7 +334,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 
 /* Place creation beside the Matters title as a simple, accessible plus. */
 .av2-matters-index > .av2-view-header { justify-content:flex-start; gap:3px; }
-.av2-matters-index > .av2-view-header .av2-matters-create { display:inline-flex; align-items:center; justify-content:center; width:28px; height:32px; min-height:32px; padding:0; border:0; background:transparent; color:var(--av2-muted); font:400 1.375rem/1 "Sarabun",sans-serif; text-decoration:none; }
+.av2-matters-index > .av2-view-header .av2-matters-create { display:inline-flex; align-items:center; justify-content:center; width:28px; height:32px; min-height:32px; padding:0; border:0; background:transparent; color:var(--av2-muted); font:400 1.375rem/1 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; text-decoration:none; }
 .av2-matters-index > .av2-view-header .av2-matters-create:hover { background:transparent; color:var(--av2-ink); }
 @media (pointer:coarse) { .av2-matters-index > .av2-view-header .av2-matters-create { width:44px; height:44px; } }
 
@@ -342,7 +342,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 .av2-matters-index > .av2-view-header .av2-matters-create { position:relative; overflow:visible; }
 .av2-create-plus { display:block; transform:scale(1); transition:transform 140ms ease; }
 .av2-matters-create:is(:hover,:focus-visible) .av2-create-plus { transform:scale(1.16); }
-.av2-matters-create::after { content:"Create new"; position:absolute; left:calc(100% + 4px); top:50%; transform:translateY(-50%) translateX(-3px); padding:5px 8px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-bg); color:var(--av2-ink); font:400 .75rem/1.4 "Sarabun",sans-serif; box-shadow:0 2px 8px #0000000d; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity 140ms ease,transform 140ms ease; z-index:2; }
+.av2-matters-create::after { content:"Create new"; position:absolute; left:calc(100% + 4px); top:50%; transform:translateY(-50%) translateX(-3px); padding:5px 8px; border:1px solid var(--av2-line); border-radius:5px; background:var(--av2-bg); color:var(--av2-ink); font:400 .75rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; box-shadow:0 2px 8px #0000000d; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity 140ms ease,transform 140ms ease; z-index:2; }
 .av2-matters-create:is(:hover,:focus-visible)::after { opacity:1; transform:translateY(-50%) translateX(0); }
 @media (prefers-reduced-motion:reduce) { .av2-create-plus,.av2-matters-create::after { transition:none; } .av2-matters-create:is(:hover,:focus-visible) .av2-create-plus { transform:none; } }
 
@@ -372,7 +372,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 .av2-matter-menu > summary:hover { color:var(--av2-ink); }
 .av2-matter-menu-body { position:fixed; z-index:60; width:240px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow:auto; padding:5px; border:1px solid var(--av2-line); border-radius:7px; background:var(--av2-bg); box-shadow:0 6px 20px #00000014; }
 .av2-matter-menu:not([open]) .av2-matter-menu-body { display:none; }
-.av2 .av2-matters-index .av2-matter-menu-body :is(a,button) { display:flex; justify-content:flex-start; width:100%; min-height:34px; padding:7px 9px; margin:0; border:0; border-radius:4px; background:transparent; color:var(--av2-ink) !important; font:400 .8125rem/1.4 "Sarabun",sans-serif; text-decoration:none; text-align:left; cursor:pointer; }
+.av2 .av2-matters-index .av2-matter-menu-body :is(a,button) { display:flex; justify-content:flex-start; width:100%; min-height:34px; padding:7px 9px; margin:0; border:0; border-radius:4px; background:transparent; color:var(--av2-ink) !important; font:400 .8125rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; text-decoration:none; text-align:left; cursor:pointer; }
 .av2 .av2-matters-index .av2-matter-menu-body :is(a,button):hover { background:var(--av2-soft); }
 @media (max-width:650px) {
  .av2-matters-index .av2-search-filter { flex-basis:100%; width:100%; }
@@ -398,7 +398,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 .av2-matters-index .av2-list-columns,
 .av2-matters-index .av2-row-heading { display:grid; grid-template-columns:minmax(0,1fr) 110px 110px 100px 28px; gap:12px; align-items:center; }
 .av2-list-columns { margin-top:16px; padding-bottom:6px; border-bottom:1px solid var(--av2-line); }
-.av2-sort-column { justify-self:start; min-height:30px; padding:4px 0; border:0; background:transparent; color:var(--av2-muted); font:400 .8125rem/1.4 "Sarabun",sans-serif; cursor:pointer; }
+.av2-sort-column { justify-self:start; min-height:30px; padding:4px 0; border:0; background:transparent; color:var(--av2-muted); font:400 .8125rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; cursor:pointer; }
 .av2-sort-column:hover,.av2-sort-column[aria-pressed="true"] { color:var(--av2-ink); }
 .av2-list-deadline,.av2-list-updated { color:var(--av2-muted); font-size:.75rem; }
 .av2-matters-index .av2-badges { justify-content:flex-start; }
@@ -501,7 +501,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 /* Matter creation shares the quiet typography and grouping of the inventory. */
 .av2 .lpc-draft-editor { width:100%; max-width:640px; }
 .av2 .lpc-draft-editor .av2-view-header { display:block; margin-bottom:0; }
-.av2 .lpc-draft-editor .av2-view-header h1 { font-family:"Sarabun",sans-serif; font-size:1.75rem; font-weight:500; line-height:1.25; }
+.av2 .lpc-draft-editor .av2-view-header h1 { font-family:var(--lpc-portal-font-sans, "Sarabun"),sans-serif; font-size:1.75rem; font-weight:500; line-height:1.25; }
 .av2 .lpc-draft-editor .av2-lead { margin:8px 0 0; font-size:.875rem; }
 .av2 .lpc-draft-editor .av2-draft-steps { gap:24px; margin:24px 0 0; flex-wrap:nowrap; overflow-x:auto; padding:3px 0; }
 .av2 .lpc-draft-editor .av2-draft-steps button { flex-shrink:0; min-height:36px; padding:8px 0; border:0; border-radius:0; background:transparent; color:var(--av2-muted); font-size:.8125rem; }
@@ -599,7 +599,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 .av2 .av2-compose .av2-view-header h1 { font-size:1.625rem; }
 .av2 .av2-compose .av2-compose-intro { gap:16px; }
 .av2-compose-intro > label { font-size:.9375rem; color:var(--av2-muted); }
-.av2-compose textarea { width:100%; padding:12px; border:1px solid var(--av2-line); border-radius:6px; background:var(--av2-bg); color:var(--av2-ink); font:400 .9375rem/1.6 "Sarabun",sans-serif; resize:vertical; }
+.av2-compose textarea { width:100%; padding:12px; border:1px solid var(--av2-line); border-radius:6px; background:var(--av2-bg); color:var(--av2-ink); font:400 .9375rem/1.6 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; resize:vertical; }
 .av2-compose-examples { display:flex; flex-wrap:wrap; gap:8px 16px; }
 .av2 .av2-compose .av2-compose-example { border:0; background:transparent; color:var(--av2-muted); padding:6px 0; font-size:.8125rem; cursor:pointer; text-decoration:none; }
 .av2 .av2-compose .av2-compose-example:hover { color:var(--av2-ink); }
@@ -650,7 +650,7 @@ body.av2 { background:var(--av2-sidebar-bg); }
 .av2 .av2-compose .av2-draft-task-heading h2,
 .av2 .av2-compose .av2-compose-requirements h2 { font-size:.8125rem; font-weight:500; margin:0; color:var(--av2-ink); }
 .av2 .av2-compose .av2-field :is(input,select,textarea),
-.av2 .av2-compose .av2-draft-task input { border:1px solid transparent; background:transparent; box-shadow:none; padding:6px 8px; margin-left:-9px; border-radius:5px; width:calc(100% + 9px); font:400 .9375rem/1.55 "Sarabun",sans-serif; }
+.av2 .av2-compose .av2-draft-task input { border:1px solid transparent; background:transparent; box-shadow:none; padding:6px 8px; margin-left:-9px; border-radius:5px; width:calc(100% + 9px); font:400 .9375rem/1.55 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 .av2 .av2-compose .av2-field :is(input,select,textarea):hover,
 .av2 .av2-compose .av2-draft-task input:hover { background:var(--av2-soft); }
 .av2 .av2-compose .av2-field :is(input,select,textarea):focus,
@@ -709,7 +709,7 @@ body.av2 #supportDrawer :is(.support-drawer-menu-trigger,.support-drawer-close,.
 body.av2 #supportDrawer .support-message-utility[aria-pressed="true"] { background:transparent; color:var(--av2-ink); transform:none; }
 body.av2 #supportDrawer :is(.support-drawer-menu-trigger,.support-drawer-close,.support-message-utility) svg { width:16px; height:16px; flex-basis:16px; }
 body.av2 #supportDrawer .support-drawer-menu-panel { top:calc(100% + 6px); width:max-content; min-width:0; padding:4px; border:1px solid var(--av2-line); border-radius:6px; background:var(--av2-bg); box-shadow:0 4px 16px #10243f12; backdrop-filter:none; }
-body.av2 #supportDrawer .support-drawer-menu-item { min-height:32px; padding:7px 10px; border-radius:4px; font:400 .8125rem/1.4 "Sarabun",sans-serif; color:var(--av2-ink); white-space:nowrap; }
+body.av2 #supportDrawer .support-drawer-menu-item { min-height:32px; padding:7px 10px; border-radius:4px; font:400 .8125rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; color:var(--av2-ink); white-space:nowrap; }
 body.av2 #supportDrawer .support-drawer-menu-item:hover:not(:disabled),
 body.av2 #supportDrawer .support-drawer-menu-item:focus-visible { background:var(--av2-soft); }
 body.av2 #supportDrawer .support-thread { flex:0 1 auto; padding:22px 20px 10px; gap:22px; }
@@ -721,7 +721,7 @@ body.av2 #supportDrawer .support-message-utilities { gap:2px; margin-left:-5px; 
 body.av2 #supportDrawer .support-message--user { max-width:90%; }
 body.av2 #supportDrawer .support-message--user .support-message-bubble { border:0; border-radius:6px; background:var(--av2-soft); color:var(--av2-ink); }
 body.av2 #supportDrawer .support-quick-prompts { flex:0 0 auto; align-items:stretch; gap:2px; padding:4px 20px 20px; margin:0; }
-body.av2 #supportDrawer :is(.support-quick-prompt,.support-quick-prompt--primary) { width:100%; min-height:32px; padding:6px 8px; border:0; border-radius:4px; background:transparent; color:var(--av2-muted); text-align:left; font:400 .8125rem/1.5 "Sarabun",sans-serif; box-shadow:none; transform:none; }
+body.av2 #supportDrawer :is(.support-quick-prompt,.support-quick-prompt--primary) { width:100%; min-height:32px; padding:6px 8px; border:0; border-radius:4px; background:transparent; color:var(--av2-muted); text-align:left; font:400 .8125rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; box-shadow:none; transform:none; }
 body.av2 #supportDrawer :is(.support-quick-prompt,.support-quick-prompt--primary):hover { background:var(--av2-soft); color:var(--av2-ink); transform:none; }
 body.av2 #supportDrawer .support-composer { margin-top:auto; padding:12px 16px 14px; border-top:1px solid var(--av2-line); background:var(--av2-bg); }
 body.av2 #supportDrawer .support-composer-shell { min-height:48px; border:1px solid var(--av2-line); border-radius:6px; background:var(--av2-bg); box-shadow:none; }
@@ -783,7 +783,7 @@ body.av2 #supportDrawer button:focus-visible { outline:2px solid var(--av2-accen
 
 /* Personal planning follows the same quiet list hierarchy as Home and Matters. */
 .av2-tasks-index > .av2-view-header { padding:0; border:0; margin-bottom:24px; }
-.av2-tasks-index h1 { margin:0; font:600 1.75rem/1.25 "Sarabun",sans-serif; letter-spacing:-.025em; }
+.av2-tasks-index h1 { margin:0; font:600 1.75rem/1.25 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; letter-spacing:-.025em; }
 .av2-tasks-index .av2-lead { margin:8px 0 0; font-size:.875rem; color:var(--av2-muted); }
 .av2-tasks-index .av2-card { padding:0; border:0; border-radius:0; box-shadow:none; background:transparent; margin-top:32px; }
 .av2-tasks-index .av2-card h2 { font-size:1.1875rem; font-weight:500; margin:0; }

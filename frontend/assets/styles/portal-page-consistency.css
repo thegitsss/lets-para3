@@ -6,12 +6,12 @@ body.lpc-v2:not(.av2) {--lpc-section-size:calc(17 * var(--lpc-reading-unit,1px))
 :root body.av2 .av2-task-title {align-items:flex-start;}
 /* Home's date is vertically centered beside Today, per the alignment review. */
 :root body.av2 .av2-home > .av2-view-header > .av2-home-today {align-self:center;}
-:root body.av2 :is(.av2-home h2,.av2-help .v2-help-article-section h2,.av2-blocked-title,.av2-security-section > h2,.av2-account-section > h2,[data-payments-page] h2,[data-payment-setup] > section > h2) {font:500 var(--lpc-section-size)/1.4 var(--av2-font-sans,"Sarabun",sans-serif);letter-spacing:0;}
+:root body.av2 :is(.av2-home h2,.av2-help .v2-help-article-section h2,.av2-blocked-title,.av2-security-section > h2,.av2-account-section > h2,[data-payments-page] h2,[data-payment-setup] > section > h2) {font:500 var(--lpc-section-size)/1.4 var(--av2-font-sans,var(--lpc-portal-font-sans, "Sarabun"),sans-serif);letter-spacing:0;}
 :root body.av2 .av2-account-nav {gap:18px;padding-bottom:0;}
 :root body.av2 .av2-account-nav a {padding:8px 2px;min-height:44px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;font-size:calc(14 * var(--lpc-reading-unit,1px));font-weight:500;}
 :root body.av2 .av2-account-nav a[aria-current=page] {background:transparent;border-bottom-color:var(--av2-accent);font-weight:500;}
 :root body.av2 :is(.av2-file-filters,.av2-payment-filters,.matter-application-filters,.av2-discovery-search) button[type=submit],
-:root body.av2 .av2-compact-filters > button[type=submit] {min-height:44px;height:auto;padding:10px 13px;border-radius:5px;font:400 calc(14 * var(--lpc-reading-unit,1px))/1.5 "Sarabun",sans-serif;}
+:root body.av2 .av2-compact-filters > button[type=submit] {min-height:44px;height:auto;padding:10px 13px;border-radius:5px;font:400 calc(14 * var(--lpc-reading-unit,1px))/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;}
 :root body.av2 .portal-icon-select {position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;min-width:36px;height:36px;flex:0 0 36px;border:0;border-radius:5px;background:transparent;color:var(--av2-muted);}
 :root body.av2 .portal-icon-select > select {position:absolute;inset:0;width:100%;height:100%;min-height:0;min-width:0;padding:0;margin:0;opacity:0;cursor:pointer;z-index:1;}
 :root body.av2 .portal-icon-select > .portal-icon {width:16px;height:16px;pointer-events:none;}
@@ -29,7 +29,7 @@ body.lpc-v2:not(.av2) {--lpc-section-size:calc(17 * var(--lpc-reading-unit,1px))
 :root body.av2 [data-v2-header-return-source] {display:none!important;}
 :root body.av2 .v2-header-back {min-width:0;max-width:240px;margin-right:12px;}
 :root body.av2 .v2-header-back[hidden] {display:none;}
-:root body.av2 .v2-header-back-action {display:flex;align-items:center;gap:6px;min-height:32px;padding:4px 0;border:0;background:transparent;color:var(--av2-accent);font:400 calc(13 * var(--lpc-reading-unit,1px))/20px "Sarabun",sans-serif;text-decoration:none;}
+:root body.av2 .v2-header-back-action {display:flex;align-items:center;gap:6px;min-height:32px;padding:4px 0;border:0;background:transparent;color:var(--av2-accent);font:400 calc(13 * var(--lpc-reading-unit,1px))/20px var(--lpc-portal-font-sans, "Sarabun"),sans-serif;text-decoration:none;}
 :root body.av2 .v2-header-back-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 :root body.av2 .v2-header-back-action:focus-visible {outline:2px solid var(--av2-accent);outline-offset:3px;}
 /* Paralegal primary and secondary views share the same content origin. */
@@ -68,7 +68,7 @@ body.lpc-v2:not(.av2) {--lpc-section-size:calc(17 * var(--lpc-reading-unit,1px))
 /* Use the primary-page gutter rather than Home's historical inner gutter. */
 :root body.lpc-v2:not(.av2) .v2-view:has(> .v2-home) {padding-inline:32px;}
 @media(max-width:900px){:root body.lpc-v2:not(.av2) .v2-view:has(> .v2-home) {padding-inline:16px;}}
-:root body.av2 form[aria-label="Paralegal filters"] button[type=submit] {min-height:44px;padding:10px 13px;font:400 calc(14 * var(--lpc-reading-unit,1px))/1.5 "Sarabun",sans-serif;}
+:root body.av2 form[aria-label="Paralegal filters"] button[type=submit] {min-height:44px;padding:10px 13px;font:400 calc(14 * var(--lpc-reading-unit,1px))/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;}
 :root body.av2 .av2-blocked-title {margin-left:0;}
 :root body.lpc-v2:not(.av2) .v2-settings :is(.v2-settings-section-heading h2,.v2-settings-security-card h2),
 :root body.lpc-v2:not(.av2) .lpc-summary-overview-heading h2 {font:500 var(--lpc-section-size)/1.4 var(--v2-font-sans);font-weight:500!important;letter-spacing:0;}
@@ -79,7 +79,7 @@ body.lpc-v2:not(.av2) {--lpc-section-size:calc(17 * var(--lpc-reading-unit,1px))
 :root body.av2 [data-payment-setup] > .av2-card {border:0;border-top:1px solid var(--av2-line);}
 :root body.lpc-v2:not(.av2) .v2-settings #v2-settings-security .v2-settings-section-heading h2 {font:500 var(--lpc-section-size)/1.4 var(--v2-font-sans);font-weight:500!important;}
 :root body.av2 .av2-categories {gap:18px;}
-:root body.av2 :is(.av2-category,.av2-account-nav a) {display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 2px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;color:var(--av2-muted);font:500 calc(14 * var(--lpc-reading-unit,1px))/1.5 "Sarabun",sans-serif;}
+:root body.av2 :is(.av2-category,.av2-account-nav a) {display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 2px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;color:var(--av2-muted);font:500 calc(14 * var(--lpc-reading-unit,1px))/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;}
 :root body.av2 :is(.av2-category,.av2-account-nav a)[aria-current=page] {border-bottom-color:var(--av2-accent);background:transparent;color:var(--av2-ink);font-weight:500;box-shadow:none;}
 :root body.av2 .av2-filter-disclosure[open] > summary {background:var(--av2-soft);color:var(--av2-accent);}
 :root body.av2 .av2-filter-disclosure > summary:focus-visible {outline:2px solid var(--av2-accent);outline-offset:2px;}

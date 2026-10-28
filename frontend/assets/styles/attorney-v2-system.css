@@ -1,7 +1,7 @@
 /* Attorney V2 shared finishing rules.
    Page composition stays in the component stylesheets. Reusable states belong here. */
 :root {
- --av2-page-title:600 1.75rem/1.25 "Sarabun",sans-serif;
+ --av2-page-title:600 1.75rem/1.25 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;
  --av2-section-size:1.1875rem;
  --av2-control-radius:5px;
  --av2-tooltip-bg:#4d70a8;
@@ -13,7 +13,7 @@
 .av2 .av2-view > .av2-view-header .av2-lead { margin:8px 0 24px; font-size:.875rem; line-height:1.5; }
 .av2 .av2-card-heading h2,.av2 .av2-section-title { font-size:var(--av2-section-size); font-weight:500; line-height:1.4; color:var(--av2-ink); }
 .av2 .av2-nav a[aria-current=page] { background:var(--av2-selected); }
-.av2 :is(button,input,textarea,select) { font-family:"Sarabun",sans-serif; }
+.av2 :is(button,input,textarea,select) { font-family:var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 .av2 :is(button,a,input,textarea,select,summary):focus-visible { outline:2px solid var(--av2-accent); outline-offset:3px; }
 .av2 :is(button,input,textarea,select):disabled { cursor:default; opacity:.55; }
 .av2 :is(button,input,textarea,select):disabled:hover { filter:none; }
@@ -38,7 +38,7 @@
 .av2 .av2-creation-close::after {
  padding:9px 14px; border:0; border-radius:6px;
  background:var(--av2-tooltip-bg); color:var(--av2-tooltip-ink);
- font:500 .875rem/1.4 "Sarabun",sans-serif;
+ font:500 .875rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;
  box-shadow:var(--av2-tooltip-shadow);
 }
 /* Metrics wrap as complete count/label pairs at larger text sizes. */
@@ -87,13 +87,13 @@
  .av2 .av2-tasks-index .av2-task-row .av2-row-heading { grid-template-columns:44px minmax(0,1fr) auto; }
  .av2-tasks-index .av2-task-row > :is(.av2-task-due,.av2-preview) { margin-left:54px; }
 }
-.av2 .av2-tooltip { position:fixed; z-index:1000; max-width:min(22rem,calc(100vw - 16px)); padding:9px 14px; border:0; border-radius:6px; background:var(--av2-tooltip-bg); color:var(--av2-tooltip-ink); font:500 .875rem/1.4 "Sarabun",sans-serif; box-shadow:var(--av2-tooltip-shadow); pointer-events:none; overflow-wrap:anywhere; }
+.av2 .av2-tooltip { position:fixed; z-index:1000; max-width:min(22rem,calc(100vw - 16px)); padding:9px 14px; border:0; border-radius:6px; background:var(--av2-tooltip-bg); color:var(--av2-tooltip-ink); font:500 .875rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; box-shadow:var(--av2-tooltip-shadow); pointer-events:none; overflow-wrap:anywhere; }
 [data-attorney-state]:not([data-attorney-state=ready]) .av2-tooltip { display:none; }
 /* Settings, Help and profile sections share the authenticated typography. */
 .av2 .av2-help h1 { font:var(--av2-page-title); letter-spacing:-.025em; }
 .av2 .av2-help h2,.av2 .av2-account-section legend,.av2 .av2-account-section > h2,
-.av2 .av2-security-section > h2,.av2 .av2-public-section h2 { font:500 var(--av2-section-size)/1.4 "Sarabun",sans-serif; }
-.av2 .av2-public-header h2 { font:500 1.5rem/1.3 "Sarabun",sans-serif; }
+.av2 .av2-security-section > h2,.av2 .av2-public-section h2 { font:500 var(--av2-section-size)/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
+.av2 .av2-public-header h2 { font:500 1.5rem/1.3 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 .av2 .av2-help button { font-size:.875rem; border-radius:var(--av2-control-radius); }
 .av2 .av2-help button:not(:disabled):hover { background:var(--av2-soft); color:var(--av2-ink); }
 .av2 .av2-account-field label { font-size:.8125rem; }
@@ -184,14 +184,14 @@
 
 /* Resume-style candidate profile. */
 .av2 .av2-profile-resume > .av2-profile-pagebar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 20px; margin:0; padding:0; }
-.av2 .av2-profile-resume > .av2-profile-pagebar h1 { margin:0; font:400 .8125rem/1.4 "Sarabun",sans-serif; color:var(--av2-muted); letter-spacing:0; }
+.av2 .av2-profile-resume > .av2-profile-pagebar h1 { margin:0; font:400 .8125rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; color:var(--av2-muted); letter-spacing:0; }
 .av2 .av2-profile-pagebar .av2-profile-back { display:inline-flex; align-items:center; min-height:32px; padding:4px 0; font-size:.8125rem; line-height:1.4; color:var(--av2-muted); text-decoration:none; }
 .av2 .av2-profile-pagebar .av2-profile-back:hover { color:var(--av2-accent); text-decoration:underline; text-underline-offset:3px; }
 .av2 .av2-profile-resume > [data-av2-region="candidate-profile"] { border:0; padding:0; background:transparent; box-shadow:none; margin-top:18px; }
 .av2 .av2-profile-intro { display:flex; align-items:center; gap:16px; padding:0 0 18px; border-bottom:1px solid var(--av2-line); }
 .av2 .av2-profile-intro > div { min-width:0; }
 .av2 .av2-profile-intro img { width:64px; height:64px; flex:0 0 64px; border-radius:50%; object-fit:cover; }
-.av2 .av2-profile-intro h1 { margin:0 0 6px; font:500 1.75rem/1.2 "Sarabun",sans-serif; overflow-wrap:anywhere; }
+.av2 .av2-profile-intro h1 { margin:0 0 6px; font:500 1.75rem/1.2 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; overflow-wrap:anywhere; }
 .av2 .av2-profile-intro p { margin:0 0 5px; font-size:.8125rem; line-height:1.45; }
 .av2 .av2-profile-intro .av2-status { background:transparent; border:0; padding:0; color:var(--av2-accent); }
 .av2 .av2-profile-columns { display:grid; padding-top:20px; }
@@ -338,7 +338,7 @@ body.av2 .av2-header {height:48px;min-height:48px;padding:0 20px;}
 body.av2 .av2-header .av2-header-tools {gap:5px;}
 body.av2 .av2-header .av2-header-tools > .av2-icon {width:30px;min-width:30px;height:30px;min-height:30px;padding:6px;border-radius:6px;}
 body.av2 .av2-header svg {width:18px;height:18px;flex-basis:18px;stroke-width:1.65;}
-body.av2 .av2-header .av2-header-tools > .av2-create-trigger {width:auto;padding:0 11px;border-radius:5px;font:600 .75rem/1.4 "Sarabun",sans-serif;font-size:.75rem !important;}
+body.av2 .av2-header .av2-header-tools > .av2-create-trigger {width:auto;padding:0 11px;border-radius:5px;font:600 .75rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;font-size:.75rem !important;}
 body.av2 .av2-header .av2-header-tools .av2-assistant-trigger > span {display:none;}
 @media(max-width:900px),(pointer:coarse) {
  body.av2 .av2-header {padding-inline:12px;}
