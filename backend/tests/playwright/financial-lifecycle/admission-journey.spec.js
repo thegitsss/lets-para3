@@ -86,15 +86,11 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await adminPage.waitForFunction(() => typeof window.reviewAdminApplicant === 'function');
     await adminPage.evaluate(id => window.reviewAdminApplicant(id), id);
     const approve = adminPage.locator('#approveUserBtn');
-    await expect(approve).toBeDisabled();
-    await adminPage.getByLabel('Qualification', { exact: true }).selectOption('law_firm_experience');
-    await adminPage.getByLabel('Verification source', { exact: true }).selectOption('employer_contact');
-    await adminPage.getByLabel('Source and result', { exact: true }).fill('Synthetic independently sourced employer contact confirmed the employment dates and role.');
-    await adminPage.getByLabel('I verified this admission qualification.', { exact: true }).check();
+    await expect(adminPage.locator('.admin-qualification-review')).toHaveCount(0);
     await expect(approve).toBeEnabled();
     await adminPage.screenshot({ path: info.outputPath('admin-qualification-review.png') });
     await adminPage.setViewportSize({ width: 390, height: 844 });
-    await adminPage.locator('.admin-qualification-review').scrollIntoViewIfNeeded();
+    await approve.scrollIntoViewIfNeeded();
     await adminPage.screenshot({ path: info.outputPath('admin-qualification-review-phone.png') });
     expect(await adminPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     // Keep the real committed response in flight while the owner reopens the
@@ -131,8 +127,8 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await expect(approve).toHaveText('Approve');
     await adminPage.locator('[data-account-tab="history"]').click();
     const admissionHistory = adminPage.locator('[data-account-panel="history"]');
-    await expect(admissionHistory).toContainText('Qualification verified:');
-    await expect(admissionHistory).toContainText('Synthetic independently sourced employer contact confirmed the employment dates and role.');
+    await expect(admissionHistory).toContainText('Approved');
+    await expect(admissionHistory).not.toContainText('Qualification verified:');
     expect(approvalWrites).toBe(1);
     expect(await require('../../../models/AuditLog').countDocuments({action:'admin.user.approved',targetId:applicant._id})).toBe(1);
     await expect(modal).toHaveAttribute('data-admission-revision',reopenedRevision);
