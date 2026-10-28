@@ -127,7 +127,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await expect(approve).toHaveText('Approve');
     await adminPage.locator('[data-account-tab="history"]').click();
     const admissionHistory = adminPage.locator('[data-account-panel="history"]');
-    await expect(admissionHistory).toContainText('Approved');
+    await expect(admissionHistory.locator('strong').filter({ hasText: /^approved$/ })).toHaveCount(1);
     await expect(admissionHistory).not.toContainText('Qualification verified:');
     expect(approvalWrites).toBe(1);
     expect(await require('../../../models/AuditLog').countDocuments({action:'admin.user.approved',targetId:applicant._id})).toBe(1);
