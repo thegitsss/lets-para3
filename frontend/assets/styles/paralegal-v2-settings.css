@@ -703,7 +703,7 @@
   border-radius: 5px;
   color: var(--v2-blue);
   background: transparent;
-  font: 500 0.75rem/1 Sarabun, Arial, sans-serif;
+  font: 500 0.75rem/1 var(--lpc-portal-font-sans, Sarabun), Arial, sans-serif;
   transform: translateY(-50%);
 }
 

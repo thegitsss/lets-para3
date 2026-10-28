@@ -1,5 +1,5 @@
 /* Isolated from the approved Profile rows and inline editors. */
-.ri-dialog { --ri-accent: var(--v2-blue, #4d70a8); width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 38px; border: 1px solid var(--v2-line, #e9edf3); border-radius: 16px; background: var(--v2-white, white); color: var(--v2-ink, #263347); font: 400 calc(16 * var(--lpc-reading-unit, 1px))/1.55 var(--v2-font-sans, 'Sarabun', sans-serif); overflow: auto; overscroll-behavior: contain; }
+.ri-dialog { --ri-accent: var(--v2-blue, #4d70a8); width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 38px; border: 1px solid var(--v2-line, #e9edf3); border-radius: 16px; background: var(--v2-white, white); color: var(--v2-ink, #263347); font: 400 calc(16 * var(--lpc-reading-unit, 1px))/1.55 var(--v2-font-sans, var(--lpc-portal-font-sans, 'Sarabun'), sans-serif); overflow: auto; overscroll-behavior: contain; }
 .ri-dialog::backdrop { background: rgb(11 41 71 / .36); }
 .ri-dialog h2 { margin: 0 24px 12px 0; font: 500 calc(34 * var(--lpc-reading-unit, 1px))/1.12 var(--v2-font-serif, 'Cormorant Garamond', Georgia, serif); letter-spacing: -.025em; }
 .ri-copy { margin: 0 0 24px; max-width: 48ch; color: var(--v2-muted, #657186); }

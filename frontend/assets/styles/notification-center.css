@@ -42,7 +42,7 @@
 .lpc-v2 .lpc-notification-center.v2-notifications-panel { max-height: min(680px, calc(100dvh - var(--v2-header-height) - 24px)); }
 .lpc-notification-center [data-v2-notifications-content] { min-height: 0; overflow: auto; padding: 0; }
 .av2 [data-av2-open="notifications"] { position: relative; }
-.lpc-notification-badge { position: absolute; top: 0; right: -2px; min-width: 18px; min-height: 18px; padding: 1px 4px; border-radius: 10px; background: var(--av2-accent, #385d91); color: var(--av2-bg, #fff); font: 600 .6875rem/1.4 "Sarabun", sans-serif; }
+.lpc-notification-badge { position: absolute; top: 0; right: -2px; min-width: 18px; min-height: 18px; padding: 1px 4px; border-radius: 10px; background: var(--av2-accent, #385d91); color: var(--av2-bg, #fff); font: 600 .6875rem/1.4 var(--lpc-portal-font-sans, "Sarabun"), sans-serif; }
 
 /* Selected grouped Inbox: Notion's quiet feed, with inline LPC event actions. */
 :root body.lpc-v2 .lpc-notification-center.lpc-grouped-inbox {

@@ -23,7 +23,7 @@ body.av2 .av2-brand-menu[open] .av2-brand > svg { transform:none; }
 body.av2 .av2-header [data-av2-assistant] > span { display:none; }
 
 /* 18: initials are the missing-photo fallback in both account menus. */
-.v2-menu-identity .portal-identity-initials { display:grid; place-items:center; width:64px; height:64px; flex:none; border:1px solid var(--v2-line); border-radius:50%; background:var(--v2-soft); color:var(--v2-ink); font:400 calc(20 * var(--lpc-reading-unit, 1px))/1 "Sarabun",sans-serif; }
+.v2-menu-identity .portal-identity-initials { display:grid; place-items:center; width:64px; height:64px; flex:none; border:1px solid var(--v2-line); border-radius:50%; background:var(--v2-soft); color:var(--v2-ink); font:400 calc(20 * var(--lpc-reading-unit, 1px))/1 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 .v2-menu-identity [hidden] { display:none !important; }
 
 /* 20-21: Attorney charcoal palette, including role-local conversation tokens. */
@@ -81,7 +81,7 @@ body:not(.av2) .v2-help-directory button { width:auto; min-height:40px; padding:
 body:not(.av2) .v2-help-content { max-width:800px; }
 body.lpc-v2:not(.av2) .v2-help .v2-help-assistant-button { min-height:44px; padding:10px 14px; border:1px solid var(--v2-line); border-radius:6px; background:transparent; color:var(--v2-blue-hover); font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
 body.av2 .av2-help .v2-help-article-section { padding:0 0 30px; margin:0 0 30px; border-top:0; border-bottom:1px solid var(--av2-line); }
-body.av2 .av2-help .v2-help-article-section h2 { margin:0 0 12px; font:500 calc(21 * var(--lpc-reading-unit, 1px))/1.4 "Sarabun",sans-serif; }
+body.av2 .av2-help .v2-help-article-section h2 { margin:0 0 12px; font:500 calc(21 * var(--lpc-reading-unit, 1px))/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 body.av2 .av2-help .v2-help-answer { border:0; }
 body.av2 .av2-help .v2-help-answer > summary { min-height:44px; padding:10px 0; font-size:.875rem; line-height:1.5; }
 body.av2 .av2-help .v2-help-answer > p { margin:0; padding:0 0 16px; font-size:.875rem; line-height:1.65; }
@@ -147,7 +147,7 @@ body.lpc-v2 .av2-conversations-page .av2-inbox-workspace .av2-conversation{max-w
 body.lpc-v2 :is(.av2-matter-dialog,.v2-work-dialog,.v2-matter-dialog) { width:608px; max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px); padding:28px; border-radius:12px; overflow:auto; }
 body.lpc-v2 .av2-matter-dialog > .av2-section-heading,
 body.lpc-v2 :is(.v2-work-dialog,.v2-matter-dialog) > header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 24px; padding:12px 16px; border:1px solid var(--v2-line,var(--av2-line)); border-radius:6px; background:var(--v2-soft,var(--av2-soft)); min-height:0; }
-body.lpc-v2 :is(.av2-matter-dialog,.v2-work-dialog,.v2-matter-dialog) h2 { margin:0; padding:0; border:0; background:none; font:500 calc(20 * var(--lpc-reading-unit, 1px))/1.35 "Sarabun",sans-serif; min-width:0; overflow-wrap:anywhere; }
+body.lpc-v2 :is(.av2-matter-dialog,.v2-work-dialog,.v2-matter-dialog) h2 { margin:0; padding:0; border:0; background:none; font:500 calc(20 * var(--lpc-reading-unit, 1px))/1.35 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; min-width:0; overflow-wrap:anywhere; }
 body.lpc-v2 .av2-matter-dialog > .av2-section-heading > button,
 body.lpc-v2 :is(.v2-work-dialog,.v2-matter-dialog) > header > button { position:static; display:grid; place-items:center; flex:none; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; border:0; background:transparent; font-size:calc(24 * var(--lpc-reading-unit, 1px)); text-decoration:none; }
 body.lpc-v2 :is(.v2-work-dialog-body,.v2-matter-dialog-body) { padding:0; }

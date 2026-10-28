@@ -302,7 +302,7 @@ body.support-drawer-open .support-drawer {
 
 .support-drawer-title {
   margin: 0;
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: clamp(1.55rem, 2vw, 1.85rem);
   font-weight: 500;
   letter-spacing: 0;
@@ -311,7 +311,7 @@ body.support-drawer-open .support-drawer {
 
 .support-drawer-subtitle {
   margin: 5px 0 0;
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   max-width: 30rem;
   font-size: 1.02rem;
   line-height: 1.55;
@@ -398,7 +398,7 @@ body.support-drawer-open .support-drawer {
   border-radius: 12px;
   background: transparent;
   color: var(--ink, #1a1a1a);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.84rem;
   font-weight: 300;
   line-height: 1.2;
@@ -453,7 +453,7 @@ body.support-drawer-open .support-drawer {
   border: 1px solid rgba(185, 28, 28, 0.14);
   background: rgba(185, 28, 28, 0.06);
   color: #8a1f1f;
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -522,7 +522,7 @@ body.support-drawer-open .support-drawer {
   background: transparent;
   padding: 6px 8px;
   color: var(--muted, #6b7280);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.72rem;
   font-weight: 300;
   cursor: pointer;
@@ -554,7 +554,7 @@ body.support-drawer-open .support-drawer {
   background: rgba(255, 255, 255, 0.76);
   padding: 8px 12px;
   color: var(--ink, #1a1a1a);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.8rem;
   font-weight: 300;
   line-height: 1.2;
@@ -568,7 +568,7 @@ body.support-drawer-open .support-drawer {
   background: rgba(248, 250, 252, 0.92);
   padding: 7px 12px;
   color: rgba(31, 36, 43, 0.82);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.78rem;
   font-weight: 300;
   line-height: 1.2;
@@ -608,7 +608,7 @@ body.support-drawer-open .support-drawer {
 }
 
 .support-message-meta {
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.72rem;
   font-weight: 300;
   letter-spacing: 0.02em;
@@ -621,7 +621,7 @@ body.support-drawer-open .support-drawer {
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.95rem;
   font-weight: 300;
   line-height: 1.6;
@@ -699,7 +699,7 @@ body.support-drawer-open .support-drawer {
 .support-escalation-title,
 .support-escalation-text {
   margin: 0;
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
 }
 
 .support-escalation-title {
@@ -722,7 +722,7 @@ body.support-drawer-open .support-drawer {
   background: rgba(255, 255, 255, 0.92);
   padding: 8px 14px;
   color: var(--ink, #1a1a1a);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.79rem;
   font-weight: 400;
   cursor: pointer;
@@ -795,7 +795,7 @@ body.support-drawer-open .support-drawer {
   width: 100%;
   margin-bottom: 2px;
   color: rgba(31, 36, 43, 0.7);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.84rem;
   font-weight: 300;
   line-height: 1.45;
@@ -807,7 +807,7 @@ body.support-drawer-open .support-drawer {
   background: rgba(255, 255, 255, 0.76);
   padding: 9px 14px;
   color: var(--ink, #1a1a1a);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.84rem;
   font-weight: 300;
   line-height: 1.2;
@@ -851,7 +851,7 @@ body.support-drawer-open .support-drawer {
   gap: 6px;
   margin: 14px 6px 0;
   color: rgba(92, 112, 148, 0.66);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.8rem;
   font-weight: 300;
   line-height: 1.4;
@@ -895,7 +895,7 @@ body.support-drawer-open .support-drawer {
   overflow: hidden;
   pointer-events: none;
   color: rgba(92, 112, 148, 0.84);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 1rem;
   font-weight: 300;
   line-height: 1.5;
@@ -938,7 +938,7 @@ body.support-drawer-open .support-drawer {
   resize: none;
   background: transparent;
   color: rgba(93, 114, 151, 0.98);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 1rem;
   font-weight: 300;
   line-height: 1.5;
@@ -1264,7 +1264,7 @@ body.support-drawer-open .support-drawer {
   background: #ffffff;
   background-image: none;
   box-shadow: -12px 0 38px rgba(20, 25, 34, 0.12);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
 }
 
 .support-drawer-header {
@@ -1331,7 +1331,7 @@ body.support-drawer-open .support-drawer {
 
 .support-thread:empty::before {
   color: var(--support-ink);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 1.22rem;
   font-weight: 500;
   line-height: 1.25;
@@ -1350,7 +1350,7 @@ body.support-drawer-open .support-drawer {
 .support-message-bubble {
   padding: 0 2px;
   color: var(--support-ink);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.92rem;
   font-weight: 400;
   letter-spacing: -0.006em;
@@ -1462,7 +1462,7 @@ body.support-drawer-open .support-drawer {
 .support-composer textarea,
 .support-composer-prompt {
   color: var(--support-ink);
-  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif);
   font-size: 0.88rem;
   font-weight: 400;
   letter-spacing: -0.006em;
@@ -1686,7 +1686,7 @@ body.support-drawer-open .support-drawer { transform: translate3d(0, 0, 0); }
 }
 
 /* Shared controls and theme geometry for the current edge-mounted drawer. */
-.support-drawer { font-family: var(--font-sans, "Sarabun", sans-serif); }
+.support-drawer { font-family: var(--font-sans, var(--lpc-portal-font-sans, "Sarabun"), sans-serif); }
 .support-drawer-header { flex-wrap: wrap; gap: 8px 12px; flex-shrink: 0; }
 .support-drawer-heading { flex: 1 0 auto; min-width: 0; max-width: 100%; }
 .support-drawer-title { color: var(--support-ink); overflow-wrap: normal; line-height: 1.25; }

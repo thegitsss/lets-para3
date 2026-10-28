@@ -698,7 +698,7 @@ body.lpc-v2 .v2-profile-document-menu > summary:focus-visible { outline: 2px sol
   :root body.lpc-v2 .v2-profile-approved .v2-profile-group--account > .v2-profile-section-top { grid-column: 1; grid-row: 2; justify-content: flex-start; }
 }
 
-/* Genuine bundled Sarabun ExtraLight (official CSS weight 200), Profile only. */
+/* Genuine bundled var(--lpc-portal-font-sans, Sarabun) ExtraLight (official CSS weight 200), Profile only. */
 :root body.lpc-v2 .v2-settings:has(> .v2-profile-approved:not([hidden])) .v2-settings-title,
 :root body.lpc-v2 .v2-profile-approved,
 :root body.lpc-v2 .v2-profile-approved * { font-weight: 200; font-synthesis: none; }

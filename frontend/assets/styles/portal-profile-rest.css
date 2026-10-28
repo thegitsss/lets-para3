@@ -96,7 +96,7 @@
 :root body.lpc-v2 .lpc-profile-actions > :is(button,a),
 :root body.lpc-v2 .v2-profile-approved .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a) {
   min-height:28px; min-width:28px; padding:3px 7px; border-radius:4px;
-  color:var(--ref-accent); font:400 calc(13 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) "Sarabun",sans-serif; font-weight:400 !important;
+  color:var(--ref-accent); font:400 calc(13 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) var(--lpc-portal-font-sans, "Sarabun"),sans-serif; font-weight:400 !important;
 }
 :root body.lpc-v2 .lpc-profile-actions > :is(button,a):hover:not(:disabled),
 :root body.lpc-v2 .v2-profile-direct-editor .v2-profile-form-actions > :is(button,a):hover:not(:disabled) { background:var(--ref-soft); }

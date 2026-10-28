@@ -1,5 +1,5 @@
 /* Shared attorney-facing profile presentation. Keep both portals in sync here. */
-:root body.lpc-v2 .lpc-candidate-profile {--av2-bg:#fff;--av2-soft:#f5f7fa;--av2-ink:#263347;--av2-muted:#657186;--av2-line:#e9edf3;--av2-accent:#406aa8;--av2-primary:#10243f;--av2-primary-ink:#fff;color:var(--av2-ink);font:400 1rem/1.5 "Sarabun",sans-serif;min-width:0;}
+:root body.lpc-v2 .lpc-candidate-profile {--av2-bg:#fff;--av2-soft:#f5f7fa;--av2-ink:#263347;--av2-muted:#657186;--av2-line:#e9edf3;--av2-accent:#406aa8;--av2-primary:#10243f;--av2-primary-ink:#fff;color:var(--av2-ink);font:400 1rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;min-width:0;}
 :root.theme-dark body.lpc-v2 .lpc-candidate-profile {--av2-bg:#18191b;--av2-soft:#242527;--av2-ink:#d9dce1;--av2-muted:#a0a5af;--av2-line:#303237;--av2-accent:#a9bafa;--av2-primary:#d9e6ff;--av2-primary-ink:#10243f;}
 :root body.lpc-v2 .lpc-candidate-profile * {box-sizing:border-box;}
 :root body.lpc-v2 .lpc-candidate-profile .av2-muted {color:var(--av2-muted);}
@@ -12,14 +12,14 @@
 
 
 :root body.lpc-v2 .lpc-candidate-profile > .av2-profile-pagebar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 20px; margin:0; padding:0; }
-:root body.lpc-v2 .lpc-candidate-profile > .av2-profile-pagebar h1 { margin:0; font:400 .8125rem/1.4 "Sarabun",sans-serif; color:var(--av2-muted); letter-spacing:0; }
+:root body.lpc-v2 .lpc-candidate-profile > .av2-profile-pagebar h1 { margin:0; font:400 .8125rem/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; color:var(--av2-muted); letter-spacing:0; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-pagebar .av2-profile-back { display:inline-flex; align-items:center; min-height:32px; padding:4px 0; font-size:.8125rem; line-height:1.4; color:var(--av2-muted); text-decoration:none; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-pagebar .av2-profile-back:hover { color:var(--av2-accent); text-decoration:underline; text-underline-offset:3px; }
 :root body.lpc-v2 .lpc-candidate-profile > [data-av2-region="candidate-profile"] { border:0; padding:0; background:transparent; box-shadow:none; margin-top:18px; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro { display:flex; align-items:center; gap:16px; padding:0 0 18px; border-bottom:1px solid var(--av2-line); }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro > div { min-width:0; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro img { width:64px; height:64px; flex:0 0 64px; border-radius:50%; object-fit:cover; }
-:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro h1 { margin:0 0 6px; font:500 1.75rem/1.2 "Sarabun",sans-serif; overflow-wrap:anywhere; }
+:root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro h1 { margin:0 0 6px; font:500 1.75rem/1.2 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; overflow-wrap:anywhere; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro p { margin:0 0 5px; font-size:.8125rem; line-height:1.45; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-intro .av2-status { background:transparent; border:0; padding:0; color:var(--av2-accent); }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-columns { display:grid; padding-top:20px; }
@@ -98,7 +98,7 @@
 :root body.lpc-v2 .lpc-candidate-profile .lpc-saved-button.lpc-save-star { position:relative; width:40px; min-height:40px; padding:8px; border:0; background:transparent; color:var(--av2-accent); }
 :root body.lpc-v2 .lpc-candidate-profile .lpc-save-star svg { width:24px; height:24px; flex:0 0 24px; fill:none; stroke:currentColor; stroke-width:1.5; }
 :root body.lpc-v2 .lpc-candidate-profile .lpc-save-star[aria-pressed="true"] svg { fill:currentColor; stroke-width:1.5; }
-:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star-tooltip { display:none; position:absolute; right:0; top:100%; z-index:20; white-space:nowrap; padding:6px 9px; border-radius:5px; background:#182033; color:#fff; font:400 12px/1.4 "Sarabun",sans-serif; }
+:root body.lpc-v2 .lpc-candidate-profile .lpc-save-star-tooltip { display:none; position:absolute; right:0; top:100%; z-index:20; white-space:nowrap; padding:6px 9px; border-radius:5px; background:#182033; color:#fff; font:400 12px/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 :root body.lpc-v2 .lpc-candidate-profile .lpc-save-star:hover .lpc-save-star-tooltip, .lpc-save-star:focus-visible .lpc-save-star-tooltip { display:block; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .lpc-saved-button.lpc-save-star { width:44px; min-height:44px; padding:3px; border:0; border-radius:9px; background:transparent; color:var(--av2-accent); box-shadow:none; }
 :root body.lpc-v2 .lpc-candidate-profile .av2-profile-actions .lpc-save-star:is(:hover,:focus-visible,[aria-pressed="true"]) { background:transparent; box-shadow:none; color:var(--av2-accent); }
@@ -109,7 +109,7 @@
 :root body.lpc-v2 .lpc-candidate-profile .lpc-save-star svg { transition:none; }
 }
 :root body.lpc-v2 .lpc-candidate-profile .lpc-save-star:hover:not(:focus-visible) .lpc-save-star-tooltip { animation:lpc-bookmark-caption .22s ease-out .4s both; }
-:root body.lpc-v2 .lpc-candidate-profile .lpc-candidate-preview-invite {display:block;width:100%;min-height:44px;padding:12px;border:0;border-radius:6px;color:var(--av2-primary-ink);background:var(--av2-primary);text-align:center;font:500 .875rem/1.5 "Sarabun",sans-serif;}
+:root body.lpc-v2 .lpc-candidate-profile .lpc-candidate-preview-invite {display:block;width:100%;min-height:44px;padding:12px;border:0;border-radius:6px;color:var(--av2-primary-ink);background:var(--av2-primary);text-align:center;font:500 .875rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif;}
 :root body.lpc-v2 .lpc-candidate-profile .lpc-candidate-preview-actions button:disabled {opacity:1;cursor:default;}
 .lpc-candidate-preview-hiring {text-decoration:underline;text-underline-offset:4px;}
 :root body.lpc-v2 [data-v2-profile-preview] {max-width:960px;margin-inline:auto;}

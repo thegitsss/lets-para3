@@ -1,6 +1,6 @@
 /* Shared light/dark Home composition: record-first lists, compact vertical rhythm. */
 .av2-home > .av2-view-header { padding:0; border:0; }
-.av2-home h1 { font:600 1.75rem/1.25 "Sarabun",sans-serif; letter-spacing:-.025em; }
+.av2-home h1 { font:600 1.75rem/1.25 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; letter-spacing:-.025em; }
 .av2-home .av2-card { margin:0; padding:0; border:0; border-radius:0; min-width:0; }
 .av2-home .av2-card-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-bottom:8px; }
 .av2-home .av2-card h2,.av2-home-review h2 { font-size:1rem; font-weight:600; line-height:1.45; margin:0; letter-spacing:-.015em; }
@@ -14,7 +14,7 @@
 .av2-home .av2-metrics { display:flex; flex-wrap:wrap; gap:8px 23px; margin:0; }
 .av2-home .av2-metrics > div { display:flex; flex-direction:row-reverse; align-items:baseline; gap:7px; }
 .av2-home .av2-metrics dt { font-size:.8125rem; color:var(--av2-muted); }
-.av2-home .av2-metrics dd { margin:0; white-space:nowrap; font:600 1rem/1.5 "Sarabun",sans-serif; font-variant-numeric:tabular-nums; }
+.av2-home .av2-metrics dd { margin:0; white-space:nowrap; font:600 1rem/1.5 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; font-variant-numeric:tabular-nums; }
 .av2-home .av2-metrics dd a { font:inherit; min-height:28px; min-width:12px; padding:0; color:var(--av2-ink) !important; text-decoration:none; }
 .av2-home .av2-home-grid { display:grid; grid-template-columns:minmax(0,1fr) 210px; gap:20px 40px; margin-top:16px; align-items:start; }
 .av2-home-primary { display:grid; gap:20px; min-width:0; }
@@ -195,8 +195,8 @@
 .av2-home-history .av2-record-title { font-weight:400; }
 .av2-home .av2-workspace-guide > summary { color:var(--av2-ink); font-weight:500; font-size:.875rem; min-height:30px; }
 .av2-home .av2-guide-content:not(:has([data-guide-title])) { padding:2px 0 0; gap:0; }
-.av2-home .av2-guide-start { font:400 .8125rem/1.45 "Sarabun",sans-serif; padding:4px 0; min-height:30px; color:var(--av2-accent); }
-.av2-home .av2-guide-controls button { font:400 .8125rem/1.45 "Sarabun",sans-serif; }
+.av2-home .av2-guide-start { font:400 .8125rem/1.45 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; padding:4px 0; min-height:30px; color:var(--av2-accent); }
+.av2-home .av2-guide-controls button { font:400 .8125rem/1.45 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; }
 @media (pointer:coarse) {
  .av2-home-supporting .av2-home-history > summary,
  .av2-home .av2-workspace-guide > summary,

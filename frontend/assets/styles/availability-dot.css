@@ -1,7 +1,7 @@
 .lpc-availability-dot { position:relative; display:inline-flex; width:24px; height:24px; margin-left:6px; vertical-align:middle; align-items:center; justify-content:center; flex:none; border-radius:50%; }
 .lpc-availability-dot::before { content:''; width:8px; height:8px; border-radius:50%; background:#24834b; }
 .lpc-availability-dot.is-unavailable::before { background:#c44242; }
-.lpc-availability-tooltip { display:none; position:absolute; top:100%; right:0; z-index:20; padding:5px 9px; border-radius:5px; background:#182033; color:#fff; font:400 12px/1.4 "Sarabun",sans-serif; white-space:nowrap; }
+.lpc-availability-tooltip { display:none; position:absolute; top:100%; right:0; z-index:20; padding:5px 9px; border-radius:5px; background:#182033; color:#fff; font:400 12px/1.4 var(--lpc-portal-font-sans, "Sarabun"),sans-serif; white-space:nowrap; }
 .lpc-availability-dot:hover .lpc-availability-tooltip,.lpc-availability-dot:focus .lpc-availability-tooltip { display:block; }
 .lpc-availability-dot:focus-visible { outline:2px solid #6495ed; outline-offset:2px; }
 .lpc-availability-dot.is-available::before { background:#24a15a; box-shadow:0 0 5px #24a15a40; }
