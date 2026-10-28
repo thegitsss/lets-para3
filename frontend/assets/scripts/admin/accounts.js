@@ -31,17 +31,6 @@ function init() {
       seq = ++sequence;
     modal.dataset.admissionUserId = id;
     modal.dataset.admissionRevision = user.admissionRevision || '';
-    window.readAdminQualificationReview = () => {
-      if (!isCurrent() || modal.dataset.admissionUserId !== id) return null;
-      const confirmed = el('adminQualificationConfirmed');
-      if (!confirmed) return null;
-      return {
-        confirmed: confirmed.checked,
-        qualification: el('adminQualificationType').value,
-        method: el('adminQualificationMethod').value,
-        evidence: el('adminQualificationEvidence').value.trim(),
-      };
-    };
     let historyRequest = 0;
     const isCurrent = () => seq === sequence && !modal.classList.contains('hidden');
     let writing = false;
@@ -106,28 +95,6 @@ function init() {
       const brief = document.createElement('p'); brief.className = 'admin-admission-brief'; brief.textContent = admissionMessage;
       root.querySelector('.admin-tabs').after(brief);
     }
-    if (requiresAdmissionReview && user.role === 'paralegal') {
-      const verification = document.createElement('section');
-      verification.className = 'admin-review-card admin-qualification-review';
-      verification.innerHTML = `<h3>Qualification verification</h3>
-        <p>Verify the qualifying education or law-firm experience before approving. Document safety checks do not verify credentials.</p>
-        <label for="adminQualificationType">Qualification</label>
-        <select id="adminQualificationType"><option value="">Choose the qualification</option><option value="certificate">Paralegal certificate</option><option value="degree">Degree in paralegal studies</option><option value="law_firm_experience">At least one year of law-firm experience</option></select>
-        <label for="adminQualificationMethod">Verification source</label>
-        <select id="adminQualificationMethod"><option value="">Choose the source</option><option value="issuing_institution">Issuing institution</option><option value="employer_contact">Independently sourced employer contact</option><option value="official_communication">Official communication</option><option value="reliable_documentation">Other reliable documentation</option></select>
-        <label for="adminQualificationEvidence">Source and result</label>
-        <textarea id="adminQualificationEvidence" rows="3" maxlength="2000" placeholder="Identify what you checked, when, and the result. Keep unnecessary personal details out of this note."></textarea>
-        <label><input type="checkbox" id="adminQualificationConfirmed"> I verified this admission qualification.</label>`;
-      el('adminDecisionNote').closest('.admin-review-card').before(verification);
-      el('adminQualificationType').value = user.paralegalQualification || '';
-      if (user.paralegalQualification) el('adminQualificationType').disabled = true;
-      const updateApproval = () => {
-        const review = window.readAdminQualificationReview();
-        el('approveUserBtn').disabled = !canAccess || check.status !== 'fulfilled' || !check.value.canApprove || !review?.confirmed || !review.qualification || !review.method || !review.evidence;
-      };
-      verification.addEventListener('input', updateApproval);
-      verification.addEventListener('change', updateApproval);
-    }
     const historyPanel = root.querySelector('[data-account-panel="history"]');
     async function loadHistory() {
       if (!isCurrent()) return;
@@ -160,7 +127,7 @@ function init() {
         window.openSupportTicketInAdmin(ticket.dataset.accountTicket);
       }
     });
-    el('approveUserBtn').disabled = !requiresAdmissionReview || !canAccess || check.status !== 'fulfilled' || !check.value.canApprove || user.role === 'paralegal';
+    el('approveUserBtn').disabled = !requiresAdmissionReview || !canAccess || check.status !== 'fulfilled' || !check.value.canApprove;
     draftStore.paint(draft);
     replaceEventHandler(el('adminDecisionNote'), 'input', e=>{draft.note=e.target.value;draftStore.change(draft);});
     if(draft.uncertain)el('adminAccountResult').textContent='The last email outcome is unconfirmed. Check or retry the saved request; a recorded send will not be repeated.';
