@@ -131,15 +131,16 @@ const qualificationReview = { confirmed: true, qualification: 'law_firm_experien
   method: 'employer_contact', evidence: 'Synthetic independently sourced employer contact confirmed three years of law-firm employment.' };
 const decide = (applicant, action, body) => request(app).post(`/api/admin/users/${applicant._id}/${action}`).set('Cookie', cookie(admin)).send({ expectedOwnerId: String(admin._id), ...body });
 
-test('paralegal approval requires a current application and recorded credential verification', async () => {
+test('owner can approve a current paralegal application without recording qualification verification', async () => {
   const applicant = await pendingParalegal();
-  expect((await decide(applicant, 'approve', { note: 'Documents looked safe.' })).status).toBe(409);
-  const revision = admissionRevision(applicant);
-  expect((await decide(applicant, 'approve', { reviewedRevision: revision })).status).toBe(409);
-  expect((await decide(applicant, 'approve', { reviewedRevision: revision, qualificationReview: { ...qualificationReview, confirmed: false } })).status).toBe(409);
-  expect((await decide(applicant, 'approve', { reviewedRevision: revision, qualificationReview: { ...qualificationReview, qualification: 'certificate' } })).status).toBe(409);
-  expect((await User.findById(applicant._id)).status).toBe('pending');
-  expect(sendEmail).not.toHaveBeenCalled();
+  expect((await decide(applicant, 'approve', {})).status).toBe(409);
+  const result = await decide(applicant, 'approve', { reviewedRevision: admissionRevision(applicant) });
+  expect(result.status).toBe(200);
+  const saved = await User.findById(applicant._id);
+  expect(saved.status).toBe('approved');
+  expect(saved.audit).toHaveLength(1);
+  expect(saved.audit[0].qualificationReview).toBeUndefined();
+  expect(sendEmail.mock.calls.filter(call => call[0] === applicant.email)).toHaveLength(1);
 });
 
 test('changed admission evidence invalidates the reviewed application without approving', async () => {

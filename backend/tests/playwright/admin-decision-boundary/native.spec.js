@@ -33,9 +33,7 @@ async function fixture(browser) {
     await expect(row).toHaveCount(1); await row.getByRole('button', { name: 'View', exact: true }).click();
     await expect(page.locator('#pendingUserModal')).toBeVisible();
     await expect(page.locator('#pendingUserModal')).toHaveAttribute('data-admission-user-id', applicant.id);
-    await page.getByLabel('Verification source', { exact: true }).selectOption('employer_contact');
-    await page.getByLabel('Source and result', { exact: true }).fill(f.qualificationReview.evidence);
-    await page.getByLabel('I verified this admission qualification.', { exact: true }).check();
+    await expect(page.locator('.admin-qualification-review')).toHaveCount(0);
     await expect(page.locator('#approveUserBtn')).toBeEnabled();
     const stored = await require('../../../models/User').findById(applicant.id).lean();
     const revision = require('../../../services/admissionReview').admissionRevision(stored);
@@ -62,7 +60,7 @@ async function fixture(browser) {
   const finish = info => f.finish(server, info, contexts, observations, [applicant.id], errors, true);
   return { actor, applicant, context, page, observations, ready, capture, finish };
 }
-test('native Admin application review records the verified qualification and truthful decision through the actual approve control at both widths', async ({ browser }, info) => {
+test('native Admin application review permits owner approval without a qualification form and records the decision through the actual approve control at both widths', async ({ browser }, info) => {
   test.setTimeout(150000); const x = await fixture(browser);
   try {
     await x.ready(); await x.capture(info, 'native-reviewed-admission');
@@ -72,7 +70,7 @@ test('native Admin application review records the verified qualification and tru
     const saved = await f.snapshot([x.applicant.id]); x.observations.push({ phase: 'actual-native-approved-record', status: response.status(), payload: await response.json(), saved });
     expect(response.status()).toBe(200); expect(saved.applicants[0].status).toBe('approved'); expect(saved.applicants[0].audit).toHaveLength(1);
     expect(saved.applicants[0].audit[0]).toMatchObject({ adminId: x.actor.id, action: 'approved' });
-    expect(saved.applicants[0].audit[0].qualificationReview).toMatchObject({ qualification: 'law_firm_experience', method: 'employer_contact' });
+    expect(saved.applicants[0].audit[0].qualificationReview).toBeUndefined();
     await expect(x.page.locator('#pendingUserModal')).toBeHidden(); await expect(x.page.locator('#toastBanner')).toContainText('User approved.');
     await x.capture(info, 'native-approved-admission-result', '#toastBanner');
     expect(server.noticeEvidence().actualOwningCalls.filter(row => row[0] === x.applicant.email)).toHaveLength(1);

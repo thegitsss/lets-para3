@@ -27,7 +27,8 @@ function prepareQualificationReview(user, input, reviewedRevision) {
   if (typeof reviewedRevision !== 'string' || reviewedRevision !== admissionRevision(user)) {
     throw conflict('This application needs a current review. Reopen it before approving.');
   }
-  if (user.role !== 'paralegal') return null;
+  // The owner verifies credentials outside LPC; recording that process is optional.
+  if (user.role !== 'paralegal' || input == null) return null;
   if (!input || input.confirmed !== true || !qualifications.has(input.qualification) || !methods.has(input.method)) {
     throw conflict('Record how you verified the applicant’s admission qualification before approving.', 'ADMISSION_QUALIFICATION_REVIEW_REQUIRED');
   }
