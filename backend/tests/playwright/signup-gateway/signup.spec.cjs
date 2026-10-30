@@ -146,12 +146,6 @@ for (const role of ['attorney', 'paralegal']) test(`${role}: actual signup, sepa
   await expect(admin.page.locator('#pendingUserDetails')).not.toContainText('good standing');
   if (role === 'paralegal') { await expect(admin.page.locator('#pendingUserDetails')).toContainText('Certification'); await expect(admin.page.locator('#pendingUserDetails')).toContainText('Resume'); }
   await admin.page.locator('[data-account-tab=review]').click();
-  if (role === 'paralegal') {
-    await admin.page.getByLabel('Qualification', { exact: true }).selectOption('law_firm_experience');
-    await admin.page.getByLabel('Verification source', { exact: true }).selectOption('employer_contact');
-    await admin.page.getByLabel('Source and result', { exact: true }).fill('Synthetic local test: verified the stated law-firm experience.');
-    await admin.page.getByLabel('I verified this admission qualification.', { exact: true }).check();
-  }
   const decision=admin.page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname===`/api/admin/users/${user._id}/approve`);
   await admin.page.locator('#approveUserBtn').click();expect((await decision).status()).toBe(200);
   await expect.poll(async () => (await User.findById(user._id).lean()).status).toBe('approved');
