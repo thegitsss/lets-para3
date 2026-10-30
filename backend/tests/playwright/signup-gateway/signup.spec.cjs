@@ -138,7 +138,15 @@ for (const role of ['attorney', 'paralegal']) test(`${role}: actual signup, sepa
   await expect(verify.locator('#verificationPanel')).toHaveAttribute('data-state', 'success');
   await expect(verify.locator('#verificationStatus')).toHaveText('We’ll review your application and email you when your account is ready.');
   await verify.screenshot({path:info.outputPath(`${role}-verified-pending.png`),fullPage:true});
-  await verification.close(); await login(page, email); await expect(page.locator('body')).toContainText('We’re reviewing your application.');
+  await verification.close(); await login(page, email);
+  const pendingApproval = page.locator('#loginApprovalDialog');
+  await expect(pendingApproval).toBeVisible();
+  await expect(pendingApproval.getByRole('heading')).toHaveText('Your sign-up request was sent and is pending approval.');
+  await expect(pendingApproval.locator('.verification-note')).not.toBeVisible();
+  await expect(pendingApproval.locator('details')).not.toBeVisible();
+  await pendingApproval.getByRole('button', { name: 'Got it', exact: true }).click();
+  await expect(pendingApproval).not.toBeVisible();
+  await expect(page.locator('#email')).toBeFocused();
   const admin = await adminReview(browser, String(user._id));
   await admin.page.locator('[data-account-tab=profile]').click();
   await expect(admin.page.locator('#pendingUserDetails')).toContainText(role === 'attorney' ? 'Synthetic Law' : '1');

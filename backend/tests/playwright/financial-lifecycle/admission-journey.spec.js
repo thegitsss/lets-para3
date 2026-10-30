@@ -77,7 +77,15 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await page.getByRole('button', { name: 'Verify email', exact: true }).click();
     await expect(page.locator('#verificationPanel')).toHaveAttribute('data-state', 'success');
     expect((await User.findById(id).lean()).emailVerified).toBe(true);
-    await login(page, email, password); await expect(page.locator('body')).toContainText('We’re reviewing your application.');
+    await login(page, email, password);
+    const pendingApproval = page.locator('#loginApprovalDialog');
+    await expect(pendingApproval).toBeVisible();
+    await expect(pendingApproval.getByRole('heading')).toHaveText('Your sign-up request was sent and is pending approval.');
+    await expect(pendingApproval.locator('.verification-note')).not.toBeVisible();
+    await expect(pendingApproval.locator('details')).not.toBeVisible();
+    await pendingApproval.getByRole('button', { name: 'Got it', exact: true }).click();
+    await expect(pendingApproval).not.toBeVisible();
+    await expect(page.locator('#email')).toBeFocused();
     expect((await page.request.get(`${server.origin}/api/paralegal/dashboard`)).status()).toBe(401);
     checkpoints.push('registered, verified, and denied workspace access while pending');
     const information = await api(adminContext, 'post', `/api/admin/workspace/accounts/${id}/information-request`, { requestId: randomUUID(), text: 'Please confirm your contract review experience.' });
