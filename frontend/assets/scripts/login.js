@@ -208,11 +208,30 @@ const initLogin = () => {
   verificationDialog?.querySelector("[data-verification-close]")?.addEventListener("click", () => verificationDialog.close());
   verificationDialog?.addEventListener("close", () => deactivateDialogFocus(verificationDialog));
 
-  const applicationStatus = document.createElement('p');
-  applicationStatus.className='login-application-status'; applicationStatus.hidden=true;
-  applicationStatus.setAttribute('role','status'); applicationStatus.setAttribute('aria-live','polite');
-  loginButton?.parentElement?.insertBefore(applicationStatus,loginButton);
-  const showApplicationStatus = message => {applicationStatus.textContent=message;applicationStatus.hidden=false;};
+  const approvalDialog = document.getElementById("loginApprovalDialog");
+  const approvalEmail = document.getElementById("loginApprovalEmail");
+  const approvalResend = approvalDialog?.querySelector("details");
+  const showApplicationStatus = ({ email = "", verificationRequired = false } = {}) => {
+    if (!approvalDialog) return;
+    document.getElementById("toastBanner")?.classList.remove("show");
+    if (verificationDialog?.open) verificationDialog.close();
+    approvalDialog.querySelector(".verification-note").hidden = !verificationRequired;
+    approvalResend.hidden = !verificationRequired;
+    approvalResend.open = false;
+    approvalEmail.value = email;
+    if (approvalDialog.open) return;
+    approvalDialog.showModal();
+    activateDialogFocus(approvalDialog, {
+      initialFocus: document.getElementById("loginApprovalTitle"),
+      returnFocus: document.getElementById("email") || loginButton,
+      onEscape: () => approvalDialog.close(),
+    });
+  };
+  approvalDialog?.querySelector(".login-approval-dismiss")?.addEventListener("click", () => approvalDialog.close());
+  approvalDialog?.addEventListener("close", () => {
+    deactivateDialogFocus(approvalDialog);
+    if (approvalResend) approvalResend.open = false;
+  });
   const notify = (message, type = "err") => {
     if (toastHelper) {
       toastHelper.show(message, { targetId: "toastBanner", type });
@@ -360,7 +379,7 @@ const initLogin = () => {
         unavailable: "Google sign-in is temporarily unavailable.",
       };
       if (errorCode === "pending") {
-        showApplicationStatus(messages.pending);
+        showApplicationStatus();
       } else if (errorCode === "email_unverified") {
         showVerificationRecovery("", messages[errorCode]);
       } else {
@@ -396,7 +415,7 @@ const initLogin = () => {
         loginButton.disabled = true;
         loginButton.textContent = "Signing in…";
       }
-      applicationStatus.hidden=true;
+      if (approvalDialog?.open) approvalDialog.close();
       const { res, data } = await postSignIn("/auth/login", { email, password });
 
       if (!res.ok) {
@@ -404,12 +423,12 @@ const initLogin = () => {
         const msg = res.status === 401 && [data?.error, data?.msg, data?.message].includes("Invalid email or password.")
           ? "Your email and password don’t match. Please try again."
           : data?.error || data?.msg || data?.message || "Sign-in failed";
-        if (data?.emailVerificationRequired === true) {
+        if (res.status === 403 && msg === "We’re reviewing your application. We’ll email you when your account is ready.") {
+          showApplicationStatus({ email, verificationRequired: data?.emailVerificationRequired === true });
+        } else if (data?.emailVerificationRequired === true) {
           showVerificationRecovery(email, msg);
-        } else if (res.status === 403 && msg === "We’re reviewing your application. We’ll email you when your account is ready.") {
-          showApplicationStatus(msg);
         } else {
-          applicationStatus.hidden=true;
+          if (approvalDialog?.open) approvalDialog.close();
           notify(msg);
         }
         return;
