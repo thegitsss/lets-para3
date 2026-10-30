@@ -261,7 +261,7 @@ jobs:
       - name: Install exact dependency graph
         run: npm ci
       - name: Download exact source-bound shard plan
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/jest
@@ -335,13 +335,13 @@ jobs:
       - name: Install exact dependency graph
         run: npm ci
       - name: Download exact source-bound shard plan
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/jest
           digest-mismatch: error
       - name: Download all original Jest shard evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*
           path: backend/test-results/jest/shard-artifacts
