@@ -42,7 +42,7 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     if (message.text().startsWith(prefix)) browserEvents.push({ role: 'paralegal', ...JSON.parse(message.text().slice(prefix.length)) });
   });
   page.on('framenavigated', frame => { if (frame === page.mainFrame()) browserEvents.push({ role: 'paralegal', type: 'navigation', page: page.url(), at: Date.now() }); });
-  const email = `admission-${randomUUID()}@example.test`, password = 'A synthetic professional passphrase!';
+  const email = `admission-${randomUUID()}@example.com`, password = 'A synthetic professional passphrase!';
   try {
     await page.goto(`${server.origin}/signup.html?role=paralegal`);
     await page.locator('#fullName').fill('Morgan Admission'); await page.locator('#email').fill(email); await page.locator('#password').fill(password);
@@ -60,7 +60,8 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await page.evaluate(() => { const input = document.createElement('input'); input.name = 'cf-turnstile-response'; input.type = 'hidden'; input.value = 'synthetic-admission-challenge'; document.querySelector('#signupForm').append(input); });
     await page.getByRole('button', { name: 'Submit application', exact: true }).click();
     await expect(page.locator('#signupConfirmation')).toBeVisible();
-    await expect(page.locator('#signupConfirmation')).toContainText('Your application is saved. Check your email to verify your address.');
+    await expect(page.locator('#signupConfirmationTitle')).toHaveText('Application submitted.');
+    await expect(page.locator('#signupConfirmationEmail')).toContainText(`We’ve sent a verification email to ${email}. Once your application has been reviewed, we’ll email you with a decision.`);
     const User = require('../../../models/User');
     const applicant = await User.findOne({ email }).select('+policyAcknowledgements').lean();
     expect(applicant).toMatchObject({ role: 'paralegal', status: 'pending', emailVerified: false, yearsExperience: 6 });
