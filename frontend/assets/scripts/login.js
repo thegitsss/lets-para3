@@ -270,11 +270,12 @@ const initLogin = () => {
     passkeyPreparations.set(challengeToken, record);
     return record.promise;
   }
-  const performPasskeyAuthentication = async (challengeToken = "") => {
+  const performPasskeyAuthentication = async (challengeToken = "", isCurrent = () => true) => {
     if (!passkeysSupported) throw new Error("Passkeys are not supported by this browser or device.");
     const cached = passkeyPreparations.get(challengeToken);
     if (!cached?.data || Date.now() - cached.createdAt >= 240000) {
       await preparePasskeySignIn(challengeToken);
+      if (!isCurrent()) return;
       notify("Passkey sign-in is ready. Select the passkey button again to continue.", "ok");
       return;
     }
@@ -282,22 +283,53 @@ const initLogin = () => {
     const optionsData = cached.data;
     // Options are ready before the click: the browser call starts immediately.
     const response = await runPasskeyCeremony(() => webAuthnBrowser.startAuthentication({ optionsJSON: optionsData.options }), {
-      action: "sign-in", cancel: () => webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(),
+      action: "sign-in", timeoutMs: 30000, cancel: () => webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(),
     });
+    if (!isCurrent()) return;
     const { res, data } = await postSignIn("/auth/passkeys/authenticate", {
       challengeId: optionsData.challengeId, response, ...(challengeToken ? { challengeToken } : {}),
     }, { suppressToast: true });
+    if (!isCurrent()) return;
+    if (res.status === 403 && data?.accountStatus === "pending") {
+      showApplicationStatus({ email: data.email || "", verificationRequired: data.emailVerificationRequired === true });
+      return;
+    }
+    if (res.status === 403 && data?.emailVerificationRequired === true) {
+      showVerificationRecovery(data.email || "", data.error || data.msg);
+      return;
+    }
     if (!res.ok) throw new Error(data?.error || data?.msg || "Passkey sign-in failed.");
     persistSession({ user: data.user || null });
     window.location.href = await resolvePostLoginTarget(data.user);
   };
+  let passkeyAttempt = 0;
+  let passkeyPending = false;
+  const restorePasskeyButton = () => {
+    if (!passkeyLoginBtn) return;
+    passkeyLoginBtn.disabled = false;
+    passkeyLoginBtn.removeAttribute("aria-busy");
+    passkeyLoginBtn.textContent = "Sign in with a passkey";
+  };
   passkeyLoginBtn?.addEventListener("click", async () => {
+    if (passkeyPending) return;
+    const attempt = ++passkeyAttempt;
+    passkeyPending = true;
     passkeyLoginBtn.disabled = true;
-    try { await performPasskeyAuthentication(); }
+    passkeyLoginBtn.setAttribute("aria-busy", "true");
+    passkeyLoginBtn.textContent = "Waiting for passkey…";
+    notify("No saved passkey? Cancel the device prompt and sign in with your password.", "info");
+    try { await performPasskeyAuthentication("", () => attempt === passkeyAttempt); }
     catch (error) {
-      notify(error?.name === "NotAllowedError" || error?.name === "AbortError" ? "Passkey sign-in was canceled. You can try again or use your password." : error?.message || "Passkey sign-in failed.");
+      if (attempt !== passkeyAttempt) return;
+      notify(error?.name === "PasskeyTimeoutError"
+        ? "Passkey sign-in wasn’t completed. Sign in with your password, or try your passkey again."
+        : error?.name === "NotAllowedError" || error?.name === "AbortError"
+          ? "Passkey sign-in was canceled. You can try again or use your password."
+          : error?.message || "Passkey sign-in failed.");
       void preparePasskeySignIn().catch(() => {});
-    } finally { passkeyLoginBtn.disabled = false; }
+    } finally {
+      if (attempt === passkeyAttempt) { passkeyPending = false; restorePasskeyButton(); }
+    }
   });
   if (passkeysSupported && passkeyLoginBtn) {
     passkeyLoginBtn.disabled = true;
@@ -407,6 +439,12 @@ const initLogin = () => {
 
   const submitLogin = async ({ email, password, originalLabel }) => {
     if (loginPending) return;
+    if (passkeyPending) {
+      passkeyAttempt += 1;
+      passkeyPending = false;
+      try { webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(); } catch { /* Password sign-in remains available. */ }
+      restorePasskeyButton();
+    }
     loginPending = true;
     let shouldRestoreButton = true;
 

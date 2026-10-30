@@ -1671,7 +1671,18 @@ router.post(
       return res.status(400).json({ error: "Passkey verification failed or expired." });
     }
     const user = challengeUser || await User.findById(passkey.userId).select("+authVersion");
-    if (!user || isDeactivatedUser(user) || !isApprovedUser(user)) {
+    if (!user || isDeactivatedUser(user)) {
+      return res.status(403).json({ error: "This account cannot sign in." });
+    }
+    if (!isApprovedUser(user)) {
+      if (String(user.status || "pending").toLowerCase() === "pending") {
+        return res.status(403).json({
+          error: "We’re reviewing your application. We’ll email you when your account is ready.",
+          accountStatus: "pending",
+          email: user.email,
+          ...(user.emailVerified !== true ? { emailVerificationRequired: true } : {}),
+        });
+      }
       return res.status(403).json({ error: "This account cannot sign in." });
     }
     const settings = await getAppSettings();
@@ -1680,7 +1691,7 @@ router.post(
     }
     ensureApprovedUserAuthReady(user);
     if (user.emailVerified !== true) {
-      return res.status(403).json({ error: EMAIL_NOT_VERIFIED_MSG });
+      return res.status(403).json({ error: EMAIL_NOT_VERIFIED_MSG, emailVerificationRequired: true, email: user.email });
     }
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
     const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
