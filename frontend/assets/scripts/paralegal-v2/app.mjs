@@ -1195,7 +1195,7 @@ function showToast(message, { appearance = "floating-pill", tone = "neutral" } =
     if (!floatingPill || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { toast.remove(); return; }
     toast.classList.add("is-leaving");
     window.setTimeout(() => toast.remove(), 180);
-  }, tone === "success" ? 3200 : tone === "error" ? 7000 : 5000);
+  }, Math.max(tone === "error" ? 15000 : 10000, 3000 + String(message || "").trim().split(/\s+/).filter(Boolean).length * 500));
 }
 
 async function signOut({ onError } = {}) {

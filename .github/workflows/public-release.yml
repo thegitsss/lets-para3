@@ -33,7 +33,7 @@ jobs:
         env:
           JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
           EMAIL_DISABLE: "true"
-        run: npm test -- --runTestsByPath tests/auth.test.js tests/googlePublicAuth.test.js tests/publicParalegalStateCounts.test.js tests/supportAdmin.test.js tests/webNotFound.test.js tests/mobileHomepageImages.test.js
+        run: npm test -- --runTestsByPath tests/auth.test.js tests/passkeyPendingApproval.test.js tests/passkeyService.test.js tests/googlePublicAuth.test.js tests/publicParalegalStateCounts.test.js tests/supportAdmin.test.js tests/webNotFound.test.js tests/mobileHomepageImages.test.js
       - name: Install browser for public journeys
         working-directory: backend
         run: |
@@ -53,6 +53,7 @@ jobs:
         run: |
           export PUPPETEER_EXECUTABLE_PATH="$(node -p "require('playwright').chromium.executablePath()")"
           node scripts/test-public-auth-navigation-ui.js
+          node scripts/test-passkey-signin-recovery-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-mobile-reference-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-first-frame-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-mobile-stability.js

@@ -38,14 +38,17 @@
   }
 
   function show(message, options = {}) {
-    const { targetId = "toastBanner", type = "info", duration = 2600 } = options;
+    const { targetId = "toastBanner", type = "info", duration = 0 } = options;
+    const words = String(message || "").trim().split(/\s+/).filter(Boolean).length;
+    const readingTime = Math.max(type === "err" || type === "error" ? 15000 : 10000, 3000 + words * 500);
+    const displayTime = Math.max(readingTime, Number(duration) || 0);
     const el = typeof targetId === "string" ? document.getElementById(targetId) : targetId;
     if (!el) return;
     el.textContent = message;
     el.dataset.toastType = type;
     el.classList.add("show");
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => el.classList.remove("show"), duration);
+    hideTimer = setTimeout(() => el.classList.remove("show"), displayTime);
   }
 
   function showStatus(status) {

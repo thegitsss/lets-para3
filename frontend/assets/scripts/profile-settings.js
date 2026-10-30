@@ -5145,7 +5145,7 @@ function showToast(message, type = "info") {
       banner.textContent = message;
       banner.dataset.toastType = type;
       banner.classList.add("show");
-      setTimeout(() => banner.classList.remove("show"), 2500);
+      setTimeout(() => banner.classList.remove("show"), Math.max(type === "err" || type === "error" ? 15000 : 10000, 3000 + String(message).trim().split(/\s+/).filter(Boolean).length * 500));
     } else {
       void showAlert(message, { title: type === "err" ? "Action unavailable" : "Notice" });
     }

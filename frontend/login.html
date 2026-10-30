@@ -383,6 +383,7 @@ button[type="submit"]:focus-visible,
     #loginVerificationDialog .lpc-dialog__button--secondary { background: #fff; color: #334155; border-color: #cbd5e1; }
     @media (min-width: 513px) { #loginVerificationDialog button[type="submit"] { width: auto; } }
   </style>
+  <link rel="stylesheet" href="assets/styles/login-approval.css" />
 </head>
 
 <body class="login-page auth-entry" data-public-page="true">
@@ -481,6 +482,24 @@ button[type="submit"]:focus-visible,
       </figure>
     </aside>
   </main>
+
+<dialog id="loginApprovalDialog" aria-labelledby="loginApprovalTitle" aria-describedby="loginApprovalDescription">
+<h2 id="loginApprovalTitle" tabindex="-1">Your sign-up request was sent and is pending approval.</h2>
+<div class="login-approval-message">
+<p id="loginApprovalDescription">We’ll email you as soon as your account is approved.</p>
+<p class="verification-note">In the meantime, please verify your email if you haven’t already.</p>
+<details class="verification-resend">
+<summary>Resend verification email</summary>
+<form data-verification-resend>
+<label for="loginApprovalEmail">Email address</label>
+<input id="loginApprovalEmail" type="email" autocomplete="email" required>
+<button type="submit">Resend verification email</button>
+<p role="status" aria-live="polite"></p>
+</form>
+</details>
+<button class="login-approval-dismiss" type="button">Got it</button>
+</div>
+</dialog>
 
   <dialog id="loginVerificationDialog" class="lpc-dialog" aria-labelledby="loginVerificationTitle" aria-describedby="loginVerificationDescription">
     <div class="lpc-dialog__card">

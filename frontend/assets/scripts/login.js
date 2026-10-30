@@ -208,11 +208,30 @@ const initLogin = () => {
   verificationDialog?.querySelector("[data-verification-close]")?.addEventListener("click", () => verificationDialog.close());
   verificationDialog?.addEventListener("close", () => deactivateDialogFocus(verificationDialog));
 
-  const applicationStatus = document.createElement('p');
-  applicationStatus.className='login-application-status'; applicationStatus.hidden=true;
-  applicationStatus.setAttribute('role','status'); applicationStatus.setAttribute('aria-live','polite');
-  loginButton?.parentElement?.insertBefore(applicationStatus,loginButton);
-  const showApplicationStatus = message => {applicationStatus.textContent=message;applicationStatus.hidden=false;};
+  const approvalDialog = document.getElementById("loginApprovalDialog");
+  const approvalEmail = document.getElementById("loginApprovalEmail");
+  const approvalResend = approvalDialog?.querySelector("details");
+  const showApplicationStatus = ({ email = "", verificationRequired = false } = {}) => {
+    if (!approvalDialog) return;
+    document.getElementById("toastBanner")?.classList.remove("show");
+    if (verificationDialog?.open) verificationDialog.close();
+    approvalDialog.querySelector(".verification-note").hidden = !verificationRequired;
+    approvalResend.hidden = !verificationRequired;
+    approvalResend.open = false;
+    approvalEmail.value = email;
+    if (approvalDialog.open) return;
+    approvalDialog.showModal();
+    activateDialogFocus(approvalDialog, {
+      initialFocus: document.getElementById("loginApprovalTitle"),
+      returnFocus: document.getElementById("email") || loginButton,
+      onEscape: () => approvalDialog.close(),
+    });
+  };
+  approvalDialog?.querySelector(".login-approval-dismiss")?.addEventListener("click", () => approvalDialog.close());
+  approvalDialog?.addEventListener("close", () => {
+    deactivateDialogFocus(approvalDialog);
+    if (approvalResend) approvalResend.open = false;
+  });
   const notify = (message, type = "err") => {
     if (toastHelper) {
       toastHelper.show(message, { targetId: "toastBanner", type });
@@ -251,11 +270,12 @@ const initLogin = () => {
     passkeyPreparations.set(challengeToken, record);
     return record.promise;
   }
-  const performPasskeyAuthentication = async (challengeToken = "") => {
+  const performPasskeyAuthentication = async (challengeToken = "", isCurrent = () => true) => {
     if (!passkeysSupported) throw new Error("Passkeys are not supported by this browser or device.");
     const cached = passkeyPreparations.get(challengeToken);
     if (!cached?.data || Date.now() - cached.createdAt >= 240000) {
       await preparePasskeySignIn(challengeToken);
+      if (!isCurrent()) return;
       notify("Passkey sign-in is ready. Select the passkey button again to continue.", "ok");
       return;
     }
@@ -263,22 +283,53 @@ const initLogin = () => {
     const optionsData = cached.data;
     // Options are ready before the click: the browser call starts immediately.
     const response = await runPasskeyCeremony(() => webAuthnBrowser.startAuthentication({ optionsJSON: optionsData.options }), {
-      action: "sign-in", cancel: () => webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(),
+      action: "sign-in", timeoutMs: 30000, cancel: () => webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(),
     });
+    if (!isCurrent()) return;
     const { res, data } = await postSignIn("/auth/passkeys/authenticate", {
       challengeId: optionsData.challengeId, response, ...(challengeToken ? { challengeToken } : {}),
     }, { suppressToast: true });
+    if (!isCurrent()) return;
+    if (res.status === 403 && data?.accountStatus === "pending") {
+      showApplicationStatus({ email: data.email || "", verificationRequired: data.emailVerificationRequired === true });
+      return;
+    }
+    if (res.status === 403 && data?.emailVerificationRequired === true) {
+      showVerificationRecovery(data.email || "", data.error || data.msg);
+      return;
+    }
     if (!res.ok) throw new Error(data?.error || data?.msg || "Passkey sign-in failed.");
     persistSession({ user: data.user || null });
     window.location.href = await resolvePostLoginTarget(data.user);
   };
+  let passkeyAttempt = 0;
+  let passkeyPending = false;
+  const restorePasskeyButton = () => {
+    if (!passkeyLoginBtn) return;
+    passkeyLoginBtn.disabled = false;
+    passkeyLoginBtn.removeAttribute("aria-busy");
+    passkeyLoginBtn.textContent = "Sign in with a passkey";
+  };
   passkeyLoginBtn?.addEventListener("click", async () => {
+    if (passkeyPending) return;
+    const attempt = ++passkeyAttempt;
+    passkeyPending = true;
     passkeyLoginBtn.disabled = true;
-    try { await performPasskeyAuthentication(); }
+    passkeyLoginBtn.setAttribute("aria-busy", "true");
+    passkeyLoginBtn.textContent = "Waiting for passkey…";
+    notify("No saved passkey? Cancel the device prompt and sign in with your password.", "info");
+    try { await performPasskeyAuthentication("", () => attempt === passkeyAttempt); }
     catch (error) {
-      notify(error?.name === "NotAllowedError" || error?.name === "AbortError" ? "Passkey sign-in was canceled. You can try again or use your password." : error?.message || "Passkey sign-in failed.");
+      if (attempt !== passkeyAttempt) return;
+      notify(error?.name === "PasskeyTimeoutError"
+        ? "Passkey sign-in wasn’t completed. Sign in with your password, or try your passkey again."
+        : error?.name === "NotAllowedError" || error?.name === "AbortError"
+          ? "Passkey sign-in was canceled. You can try again or use your password."
+          : error?.message || "Passkey sign-in failed.");
       void preparePasskeySignIn().catch(() => {});
-    } finally { passkeyLoginBtn.disabled = false; }
+    } finally {
+      if (attempt === passkeyAttempt) { passkeyPending = false; restorePasskeyButton(); }
+    }
   });
   if (passkeysSupported && passkeyLoginBtn) {
     passkeyLoginBtn.disabled = true;
@@ -360,7 +411,7 @@ const initLogin = () => {
         unavailable: "Google sign-in is temporarily unavailable.",
       };
       if (errorCode === "pending") {
-        showApplicationStatus(messages.pending);
+        showApplicationStatus();
       } else if (errorCode === "email_unverified") {
         showVerificationRecovery("", messages[errorCode]);
       } else {
@@ -388,6 +439,12 @@ const initLogin = () => {
 
   const submitLogin = async ({ email, password, originalLabel }) => {
     if (loginPending) return;
+    if (passkeyPending) {
+      passkeyAttempt += 1;
+      passkeyPending = false;
+      try { webAuthnBrowser.WebAuthnAbortService?.cancelCeremony(); } catch { /* Password sign-in remains available. */ }
+      restorePasskeyButton();
+    }
     loginPending = true;
     let shouldRestoreButton = true;
 
@@ -396,7 +453,7 @@ const initLogin = () => {
         loginButton.disabled = true;
         loginButton.textContent = "Signing in…";
       }
-      applicationStatus.hidden=true;
+      if (approvalDialog?.open) approvalDialog.close();
       const { res, data } = await postSignIn("/auth/login", { email, password });
 
       if (!res.ok) {
@@ -404,12 +461,12 @@ const initLogin = () => {
         const msg = res.status === 401 && [data?.error, data?.msg, data?.message].includes("Invalid email or password.")
           ? "Your email and password don’t match. Please try again."
           : data?.error || data?.msg || data?.message || "Sign-in failed";
-        if (data?.emailVerificationRequired === true) {
+        if (res.status === 403 && msg === "We’re reviewing your application. We’ll email you when your account is ready.") {
+          showApplicationStatus({ email, verificationRequired: data?.emailVerificationRequired === true });
+        } else if (data?.emailVerificationRequired === true) {
           showVerificationRecovery(email, msg);
-        } else if (res.status === 403 && msg === "We’re reviewing your application. We’ll email you when your account is ready.") {
-          showApplicationStatus(msg);
         } else {
-          applicationStatus.hidden=true;
+          if (approvalDialog?.open) approvalDialog.close();
           notify(msg);
         }
         return;

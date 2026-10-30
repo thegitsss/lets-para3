@@ -1,0 +1,25 @@
+/* Approved pending-approval sign-in popup. */
+
+.login-approval-message{color:#425b7a;font:300 16px/1.65 'Sarabun',sans-serif;text-align:center;}
+.login-approval-message p{margin:0;text-wrap:balance;}.login-approval-message p+p{margin-top:16px;}
+.login-approval-message details{margin-top:22px;font:inherit;text-align:center;}
+.login-approval-message summary{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0;list-style:none;cursor:pointer;color:#385f9e;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#aebed6;font:inherit;}
+.login-approval-message summary::-webkit-details-marker{display:none;}
+.login-approval-message summary:hover{font-weight:500;}
+.login-approval-message summary:focus-visible,.login-approval-dismiss:focus-visible{outline:2px solid #385f9e;outline-offset:4px;}
+.login-approval-message form{text-align:left;margin-top:16px;}
+.login-approval-message label{font:300 16px/1.5 'Sarabun',sans-serif;margin-bottom:8px;}
+.login-approval-message input{font-size:16px!important;min-height:48px!important;}
+.login-approval-message button[type=submit]{font-size:16px;min-height:48px;}
+.login-approval-message [role=status]:empty{display:none;}
+.login-approval-message [role=status]{margin-top:12px;}
+.login-approval-dismiss{min-height:44px;margin-top:24px;padding:0 8px;border:0;background:transparent;color:#586a80;font:300 16px/1.5 'Sarabun',sans-serif;cursor:pointer;}
+.login-approval-dismiss:hover{font-weight:500;}
+
+#loginApprovalDialog{border:0;border-radius:16px;background:#fff;padding:40px;width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;color:#27394d;box-shadow:0 24px 90px #15283b26;margin:auto;}
+#loginApprovalDialog::backdrop{background:rgba(22,37,55,.36);}
+#loginApprovalDialog h2{font:600 32px/1.2 'Sarabun',sans-serif;letter-spacing:-.035em;text-align:center;text-wrap:balance;margin:0 0 22px;outline:none;}
+#loginApprovalDialog .login-approval-dismiss{margin-top:24px;min-width:112px;padding:10px 24px;border:1px solid #27394d;border-radius:8px;background:#fff;color:#27394d;font-weight:500;}
+#loginApprovalDialog .login-approval-dismiss:hover{background:#f4f7fb;}
+#loginApprovalDialog:has(details[open]) .login-approval-dismiss{background:transparent;color:#586a80;border-color:transparent;font-weight:300;}
+@media(max-width:512px){#loginApprovalDialog{padding:32px 24px;}#loginApprovalDialog h2{font-size:30px;}}
