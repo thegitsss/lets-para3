@@ -14,7 +14,7 @@ test.beforeEach(async ({ context, page }) => {
   page.on('pageerror', error => { throw error; });
 });
 test.afterAll(async () => server?.close());
-async function basics(page, role = 'paralegal', email = `gateway-${randomUUID()}@example.test`) {
+async function basics(page, role = 'paralegal', email = `gateway-${randomUUID()}@example.com`) {
   await page.goto(`${server.origin}/signup.html?role=${role}`, { waitUntil: 'domcontentloaded' });
   await page.locator('#fullName').fill('Morgan Applicant'); await page.locator('#email').fill(email);
   await page.evaluate(() => document.fonts.ready);
@@ -50,7 +50,7 @@ async function adminReview(browser, id) {
 
 test('single password field, original hint, eight-character minimum and Enter to Continue', async ({ page }) => {
   await page.goto(`${server.origin}/signup.html`); await page.evaluate(() => document.fonts.ready);
-  await page.locator('#fullName').fill('Morgan Applicant'); await page.locator('#email').fill('morgan.applicant@example.test');
+  await page.locator('#fullName').fill('Morgan Applicant'); await page.locator('#email').fill('morgan.applicant@example.com');
   const before = await page.locator('#nextStepBtn').boundingBox();
   await expect(page.locator('#confirmPassword')).toHaveCount(0);
   await page.locator('#password').fill('abc');
@@ -122,8 +122,8 @@ for (const role of ['attorney', 'paralegal']) test(`${role}: actual signup, sepa
   await page.locator('#submitBtn').click(); await expect(page.locator('#submitBtn')).toBeDisabled();
   await page.locator('#signupForm').evaluate(form => form.requestSubmit()); releaseSubmission();
   await expect(page.locator('#signupConfirmation')).toBeVisible(); expect(submissions).toBe(1);
-  await expect(page.locator('#signupConfirmationTitle')).toHaveText('Check your email.');
-  await expect(page.locator('#signupConfirmationEmail')).toHaveText(email);
+  await expect(page.locator('#signupConfirmationTitle')).toHaveText(role === 'attorney' ? 'Registration received.' : 'Application submitted.');
+  await expect(page.locator('#signupConfirmationEmail')).toContainText(email);
   await expect(page.locator('#resendSignupVerification')).toBeVisible();
   await page.screenshot({path:info.outputPath(`${role}-check-email.png`),fullPage:true});
   const User = require('../../../models/User'), user = await User.findOne({ email }).lean(); expect(user.status).toBe('pending'); expect(await User.countDocuments({ email })).toBe(1);
@@ -146,12 +146,6 @@ for (const role of ['attorney', 'paralegal']) test(`${role}: actual signup, sepa
   await expect(admin.page.locator('#pendingUserDetails')).not.toContainText('good standing');
   if (role === 'paralegal') { await expect(admin.page.locator('#pendingUserDetails')).toContainText('Certification'); await expect(admin.page.locator('#pendingUserDetails')).toContainText('Resume'); }
   await admin.page.locator('[data-account-tab=review]').click();
-  if (role === 'paralegal') {
-    await admin.page.getByLabel('Qualification', { exact: true }).selectOption('law_firm_experience');
-    await admin.page.getByLabel('Verification source', { exact: true }).selectOption('employer_contact');
-    await admin.page.getByLabel('Source and result', { exact: true }).fill('Synthetic local test: verified the stated law-firm experience.');
-    await admin.page.getByLabel('I verified this admission qualification.', { exact: true }).check();
-  }
   const decision=admin.page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname===`/api/admin/users/${user._id}/approve`);
   await admin.page.locator('#approveUserBtn').click();expect((await decision).status()).toBe(200);
   await expect.poll(async () => (await User.findById(user._id).lean()).status).toBe('approved');
@@ -165,7 +159,7 @@ for (const role of ['attorney', 'paralegal']) test(`${role}: actual signup, sepa
 
 test('verification waits for an explicit click, prevents double submission and handles reused links by account status', async ({page},info) => {
   const User = require('../../../models/User');
-  const user = await User.create({firstName:'Morgan',lastName:'Verification',email:'scanner-proof@example.test',password,role:'attorney',status:'pending',emailVerified:false,state:'CA'});
+  const user = await User.create({firstName:'Morgan',lastName:'Verification',email:'scanner-proof@example.com',password,role:'attorney',status:'pending',emailVerified:false,state:'CA'});
   await require('../../../utils/emailVerification').sendVerificationEmail({user,email:user.email});
   const token=decodeURIComponent(server.evidence().external.mail.at(-1)[2].match(/token=([^&\s"'<>]+)/i)[1]);
   const url=`${server.origin}/verify-email.html?token=${encodeURIComponent(token)}`;
@@ -206,7 +200,7 @@ test('verification waits for an explicit click, prevents double submission and h
 
 test('verification recovers from a temporary failure and an expired link without losing the account', async ({page},info) => {
   const User=require('../../../models/User');
-  const user=await User.create({firstName:'Morgan',lastName:'Recovery',email:'verification-retry@example.test',password,role:'paralegal',status:'pending',emailVerified:false,state:'CA',resumeURL:'retained/resume.pdf'});
+  const user=await User.create({firstName:'Morgan',lastName:'Recovery',email:'verification-retry@example.com',password,role:'paralegal',status:'pending',emailVerified:false,state:'CA',resumeURL:'retained/resume.pdf'});
   const helper=require('../../../utils/emailVerification');await helper.sendVerificationEmail({user,email:user.email});
   const token=decodeURIComponent(server.evidence().external.mail.at(-1)[2].match(/token=([^&\s"'<>]+)/i)[1]);
   let calls=0;await page.route('**/api/auth/verify-email',route=>++calls===1?route.fulfill({status:503,json:{msg:'We couldn’t confirm verification yet. Please try again.'}}):route.continue());
@@ -249,12 +243,14 @@ test('saved signup survives mail failure, failed resend and retry without a seco
 
 test('invalid verification and sign-in both offer generic resend recovery with cooldown and retry', async ({ page }) => {
   await page.goto(`${server.origin}/verify-email.html?token=invalid-local-test`); await page.getByRole('button',{name:'Verify email',exact:true}).click(); await expect(page.locator('#verificationRecovery')).toBeVisible();
-  await page.locator('#verificationRecoveryEmail').fill('unknown@example.test'); await page.locator('[data-verification-resend] button').click();
+  await page.locator('#verificationRecoveryEmail').fill('unknown@example.com'); await page.locator('[data-verification-resend] button').click();
   await expect(page.locator('[data-verification-resend] [role=status]')).toContainText('Request received.'); await expect(page.locator('[data-verification-resend] button')).toBeDisabled();
-  await page.goto(`${server.origin}/login.html`); await page.locator('#email').fill('unknown@example.test'); await page.locator('details.verification-resend summary').click();
-  await expect(page.locator('#loginVerificationEmail')).toHaveValue('unknown@example.test');
+  await page.route('**/api/auth/login', route => route.fulfill({ status: 403, json: { error: 'Please verify your email before logging in.', emailVerificationRequired: true } }));
+  await login(page, 'unknown@example.com');
+  await expect(page.locator('#loginVerificationDialog')).toBeVisible();
+  await expect(page.locator('#loginVerificationEmail')).toHaveValue('unknown@example.com');
   let calls = 0; await page.route('**/api/auth/resend-verification', route => { calls++; return route.fulfill({ status: calls === 1 ? 503 : calls === 2 ? 429 : 200, headers: { 'Retry-After': '1' }, json: { ok: true } }); });
-  const button = page.locator('[data-verification-resend] button'); await button.click(); await expect(page.locator('[data-verification-resend] [role=status]')).toContainText('Please try again.'); await expect(button).toBeEnabled();
+  const button = page.locator('[data-verification-resend] button[type=submit]'); await button.click(); await expect(page.locator('[data-verification-resend] [role=status]')).toContainText('Please try again.'); await expect(button).toBeEnabled();
   await button.click(); await expect(page.locator('[data-verification-resend] [role=status]')).toContainText('Please wait'); await expect(button).toBeDisabled(); await expect(button).toBeEnabled();
   await expect(page.locator('[data-verification-resend] [role=status]')).toHaveText('You can request another verification email now.');
   await button.click(); await expect(page.locator('[data-verification-resend] [role=status]')).toContainText('Request received.');
@@ -305,11 +301,11 @@ test('both refined forms keep controls reachable through window resizing', async
   }
 });
 
-test('the refined preview bookmark opens the canonical signup for each role', async ({ page }) => {
+test('retired preview routes are not published for either role', async ({ page }) => {
   for (const role of ['attorney','paralegal']) {
-    await page.goto(`${server.origin}/lpc-signup-preview/index.html?role=${role}`);
-    await expect(page).toHaveURL(`${server.origin}/signup.html?role=${role}`);
-    await expect(page.locator(role==='attorney'?'#btnA':'#btnP')).toHaveAttribute('aria-pressed','true');
+    const response = await page.goto(`${server.origin}/lpc-signup-preview/index.html?role=${role}`);
+    expect(response.status()).toBe(404);
+    await expect(page.locator('#signupForm')).toHaveCount(0);
   }
 });
 
@@ -338,7 +334,7 @@ test('policy loading completion releases temporary height and preserves the fina
     await expect(page.locator('#signupPolicyStatus')).toHaveText('Loading the policy documents…');
     await page.waitForTimeout(650);
     await page.locator('#fullName').fill('Morgan Applicant');
-    await page.locator('#email').fill('morgan.policy-sizing@example.test');
+    await page.locator('#email').fill('morgan.policy-sizing@example.com');
     await page.locator('#password').fill(password);
     const card = await page.locator('.overlay').boundingBox();
     release();
@@ -370,7 +366,7 @@ test('both signup steps share card, heading, primary action and right-panel geom
   for(const role of ['attorney','paralegal']) for(const viewport of [{width:1440,height:900},{width:1024,height:768},{width:390,height:844},{width:320,height:568},{width:844,height:390}]) {
     await page.setViewportSize(viewport);await page.goto(`${server.origin}/signup.html?role=${role}`);
     await page.evaluate(()=>document.fonts.ready);await page.waitForFunction(()=>window.LPCSignupPolicy?.read());await page.waitForTimeout(650);
-    await page.locator('#fullName').fill('Morgan Sizing');await page.locator('#email').fill('morgan.sizing@example.test');await page.locator('#password').fill(password);
+    await page.locator('#fullName').fill('Morgan Sizing');await page.locator('#email').fill('morgan.sizing@example.com');await page.locator('#password').fill(password);
     // Full-page captures can resize Chromium's document and trigger the responsive controller.
     const one=await snapshot();
     if (viewport.width === 1440) { expect(one.shell.height, 'compact desktop card').toBeLessThanOrEqual(700); expect(one.shell.width).toBeLessThanOrEqual(1200); expect(Math.abs(one.action.y - one.shell.y - 504.89), 'original desktop action position').toBeLessThan(2); }
@@ -397,7 +393,7 @@ test('all four signup views retain one card size and identical basic-details geo
       await page.waitForFunction(()=>window.LPCSignupPolicy?.read());
       await page.waitForTimeout(650);
       await page.locator('#fullName').fill('Morgan Sizing');
-      await page.locator('#email').fill('morgan.sizing@example.test');
+      await page.locator('#email').fill('morgan.sizing@example.com');
       await page.locator('#password').fill(password);
       await page.locator('#nextStepBtn').click();
       const size=()=>page.locator('.overlay').evaluate(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}));

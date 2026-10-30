@@ -1,7 +1,6 @@
 .signup-page .lpc-resume-upload { margin-bottom:12px; font:inherit; }
 .signup-page .lpc-resume-upload .resume-zone { position:relative;height:205px;border:1px solid #dce3ed;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:background .25s,border-color .25s;overflow:hidden; }
 .signup-page .lpc-resume-upload .resume-zone.over { background:#f0f5ff;border-color:#779be3; }
-.signup-page .lpc-resume-upload .resume-meta { position:absolute;right:16px;top:12px;color:#718097;font-size:11px;line-height:14px;text-align:right; }
 .signup-page .lpc-resume-upload .resume-empty { display:flex;flex-direction:column;align-items:center;text-align:center;font-size:14px;line-height:21px; }
 .signup-page .lpc-resume-upload .resume-art { position:relative;width:94px;height:78px;margin:0 auto 4px;perspective:450px; }
 .signup-page .lpc-resume-upload .resume-back { position:absolute;left:12px;bottom:5px;width:72px;height:48px;border-radius:5px;background:#294668;transform:rotate(-5deg); }
@@ -12,24 +11,24 @@
 .signup-page .lpc-resume-upload .resume-zone:is(:hover,:focus-within,.over) .resume-paper { transform:translate(-3px,-10px) rotate(-17deg); }
 .signup-page .lpc-resume-upload .resume-zone:is(:hover,:focus-within,.over) .resume-paper.second { transform:translate(4px,-15px) rotate(17deg); }
 .signup-page .lpc-resume-upload .resume-zone:is(:hover,:focus-within,.over) .resume-front { transform:skewX(-9deg) rotateX(-13deg); }
-.signup-page .lpc-resume-upload .resume-zone.settling .resume-paper { transform:translateY(36px) rotate(0);transition:transform .5s cubic-bezier(.4,0,.2,1); }
+.signup-page .lpc-resume-upload .resume-zone.settling .resume-paper { transform:rotate(-12deg);transition:transform .5s cubic-bezier(.4,0,.2,1); }
+.signup-page .lpc-resume-upload .resume-zone.settling .resume-paper.second { transform:rotate(12deg); }
 .signup-page .lpc-resume-upload .resume-link { font:inherit;background:none;border:0;padding:3px 0;color:#4773bc;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:28px;margin:0; }
 .signup-page .lpc-resume-upload .resume-link:focus-visible { outline:2px solid #4773bc;outline-offset:3px;border-radius:3px; }
 .signup-page .lpc-resume-upload .resume-sub { font-size:12px;line-height:18px;color:#718097;margin-top:3px; }
 .signup-page .lpc-resume-upload .resume-empty > .resume-sub { margin-top:0; }
-.signup-page .lpc-resume-upload .resume-result { width:100%;padding:20px;display:flex;align-items:center;gap:12px;max-height:165px;overflow:auto;margin-top:16px; }
-.signup-page .lpc-resume-upload .resume-filemark { color:#4773bc;background:#edf3ff;padding:10px;border-radius:7px;font-size:11px; }
+.signup-page .lpc-resume-upload .resume-result { width:100%;display:flex;align-items:center;gap:12px;margin-top:16px; }
 .signup-page .lpc-resume-upload .resume-filetext { flex:1;min-width:0; }
 .signup-page .lpc-resume-upload .resume-filename { overflow-wrap:anywhere;font-size:14px;line-height:20px;font-weight:500; }
-.signup-page .lpc-resume-upload .resume-actions { display:flex;gap:16px;margin-top:10px; }
+.signup-page .lpc-resume-upload .resume-actions { display:flex; }
 .signup-page .lpc-resume-upload .resume-error { color:#a73737;font-size:13px;line-height:20px;margin:8px 0 0; }
 .signup-page .lpc-resume-upload [hidden] { display:none!important; }
 @media (pointer:coarse) { .signup-page .lpc-resume-upload .resume-link { min-height:44px; } }
 @media (prefers-reduced-motion:reduce) { .signup-page .lpc-resume-upload * { transition:none!important; } }
 /* Redistribute the existing optional fields between the fixed title/action anchors. */
-.signup-page.signup-step-two #roleFieldWrap { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;align-items:center; }
+.signup-page.signup-step-two #roleFieldWrap { display:grid;column-gap:12px;align-items:center; }
 .signup-page.signup-step-two #roleFieldWrap .signup-resume-cell { grid-column:1/-1; }
-.signup-page.signup-step-two #roleFieldWrap #certFileHint { grid-column:1/-1;grid-row:3; }
+.signup-page.signup-step-two #roleFieldWrap #certFileHint { grid-column:1/-1; }
 .signup-page.signup-step-two #roleFieldWrap > label { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
 .signup-page.signup-step-two #roleFieldWrap #paralegalLinkedIn { margin-bottom:12px; }
 .signup-page.signup-step-two .lpc-resume-upload { color:#293b50; }
@@ -56,7 +55,14 @@
 .signup-page.signup-step-two :is(#signupState,#paralegalExperience,#paralegalLinkedIn) { border:1px solid #dce3ed;border-radius:12px;font-size:14px;line-height:20px;color:#293b50; }
 .signup-page.signup-step-two .experience-input > span { top:22px;font-size:14px;line-height:20px; }
 .signup-page.signup-step-two .lpc-certificate-upload { margin-bottom:8px; }
-.signup-page.signup-step-two .certificate-zone { min-height:44px;border:1px solid #dce3ed;border-radius:12px;background:#fff;display:flex;align-items:center;gap:12px;padding:0 14px;color:#293b50;font-size:14px; }
+.signup-page.signup-step-two .certificate-zone { min-height:44px;border:1px solid #dce3ed;border-radius:12px;background:#fff;display:flex;align-items:center;gap:0;padding:0;color:#293b50;font-size:14px; }
+.signup-page.signup-step-two .certificate-pick { display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:44px;margin:0;padding:8px 14px;border:0;border-radius:12px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer; }
+.signup-page.signup-step-two .certificate-pick:focus-visible { outline:2px solid #4773bc;outline-offset:-2px; }
+.signup-page.signup-step-two .certificate-pick [data-cert-action] { flex-shrink:0;color:#4773bc;text-decoration:underline;text-underline-offset:3px; }
+.signup-page.signup-step-two .certificate-actions:has(button:not([hidden])) { padding-right:14px; }
+.signup-page.signup-step-two .certificate-pick [hidden] { display:none!important; }
+.signup-page .lpc-resume-upload .resume-empty>.resume-link { color:inherit;text-decoration:none; }
+.signup-page .lpc-resume-upload .resume-zone:has(.resume-empty:not([hidden])) { cursor:pointer; }
 .signup-page.signup-step-two .certificate-zone.over { border-color:#779be3;background:#f0f5ff; }
 .signup-page.signup-step-two .certificate-details { flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
 .signup-page.signup-step-two .certificate-details span { overflow-wrap:anywhere; }
@@ -65,6 +71,8 @@
 .signup-page.signup-step-two .certificate-actions button { background:none;border:0;margin:0;padding:0;font:inherit;color:#4773bc;text-decoration:underline;text-underline-offset:3px;min-height:44px;cursor:pointer; }
 .signup-page.signup-step-two .certificate-actions [hidden] { display:none!important; }
 .signup-page.signup-step-two .certificate-actions button:focus-visible { outline:2px solid #4773bc;outline-offset:2px; }
+.signup-page.signup-step-two .certificate-pick:hover [data-cert-action],
+.signup-page.signup-step-two .certificate-actions button:hover { color:#294668;text-decoration:underline; }
 @media(max-width:768px) {
  .signup-page.signup-step-two :is(#signupState,#paralegalExperience,#paralegalLinkedIn) { font-size:16px; }
  .signup-page.signup-step-two .certificate-details { font-size:16px; }
@@ -77,8 +85,6 @@
 .signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) span { width:100%; }
 .signup-page.signup-step-two .experience-hint { display:block;font-size:12px;line-height:18px;color:#52647b;margin:0; }
 .signup-page.signup-step-two .certificate-details { row-gap:0; }
-.signup-page.signup-step-two .certificate-details .certificate-format { flex-basis:100%;font-size:11px;line-height:14px;color:#52647b;margin:0; }
-.signup-page.signup-step-two .certificate-details:has([title]:not([title=""])) .certificate-format { display:none; }
 .signup-page.auth-entry #paralegalExperience { margin-bottom:4px; }
 /* Keep the numeric field quiet and its focus treatment inside the field bounds. */
 .signup-page.signup-step-two #paralegalExperience {
@@ -107,7 +113,7 @@
 .signup-page.signup-step-two .certificate-zone:hover { border-color:#779be3; }
 
 /* Keep the existing upload hints readable at their small text size. */
-.signup-page .lpc-resume-upload :is(.resume-meta, .resume-sub),
+.signup-page .lpc-resume-upload .resume-sub,
 .signup-page.signup-step-two .certificate-details small { color:#52647b; }
 
 /* Fit the experience guidance within the original desktop field gap. */
@@ -115,3 +121,26 @@
  .signup-page.auth-entry #paralegalExperience { margin-bottom:0; }
  .signup-page.signup-step-two .experience-hint { line-height:12px; }
 }
+
+/* Selected file: original folder and file details share one calm horizontal group. */
+.signup-page .lpc-resume-upload .resume-zone:has(.resume-result:not([hidden])) {
+ display:grid;grid-template-columns:94px minmax(0,1fr);align-content:safe center;align-items:center;column-gap:20px;padding:20px;overflow:auto;
+}
+.signup-page .lpc-resume-upload .resume-zone:has(.resume-result:not([hidden])) .resume-art { margin:0; }
+.signup-page .lpc-resume-upload .resume-result {
+ min-width:0;margin:0;padding:0;max-height:none;overflow:visible;text-align:left;
+}
+.signup-page .lpc-resume-upload .resume-result .resume-filetext { width:100%;min-width:0; }
+.signup-page .lpc-resume-upload .resume-zone:has(.resume-result:not([hidden])) .resume-filename {
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:14px;line-height:20px;font-weight:500;
+}
+.signup-page .lpc-resume-upload .resume-actions {justify-content:flex-start;flex-wrap:wrap;gap:0 16px;margin-top:8px;}
+.signup-page .lpc-resume-upload .resume-actions .resume-link {
+ font-size:12px;line-height:18px;min-height:28px;padding:3px 0;text-decoration:none;
+}
+.signup-page .lpc-resume-upload .resume-actions .resume-link:hover { color:#294668;text-decoration:underline; }
+.signup-page .lpc-resume-upload .resume-result [data-status] {
+ position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;
+}
+@media(pointer:coarse){.signup-page .lpc-resume-upload .resume-actions .resume-link{min-height:44px;}}
+@media(max-width:359px){.signup-page .lpc-resume-upload .resume-zone:has(.resume-result:not([hidden])){column-gap:12px;padding:16px;}}

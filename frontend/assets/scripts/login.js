@@ -208,6 +208,11 @@ const initLogin = () => {
   verificationDialog?.querySelector("[data-verification-close]")?.addEventListener("click", () => verificationDialog.close());
   verificationDialog?.addEventListener("close", () => deactivateDialogFocus(verificationDialog));
 
+  const applicationStatus = document.createElement('p');
+  applicationStatus.className='login-application-status'; applicationStatus.hidden=true;
+  applicationStatus.setAttribute('role','status'); applicationStatus.setAttribute('aria-live','polite');
+  loginButton?.parentElement?.insertBefore(applicationStatus,loginButton);
+  const showApplicationStatus = message => {applicationStatus.textContent=message;applicationStatus.hidden=false;};
   const notify = (message, type = "err") => {
     if (toastHelper) {
       toastHelper.show(message, { targetId: "toastBanner", type });
@@ -354,7 +359,9 @@ const initLogin = () => {
         two_factor_unavailable: "Unable to send a verification code. Please try again.",
         unavailable: "Google sign-in is temporarily unavailable.",
       };
-      if (errorCode === "email_unverified") {
+      if (errorCode === "pending") {
+        showApplicationStatus(messages.pending);
+      } else if (errorCode === "email_unverified") {
         showVerificationRecovery("", messages[errorCode]);
       } else {
         notify(messages[errorCode] || "Google sign-in could not be completed.");
@@ -389,14 +396,20 @@ const initLogin = () => {
         loginButton.disabled = true;
         loginButton.textContent = "Signing in…";
       }
+      applicationStatus.hidden=true;
       const { res, data } = await postSignIn("/auth/login", { email, password });
 
       if (!res.ok) {
         clearLocalSession();
-        const msg = data?.error || data?.msg || data?.message || "Sign-in failed";
+        const msg = res.status === 401 && [data?.error, data?.msg, data?.message].includes("Invalid email or password.")
+          ? "Your email and password don’t match. Please try again."
+          : data?.error || data?.msg || data?.message || "Sign-in failed";
         if (data?.emailVerificationRequired === true) {
           showVerificationRecovery(email, msg);
+        } else if (res.status === 403 && msg === "We’re reviewing your application. We’ll email you when your account is ready.") {
+          showApplicationStatus(msg);
         } else {
+          applicationStatus.hidden=true;
           notify(msg);
         }
         return;

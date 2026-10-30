@@ -1,9 +1,8 @@
 /* Original form organization inside the approved current signup shell. */
-.signup-page.auth-entry .overlay { height: auto; min-height: min(740px, calc(100dvh - 40px)); }
-.signup-page.auth-entry .left-panel { height: auto; min-height: 0; align-items: stretch; justify-content: center; padding-top: 120px; }
+.signup-page.auth-entry .left-panel { align-items: stretch; justify-content: center; }
 .signup-page.signup-step-two .left-panel { padding: 120px 36px 24px; }
-.signup-page.auth-entry .form-container { max-width: 350px; height: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; }
-.signup-page .signup-form-scroll { flex: 1 0 auto; min-height: 0; overflow-y: visible; overscroll-behavior: contain; scroll-behavior: auto; scroll-padding-block: 6px; padding: 4px; }
+.signup-page.auth-entry .form-container { max-width: 350px; min-height: 0; display: flex; flex-direction: column; }
+.signup-page .signup-form-scroll { overscroll-behavior: contain; scroll-behavior: auto; scroll-padding-block: 6px; padding: 4px; }
 .signup-page.signup-step-two .signup-form-scroll { display: flex; flex-direction: column; }
 /* Step-two fields start in a stable position. Footer content must never recenter them. */
 .signup-page.signup-step-two #signupForm { margin-block: 0; }
@@ -19,7 +18,7 @@
 .signup-page:is(.signup-step-two, .attorney-step-two) #editSignupBasics { display: inline-flex; width: auto; min-height: 44px; margin: 0; align-items: center; justify-content: center; }
 .signup-page #signupPolicyReview { margin: 12px 0 0; padding: 0; border: 0; color: #52647b; font-size: 12px; line-height: 18px; text-align: center; }
 .signup-page #signupPolicyReview p { margin: 0; }
-.signup-page #signupPolicyReview a { color: #385f9e; }
+.signup-page #signupPolicyReview a { color: #385f9e; text-decoration: none; }
 .signup-page #signupPolicyStatus:empty { display: none; }
 .signup-page #signupPolicyStatus:not(:empty) { margin-top: 8px; }
 .signup-page #signupPolicyReload { min-height: 44px; margin: 0; }
@@ -29,7 +28,6 @@
 .signup-page #paralegalCoreRow { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; margin: 0; }
 .signup-page #signupStateWrap label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 .signup-page #paralegalExperienceWrap > label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
-.signup-page .signup-resume-experience { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; align-items: start; }
 .signup-page #paralegalExperienceWrap .experience-input { position: relative; }
 .signup-page.auth-entry #paralegalExperience { display: block; width: 100%; min-height: 44px; height: 44px; margin: 0 0 12px; padding: 10px 58px 10px 14px; }
 .signup-page.auth-entry #signupState { min-height: 44px; height: 44px; }
@@ -46,7 +44,6 @@
 .signup-page .upload-input:focus-visible + .upload-placeholder { outline: 2px solid #416dae; outline-offset: 3px; }
 .signup-page .file-hint:empty { display: none; }
 .signup-page .file-hint:not(:empty) { margin: -4px 0 12px; overflow-wrap: anywhere; }
-.signup-page #paralegalAdmissionNotice { margin: 4px 0 8px; font-size: 13px; line-height: 20px; }
 .signup-page.attorney-step-two #paralegalCoreRow { display: none; }
 @media (max-width: 1050px) and (min-width: 769px) { .signup-page.signup-step-two .left-panel { padding-inline: 24px; } }
 @media (max-width: 768px) {
@@ -80,19 +77,18 @@
 .signup-page .signup-footer { padding-inline: 0; }
 .signup-page.auth-entry .signup-step-two-title { font-size: var(--signup-title-size); letter-spacing: -.035em; }
 .signup-page.attorney-step-two .signup-footer { min-height: 0; }
-.signup-page.attorney-step-two .signup-form-scroll { flex-shrink: 0; }
 
 /* Keep the application agreement at the bottom of the paralegal signup card. */
-.signup-page.signup-step-two .left-panel { position: relative; }
 .signup-page.signup-step-two #signupPolicyReview {
  position: absolute;
  bottom: 14px;
  left: 50%;
  transform: translateX(-50%);
- width: 350px;
+ width: max-content;
  max-width: calc(100% - 48px);
  margin: 0;
 }
+body.signup-page.signup-step-two #signupPolicyReview > p { max-width: none; }
 
 /* Continue and Submit occupy the same slot across both steps. */
 .signup-page.signup-step-two .left-panel { position: relative; }
@@ -156,7 +152,6 @@
 .signup-page.attorney-step-two .signup-submit-actions #submitBtn { height: var(--signup-action-height); }
 .signup-page.attorney-step-two .signup-form-scroll { flex: 0 0 auto; height: calc(var(--signup-action-top) - var(--signup-column-top) - 16px + var(--signup-action-offset, 0px)); }
 .signup-page.attorney-step-two #editSignupBasics { position: absolute; top: calc(var(--signup-action-top) + var(--signup-action-offset, 0px) + var(--signup-action-height) + 8px); left: 50%; transform: translateX(-50%); }
-.signup-page.attorney-step-two #signupPolicyReview { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: 350px; max-width: calc(100% - 48px); margin: 0; }
 @media (max-width: 768px) {
  .signup-page.auth-entry.attorney-step-two .overlay { height: calc(var(--signup-shell-height) + 96px); }
  .signup-page.auth-entry.attorney-step-two .left-panel { padding-bottom: calc(var(--signup-panel-padding-bottom) + 96px); }
@@ -173,3 +168,16 @@
 .signup-page.auth-entry.signup-application-step .left-panel { padding-bottom: calc(var(--signup-panel-padding-bottom) + var(--signup-footer-space, 32px) + var(--signup-action-offset, 0px)); }
 
 .signup-page.auth-entry #stepTwoPanel #attorneyGoodStanding:is(:focus, :focus-visible) { outline: 2px solid #385f9e; outline-offset: -2px; box-shadow: none; }
+
+
+/* The unit applies to a number, not to the empty experience prompt. */
+.signup-page .experience-input input:placeholder-shown + span { visibility: hidden; }
+
+@media (max-width: 640px) {
+  .signup-page #paralegalExperience::placeholder { font-size: 12px; }
+}
+
+/* Both admission roles share the existing responsive agreement treatment. */
+.signup-page.attorney-step-two .left-panel { position:relative; }
+.signup-page.attorney-step-two #signupPolicyReview { position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 48px);margin:0; }
+.signup-page.attorney-step-two #signupPolicyReview>p {max-width:none;}
