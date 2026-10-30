@@ -14,7 +14,7 @@ test.beforeEach(async ({ context, page }) => {
   page.on('pageerror', error => { throw error; });
 });
 test.afterAll(async () => server?.close());
-async function basics(page, role = 'paralegal', email = `gateway-${randomUUID()}@example.test`) {
+async function basics(page, role = 'paralegal', email = `gateway-${randomUUID()}@example.com`) {
   await page.goto(`${server.origin}/signup.html?role=${role}`, { waitUntil: 'domcontentloaded' });
   await page.locator('#fullName').fill('Morgan Applicant'); await page.locator('#email').fill(email);
   await page.evaluate(() => document.fonts.ready);
@@ -52,7 +52,7 @@ async function adminReview(browser, id) {
 test('regressions: common and contextual passwords are rejected before step two', async ({page}) => {
   await page.goto(`${server.origin}/signup.html`);
   await page.locator('#fullName').fill('Morgan Applicant');
-  await page.locator('#email').fill('morgan@example.test');
+  await page.locator('#email').fill('morgan@example.com');
   for (const value of ['password123!', 'morganapplicant']) {
     await page.locator('#password').fill(value); await page.locator('#nextStepBtn').click();
     await expect(page.locator('#passwordError')).toBeVisible();
@@ -169,7 +169,7 @@ test('login recovery: unavailable browser storage does not interrupt sign-in or 
     return route.fulfill({ status: 401, json: { msg: 'Synthetic invalid credentials' } });
   });
   await page.goto(`${server.origin}/login.html`);
-  await page.locator('#email').fill('recovery@example.test');
+  await page.locator('#email').fill('recovery@example.com');
   await page.locator('#password').fill(password);
   await page.locator('#loginForm button[type=submit]').click();
   await expect(page.locator('#toastBanner')).toContainText('Synthetic invalid credentials');
@@ -187,7 +187,7 @@ test('login recovery: a missing login module cannot place credentials in a GET U
     return route.fulfill({ status: 403, contentType: 'text/plain', body: 'Synthetic safe stop' });
   });
   await page.goto(`${server.origin}/login.html`);
-  await page.locator('#email').fill('recovery@example.test');
+  await page.locator('#email').fill('recovery@example.com');
   await page.locator('#password').fill(password);
   await page.locator('#loginForm button[type=submit]').click();
   await expect.poll(() => submitted?.method).toBe('POST');
@@ -205,7 +205,7 @@ test('login recovery: overlapping code and backup submissions run once and permi
     await route.fulfill({ status: 400, json: { error: 'Synthetic incorrect code' } });
   });
   await page.goto(`${server.origin}/login.html`);
-  await page.locator('#email').fill('recovery@example.test');
+  await page.locator('#email').fill('recovery@example.com');
   await page.locator('#password').fill(password);
   await page.locator('#loginForm button[type=submit]').click();
   for (const [index, endpoint, code] of [[0, '/api/auth/2fa-verify', '123456'], [1, '/api/auth/2fa-backup', 'AB12CD34']]) {
@@ -240,7 +240,7 @@ for (const phase of ['csrf', 'credentials']) test(`login recovery: stalled ${pha
     await route.fulfill({ status: 401, json: { msg: 'Synthetic invalid credentials' } }).catch(() => {});
   });
   await page.goto(`${server.origin}/login.html`);
-  await page.locator('#email').fill('recovery@example.test');
+  await page.locator('#email').fill('recovery@example.com');
   await page.locator('#password').fill(password);
   await page.locator('#loginForm button[type=submit]').click();
   await expect(page.locator('#toastBanner')).toContainText('Sign-in timed out', {timeout: 15000});

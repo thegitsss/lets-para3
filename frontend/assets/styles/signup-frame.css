@@ -1,5 +1,7 @@
 /* Preserve the shared action slot while letting validation messages take space. */
 .signup-stage { display: contents; }
+.signup-page #paralegalExperience:placeholder-shown { padding-right:14px; }
+.signup-page #paralegalExperience:placeholder-shown + span { display:none; }
 .signup-page.auth-entry.signup-application-step .signup-form-scroll {
  height: calc(var(--signup-action-top) - var(--signup-column-top) - 16px + var(--signup-action-offset, 0px) + var(--signup-error-space, 0px));
  overflow: visible;
@@ -35,14 +37,26 @@
   max-width: none;
   margin: 0;
   padding: 8px 24px calc(8px + env(safe-area-inset-bottom, 0px));
-  background: #edf0f3;
+  background: transparent;
   z-index: 2000;
+ }
+ body.signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) #signupPolicyReview {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  box-sizing: border-box;
  }
  .signup-page.signup-application-step #signupPolicyReview p { max-width: 350px; margin-inline: auto; }
  .signup-page.auth-entry.signup-application-step #editSignupBasics {
   top: calc(var(--signup-action-top) + var(--signup-action-offset, 0px) + var(--signup-error-space, 0px) + var(--signup-action-height) + 4px);
  }
  .signup-page.signup-received .signup-stage { bottom: 0; }
+}
+
+@media (max-width: 360px) {
+ .signup-page.auth-entry #paralegalExperienceWrap { width: 100%; max-width: none; }
+ .signup-page.auth-entry .experience-input { width: 100%; }
+ .signup-page.auth-entry .experience-input input::placeholder { font-size: 12px; }
 }
 
 /* Use the bundled Regular face directly; WebKit synthesizes a wider 500 weight. */
