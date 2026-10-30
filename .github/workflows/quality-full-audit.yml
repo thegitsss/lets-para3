@@ -124,7 +124,7 @@ jobs:
           --record "${{ runner.temp }}/lpc-artifact-runtime-checks--1.json"
       - name: Upload supply-chain launch evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: supply-chain-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/supply-chain
@@ -183,7 +183,7 @@ jobs:
           JS
       - name: Upload candidate identity evidence
         if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: candidate-identity-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/release/candidate.json
@@ -202,7 +202,7 @@ jobs:
           }}/lpc-artifact-runtime-checks--3.json"
       - name: Upload complete Jest shard plan
         if: ${{ always() && steps.evidence_limit_3.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/jest/plan.json
@@ -281,7 +281,7 @@ jobs:
           }}-1.json"
       - name: Upload complete raw Jest shard evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard
             }}
@@ -366,7 +366,7 @@ jobs:
           runner.temp }}/lpc-artifact-backend-coverage--1.json"
       - name: Upload complete backend union evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jest-complete-union-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/jest/required-coverage.json
@@ -461,7 +461,7 @@ jobs:
           --record "${{ runner.temp }}/lpc-artifact-browser-collection--1.json"
       - name: Upload browser collection evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-collection-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/critical-group-verification/verified-union.json
@@ -536,7 +536,7 @@ jobs:
           }}/lpc-artifact-browser-checks-${{ matrix.scope }}-1.json"
       - name: Upload browser launch evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/junit
@@ -554,7 +554,7 @@ jobs:
           }}/lpc-artifact-browser-checks-${{ matrix.scope }}-2.json"
       - name: Upload complete raw browser evidence
         if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-failure-${{ matrix.scope }}-${{ github.run_id }}-${{
             github.run_attempt }}
@@ -656,7 +656,7 @@ jobs:
           }}/lpc-artifact-browser-role-journeys-${{ matrix.group }}-1.json"
       - name: Upload browser launch evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/junit
@@ -674,7 +674,7 @@ jobs:
           }}/lpc-artifact-browser-role-journeys-${{ matrix.group }}-2.json"
       - name: Upload complete raw browser evidence
         if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-failure-${{ matrix.group }}-${{ github.run_id }}-${{
             github.run_attempt }}
@@ -837,7 +837,7 @@ jobs:
           JS
       - name: Upload complete redacted secret scan evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: secret-scan-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: results.sarif
