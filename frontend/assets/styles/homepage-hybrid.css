@@ -1753,9 +1753,9 @@ body.lpc-home .closing-scene #closing-title {
 .lpc-home .workflow__story { display: block; width: 100%; min-height: 0; }
 .lpc-home .workflow-mobile-stage, .lpc-home .workflow-mobile-nav { display: none; }
 .lpc-home .workflow-chapters {
-    position: relative; display: flex; gap: 8px; width: 100%; padding: 3px 8px;
+    position: relative; display: flex; gap: 8px; width: 100%; padding: 3px max(0px, calc((100vw - 328px)/2)) 3px 8px;
     overflow-x: scroll; overflow-y: hidden; scroll-snap-type: x mandatory;
-    scroll-padding-left: 8px; overscroll-behavior-x: contain; touch-action: auto;
+    scroll-padding: 0 8px; overscroll-behavior-x: contain; touch-action: auto;
     scrollbar-width: none;
   }
 .lpc-home .workflow-chapters::-webkit-scrollbar { display: none; }
@@ -1768,6 +1768,10 @@ body.lpc-home .closing-scene #closing-title {
       radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
     opacity: 1; transform: none; transition: none; pointer-events: auto;
     scroll-snap-align: start;
+  }
+  .lpc-home .workflow-chapters .workflow-chapter:last-child {
+    scroll-snap-align: center;
+    scroll-margin-inline: min(0px, calc((100vw - 344px)/2));
   }
 .lpc-home .workflow-chapters .workflow-chapter > * { visibility: visible; }
 .lpc-home .workflow-chapters .workflow-chapter__number { position: absolute; top: 12px; left: 24px; width: auto; height: auto; font: 12px/18px 'Sarabun', sans-serif; color: #62748a; }
