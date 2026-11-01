@@ -86,6 +86,11 @@
       if (!accordionMedia.matches || event.defaultPrevented) return;
       event.preventDefault();
       const expanding = state.animation ? !state.expanding : !item.open;
+      if (expanding && footerDirectories.includes(item)) footerDirectories.forEach((other) => {
+        const otherState = accordionStates.get(other);
+        if (other !== item && other.open &&
+            (!otherState.animation || otherState.expanding)) animateAccordion(other, false);
+      });
       if (expanding && state.name) animatedAccordions.forEach((other) => {
         const otherState = accordionStates.get(other);
         if (other !== item && otherState.name === state.name && other.open &&
@@ -98,6 +103,10 @@
   // Follow the expanding list each frame so scrolling ends with the expansion.
   document.querySelectorAll(".home-footer__directory details").forEach((category) => {
     let revealFrame = 0;
+    let revealBottom = null;
+    category.querySelector("summary")?.addEventListener("click", () => {
+      if (accordionMedia.matches) revealBottom = category.getBoundingClientRect().bottom;
+    }, { capture: true });
     const scheduleReveal = () => {
       window.cancelAnimationFrame(revealFrame);
       const reveal = () => {
@@ -110,7 +119,8 @@
         const headerBottom = document.querySelector(".home-header")?.getBoundingClientRect().bottom || 0;
         const topLimit = Math.max(viewportTop, headerBottom) + 12;
         const bounds = category.getBoundingClientRect();
-        const distance = Math.min(bounds.bottom - viewportBottom, bounds.top - topLimit);
+        const targetBottom = Math.min(revealBottom ?? viewportBottom, viewportBottom);
+        const distance = Math.min(bounds.bottom - targetBottom, bounds.top - topLimit);
         if (distance > 0) window.scrollBy({ top: distance, behavior: "instant" });
         if (state.animation && state.expanding) revealFrame = window.requestAnimationFrame(reveal);
       };
@@ -998,6 +1008,13 @@
     };
 
     workflowChapters.addEventListener("scroll", scheduleWorkflowSwipe, { passive: true });
+    workflowChapters.addEventListener("scrollend", () => {
+      if (!mobileWorkflowQuery.matches) return;
+      const lastChapter = chapters[chapters.length - 1];
+      if (activeWorkflowState !== lastChapter.dataset.workflowChapter) return;
+      const target = lastChapter.offsetLeft - (workflowChapters.clientWidth - lastChapter.offsetWidth) / 2;
+      if (Math.abs(workflowChapters.scrollLeft - target) > 1) centerWorkflowChapter(lastChapter);
+    });
     workflowChapters.addEventListener("keydown", (event) => {
       if (!mobileWorkflowQuery.matches || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
       event.preventDefault();
