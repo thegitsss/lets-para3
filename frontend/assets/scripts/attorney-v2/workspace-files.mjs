@@ -45,12 +45,15 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   const upload = createWorkspaceFileUploads(caseId, { api, signal, ownerId, state: state.upload, route, onSaved: () => void load({ quiet: true }) }); browser.before(upload);
   const removal = createWorkspaceFileRemoval(caseId, { api, signal, ownerId, state: state.removal, onRemoved: async fileId => { if (signal.aborted) return; if (selected?.id === fileId) { selected = null; rememberSelection(null); } await load(); earlier.invalidate(); }, onDenied: denied, onClose: () => { const heading = section.querySelector("h2"); heading.tabIndex = -1; heading.focus(); } }); section.append(removal);
   const earlier = createWorkspaceEarlierFiles(caseId, { api, signal, ownerId, route, onDenied: denied }); section.append(node("details", {className:"av2-secondary-disclosure", ...(route.query.has("earlierFileId") ? {open:""} : {})}, [node("summary", {text:"Earlier documents and retained versions"}), earlier]));
-  let preparation, clio, editor, editorConfigured = false, automaticEditorOpened = false, connectedFingerprint = "";
+  let preparation, clio, editor, editorConfigured = false, editorStatusFailed = false, automaticEditorOpened = false, connectedFingerprint = "";
   const connectedSlot = node("div"); section.append(connectedSlot);
-  const editorReadiness = connectedApi?.read("/api/document-collaboration/status").then(status => {
-    editorConfigured = status.configured === true;
-    const slot = detail.querySelector("[data-native-editor-slot]"); if (slot && selected) renderEditorAction(slot, selected);
-  }).catch(() => {});
+  async function checkEditor() {
+    if (!connectedApi || signal.aborted) return;
+    try { const status = await connectedApi.read("/api/document-collaboration/status"); if (typeof status.configured !== "boolean" || status.configured && !Array.isArray(status.formats)) throw new Error("Unconfirmed document editing availability"); editorConfigured = status.configured === true && status.formats.includes("docx"); editorStatusFailed = false; }
+    catch (error) { if (signal.aborted || error.name === "AbortError") return; editorStatusFailed = true; }
+    const slot = detail.querySelector("[data-native-editor-slot]"); if (slot && selected && !signal.aborted) renderEditorAction(slot, selected);
+  }
+  const editorReadiness = checkEditor();
   function connectedTools() {
     if (!connectedApi || signal.aborted) return;
     if (!value?.canUpload || value.access !== "available") { editor?.dispose(); preparation?.dispose(); clio?.dispose(); preparation = null; clio = null; connectedSlot.replaceChildren(); connectedFingerprint = ""; return; }
@@ -73,7 +76,12 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   }
   function renderEditorAction(slot, file) {
     slot.replaceChildren();
-    if (!editorConfigured || !value?.canUpload || !/\.docx$/i.test(file.name || "") || !["clean", "not_required"].includes(file.securityStatus)) return;
+    if (!value?.canUpload || !/\.docx$/i.test(file.name || "") || !["clean", "not_required"].includes(file.securityStatus)) return;
+    if (editorStatusFailed) {
+      const retry = button("Check document editing", () => { retry.disabled = true; void checkEditor(); }, "lpc-connected-button is-secondary");
+      slot.append(node("p", { className: "av2-muted", text: "Document editing could not be checked. Your other file actions are available." }), retry); return;
+    }
+    if (!editorConfigured) { if (route.query.get("editFile") === file.id) slot.append(node("p", { className: "av2-muted", text: "Document editing is unavailable. You can download and share revisions in Files." })); return; }
     const edit = button("Edit in LPC", () => {
       if (busy || reading || signal.aborted) return;
       editor?.dispose();

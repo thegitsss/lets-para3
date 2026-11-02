@@ -86,7 +86,7 @@ test("native Clio connection recovers from missing provider configuration inside
   const state = await installNativeFixture(page, { resolve(call) { if (call.path === clioBase + "/status") return connected ? connection : { configured: false, connected: false, ownerId: OWNER }; } });
   await gotoNative(page, "/attorney-v2.html#/settings?tab=connections");
   const card = page.locator("[data-native-clio-connection]");
-  await expect(card).toContainText("Clio connections are not available yet");
+  await expect(card).toContainText("Clio connections are currently unavailable. You can keep working in LPC.");
   await expect(card.getByRole("button", { name: "Start from Clio", exact: true })).toHaveCount(0);
   connected = true; await card.getByRole("button", { name: "Refresh connection" }).click();
   await expect(card.getByRole("button", { name: "Start from Clio", exact: true })).toBeVisible();

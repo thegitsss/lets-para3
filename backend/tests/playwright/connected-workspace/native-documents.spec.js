@@ -91,3 +91,35 @@ test("native editor keeps file selection through provider setup loss and a faile
   await expect(dialog).toHaveCount(0); await expect(launch).toBeFocused();
   expect(new URL(page.url()).hash).toContain("fileId=" + FILE); expect(ui.state.pageErrors).toEqual([]);
 });
+
+test("selected native Files preserves ordinary actions when editor availability fails and recovers through its explicit retry", async ({ page }) => {
+  let statusReads = 0;
+  const state = await installNativeFixture(page, { editorScript: true, resolve(call) {
+    if (call.path === base + "/status") {
+      statusReads++;
+      return statusReads === 1 ? { statusCode: 503, body: { error: "Synthetic editor availability check unavailable" } } : { configured: true, formats: ["docx"] };
+    }
+    if (call.path === base + "/matters/" + MATTER + "/files/" + FILE + "/session") return editorSession(OWNER);
+  } });
+  await gotoNative(page, "/attorney-v2.html#/matters/" + MATTER + "/files?fileId=" + FILE);
+  const detail = page.getByRole("region", { name: "Document review", exact: true });
+  await expect(detail.getByRole("heading", { name: "Discovery instructions.docx", exact: true })).toBeVisible();
+  await expect(detail).toContainText("Document editing could not be checked. Your other file actions are available.");
+  await expect(detail.getByRole("button", { name: "Download file", exact: true })).toBeEnabled();
+  await expect(detail.getByRole("button", { name: "Edit in LPC", exact: true })).toHaveCount(0);
+  expect(state.calls.filter(call => call.path.endsWith("/session"))).toHaveLength(0);
+  await expect(page.locator('script[src^="https://editor.synthetic.test"]')).toHaveCount(0);
+  const retry = detail.getByRole("button", { name: "Check document editing", exact: true });
+  await retry.focus(); await page.keyboard.press("Enter");
+  await expect(detail.getByRole("button", { name: "Edit in LPC", exact: true })).toBeVisible();
+  await expect(retry).toHaveCount(0); await expect(detail).not.toContainText("Document editing could not be checked");
+  expect(statusReads).toBe(2); expect(new URL(page.url()).hash).toContain("fileId=" + FILE);
+  await detail.getByRole("button", { name: "Edit in LPC", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Document editor", exact: true });
+  await expect(dialog.locator("[data-native-editor-stage]")).toContainText("Synthetic editor provider fixture");
+  await dialog.getByRole("button", { name: "Return to Files", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(detail.getByRole("heading", { name: "Discovery instructions.docx", exact: true })).toBeVisible();
+  expect(state.calls.filter(call => call.path.endsWith("/session"))).toHaveLength(1);
+  expect(state.pageErrors).toEqual([]);
+});

@@ -196,7 +196,7 @@ export function createClioConnection({ ownerId, api, signal, route } = {}) {
     try {
       const connection = await core.status(); if (!core.isGeneration(generation)) return;
       const heading = connectionHeading(connection), content = node('div', { className: 'lc-clio-connection-body' });
-      if (!connection.configured) content.append(paragraph('Clio connections are not available yet. You can keep working in LPC.'));
+      if (!connection.configured) content.append(paragraph('Clio connections are currently unavailable. You can keep working in LPC.'));
       else if (!connection.connected) content.append(paragraph(connection.needsReconnect ? 'Reconnect your account to resume selected matter and document transfers.' : 'Bring selected matters and documents into LPC. Return approved work to the right Clio matter.'), actions([connectButton(core)]));
       else {
         const start = control('Start from Clio', event => startHandoff(core, event.currentTarget), true);
@@ -293,7 +293,7 @@ export function createClioMatterTransfers({ caseId, ownerId, api, signal, files,
       const [connection, history] = await Promise.all([core.status(), core.read(`${BASE}transfers?caseId=${caseId}`)]); if (!core.isGeneration(generation)) return;
       if (!Array.isArray(history.items)) throw new Error('The saved Clio transfers could not be read.'); recorded = history.items; currentAssignment = typeof history.assignmentRevision === 'string' ? history.assignmentRevision : '';
       body.replaceChildren(node('div', { className: 'lc-clio-transfer-heading' }, [node('h3', { text: 'Clio' }), node('span', { className: `lc-clio-state${connection.connected ? ' is-connected' : ''}`, text: connection.connected ? 'Connected' : 'Not connected' })]));
-      if (!connection.configured) { body.append(paragraph('Clio transfers are not available yet.')); renderReceipts(); return; }
+      if (!connection.configured) { body.append(paragraph('Clio transfers are currently unavailable.')); renderReceipts(); return; }
       if (!connection.connected) { body.append(paragraph('Connect Clio to bring selected documents into this matter and return approved work.'), connectButton(core, { caseId })); renderReceipts(); return; }
       const [sources, available] = await Promise.all([core.read(`${BASE}handoffs?caseId=${caseId}`), isReadOnly() ? Promise.resolve([]) : loadFiles()]);
       if (!core.isGeneration(generation)) return;
