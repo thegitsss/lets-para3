@@ -24,6 +24,7 @@ function directoryIcon(pathData) {
 }
 export function createDirectory(route, { api, signal, ownerId }) {
   const view = page("Find a Paralegal");
+  view.firstChild.append(link("Find by experience", "/paralegal-match.html"));
   view.classList.add("av2-directory");
   const saved = route.query.get('view') === 'saved';
   const prior = safeCandidateReturn(route.query.get("returnTo"));

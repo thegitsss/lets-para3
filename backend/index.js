@@ -68,16 +68,18 @@ app.use(
         ...collectInlineScriptHashes(FRONTEND_DIR),
         "https://js.stripe.com",
         "https://challenges.cloudflare.com",
+        ...(require("./services/connectedWorkspace/editor").configuration().configured ? [require("./services/connectedWorkspace/editor").configuration().origin] : []),
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       frameSrc: [
         "'self'",
+        ...(require("./services/connectedWorkspace/editor").configuration().configured ? [require("./services/connectedWorkspace/editor").configuration().origin] : []),
         "https://js.stripe.com",
         "https://hooks.stripe.com",
         "https://challenges.cloudflare.com",
       ],
-      connectSrc: ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com", ...(require("./services/connectedWorkspace/editor").configuration().configured ? [require("./services/connectedWorkspace/editor").configuration().origin] : [])],
       imgSrc: [
         "'self'",
         "data:",
@@ -207,6 +209,10 @@ const applicationsRouter = require("./routes/applications");
 const attorneyDashboardRouter = require("./routes/attorneyDashboard");
 const paralegalDashboardRouter = require("./routes/paralegalDashboard");
 const paralegalsRouter = require("./routes/paralegals");
+const matterPreparationRouter = require("./routes/matterPreparation");
+const paralegalMatchingRouter = require("./routes/paralegalMatching");
+const documentCollaborationRouter = require("./routes/documentCollaboration");
+const clioIntegrationRouter = require("./routes/clioIntegration");
 const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
 const verificationRouter = require("./routes/verification");
@@ -258,6 +264,10 @@ app.use("/api/applications", applicationsRouter);
 app.use("/api/attorney/dashboard", attorneyDashboardRouter);
 app.use("/api/paralegal/dashboard", paralegalDashboardRouter);
 app.use("/api/paralegals", paralegalsRouter);
+app.use("/api/matter-preparation", matterPreparationRouter);
+app.use("/api/paralegal-matching", paralegalMatchingRouter);
+app.use("/api/document-collaboration", documentCollaborationRouter);
+app.use("/api/integrations/clio", clioIntegrationRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/account", accountRouter);
 app.use("/api/notifications", notificationRouter);

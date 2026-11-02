@@ -904,6 +904,7 @@ export function createMatterFilesController({
       "data-v2-file-panel": "",
     }, [
       node("h2", { id: "v2-matter-files-title", className: "v2-visually-hidden", text: "Files & submissions" }),
+      writable ? node("a", { href: "/matter-tools.html?caseId=" + encodeURIComponent(matterId), className: "v2-matter-file-help", text: "Prepare workspace and check submissions" }) : null,
       node("div", { className: "v2-matter-panel-heading v2-matter-file-summary" }, [
         node("span", { className: "v2-matter-panel-note", "data-v2-file-count": "" }),
       ]),

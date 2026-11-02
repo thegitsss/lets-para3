@@ -12,6 +12,7 @@ import { createWorkspaceFileHistory } from "./workspace-file-history.mjs";
 import { createWorkspaceFileUploads } from "./workspace-file-uploads.mjs";
 export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, privateState }) {
   const section = node("section", { "aria-label": "Matter files", "data-workspace-files": "" });
+  section.append(link("Prepare workspace and check submissions", "/matter-tools.html?caseId=" + caseId, "av2-secondary"));
   const feedback = node("p", { role: "status", "data-file-feedback": "" }), notice = node("p"), list = node("ul", { className: "av2-file-list" }), detail = node("section", { "aria-label": "Document review", className: "av2-file-detail" });
   const state = privateState.fileReviews.get(caseId) || { drafts: {}, pending: null }; privateState.fileReviews.set(caseId, state);
   state.upload ||= {}; state.replacements ||= {}; state.removal ||= {};

@@ -68,6 +68,7 @@ export function createMatterWorkspace(route, identity, context) {
   const cached = context.privateState.workspaceHeaders.get(caseId);
   const title = node(embeddedConversation ? "h2" : "h1", { id: embeddedConversation ? "av2-thread-title" : "av2-page-title", text: cached?.title || "Matter" });
   const titleRow = node("div", { className: "av2-matter-title-row" }, [title]);
+  if (tab === "work") titleRow.append(link("Prepare workspace", "/matter-tools.html?caseId=" + caseId, "av2-secondary"));
   const homeReturn = safeHomeReturn(route.query.get("returnHome"));
   const header = node("header", { className: "av2-matter-header" }, [link(homeReturn ? "Back to Home" : "Back to Matters", homeReturn || matterReturnHref(route)), titleRow]);
   const headerFacts = node("p", { className: "av2-matter-header-facts" });
