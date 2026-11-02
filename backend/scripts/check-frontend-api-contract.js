@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { literalRoutePaths } = require("../utils/frontendRoutePaths");
 
 const backendRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(backendRoot, "..");
@@ -41,8 +42,7 @@ function routeDeclarations(filePath, routerName = "router", seen = new Set()) {
   seen = new Set([...seen, filePath]);
   const source = fs.readFileSync(filePath, "utf8");
   const escaped = routerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`${escaped}\\.(?:get|post|put|patch|delete)\\s*\\(\\s*(["'\\x60])([^"'\\x60]+)\\1`, "g");
-  const routes = [...source.matchAll(pattern)].map((match) => match[2]);
+  const routes = literalRoutePaths(source, routerName);
   // Follow locally required nested routers, including configured router factories.
   // Keep the real prefix so a child route cannot satisfy an unrelated API path.
   const nested = new RegExp(`${escaped}\\.use\\(\\s*(["'])([^"']+)\\1\\s*,\\s*require\\(["'](\\.[^"']+)["']\\)`, "g");

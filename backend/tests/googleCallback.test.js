@@ -52,7 +52,6 @@ test('a verified linked account establishes a managed session and preserves its 
 test.each([
   [{ status: 'pending' }, 'pending'],
   [{ disabled: true }, 'disabled'],
-  [{ emailVerified: false }, 'email_unverified'],
 ])('linked account restrictions remain authoritative: %j', async (overrides, error) => {
   await account(overrides);
   const { response } = await callback();
@@ -117,4 +116,13 @@ for (const method of ['google', 'password']) test.each([{ error: true }, { disab
   expect(saved.twoFactorChallengeHash).toBeFalsy();
   expect(saved.twoFactorTempCode).toBeFalsy();
   expect(await AuthSession.countDocuments({})).toBe(0);
+});
+
+test.each(['attorney', 'paralegal'])('an approved unverified linked %s can sign in without changing email verification', async role => {
+  const user = await account({ role, emailVerified: false });
+  const { response } = await callback({ next: `/${role}-v2.html#/home` });
+  expect(response.status).toBe(302);
+  expect(response.headers.location).toBe(`/${role}-v2.html#/home`);
+  expect(await AuthSession.countDocuments({ userId: user._id })).toBe(1);
+  expect((await User.findById(user._id)).emailVerified).toBe(false);
 });

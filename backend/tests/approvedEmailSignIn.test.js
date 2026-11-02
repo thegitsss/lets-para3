@@ -1,0 +1,30 @@
+const request = require('supertest');
+const User = require('../models/User');
+const AuthSession = require('../models/AuthSession');
+const { connect, clearDatabase, closeDatabase } = require('./helpers/db');
+const { buildTestApp } = require('./helpers/testApp');
+jest.mock('../utils/email', () => jest.fn(async () => ({ ok: true })));
+const app = buildTestApp();
+const password = 'An isolated approval access passphrase!';
+beforeAll(connect);
+beforeEach(clearDatabase);
+afterAll(closeDatabase);
+test.each(['attorney', 'paralegal'])('approved unverified %s can use password sign-in without changing verification', async role => {
+  const user = await User.create({ firstName: 'Synthetic', lastName: 'Applicant', email: `${role}@approval-access.test`, password, role, status: 'approved', emailVerified: false });
+  const response = await request(app).post('/api/auth/login').send({ email: user.email, password });
+  expect(response.status).toBe(200);
+  const cookie = response.headers['set-cookie'].find(value => value.startsWith('token=')).split(';')[0];
+  const me = await request(app).get('/api/auth/me').set('Cookie', cookie);
+  expect(me.status).toBe(200);
+  expect(me.body.user.id).toBe(String(user._id));
+  expect((await User.findById(user._id)).emailVerified).toBe(false);
+  expect(await AuthSession.countDocuments({ userId: user._id })).toBe(1);
+});
+test('administrator email verification remains required', async () => {
+  const user = await User.create({ firstName: 'Synthetic', lastName: 'Administrator', email: 'admin@approval-access.test', password, role: 'admin', status: 'approved', emailVerified: false });
+  const response = await request(app).post('/api/auth/login').send({ email: user.email, password });
+  expect(response.status).toBe(403);
+  expect(response.body.emailVerificationRequired).toBe(true);
+  expect(await AuthSession.countDocuments({ userId: user._id })).toBe(0);
+  expect((await User.findById(user._id)).emailVerified).toBe(false);
+});

@@ -216,7 +216,7 @@ const providerIdentitySchema = new Schema(
   {
     provider: {
       type: String,
-      enum: ["google"],
+      enum: ["google", "linkedin", "microsoft"],
       required: true,
       lowercase: true,
       trim: true,

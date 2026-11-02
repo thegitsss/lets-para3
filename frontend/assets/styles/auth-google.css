@@ -73,3 +73,5 @@
     transform: none;
   }
 }
+
+.google-auth-button + .google-auth-button { margin-top: 10px; }

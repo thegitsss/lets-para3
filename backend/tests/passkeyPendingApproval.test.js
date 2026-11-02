@@ -56,13 +56,23 @@ test("denied account stays blocked without pending or verification recovery", as
   expect(await AuthSession.countDocuments()).toBe(0);
 });
 
-test("approved account with unverified email receives verification recovery", async () => {
-  const user = await account("attorney", "approved", false);
+test.each(["attorney", "paralegal"])("approved unverified %s signs in with passkey proof without changing verification", async role => {
+  const user = await account(role, "approved", false);
+  verifyAuthentication.mockResolvedValue({ userId: user._id, _id: user._id });
+  const response = await signIn();
+  expect(response.status).toBe(200);
+  expect(response.body).not.toHaveProperty("emailVerificationRequired");
+  expect(response.body.user.status).toBe("approved");
+  expect(await AuthSession.countDocuments({ userId: user._id })).toBe(1);
+  expect((await User.findById(user._id)).emailVerified).toBe(false);
+});
+
+test("administrator passkey sign-in still requires email verification", async () => {
+  const user = await account("admin", "approved", false);
   verifyAuthentication.mockResolvedValue({ userId: user._id, _id: user._id });
   const response = await signIn();
   expect(response.status).toBe(403);
   expect(response.body).toMatchObject({ emailVerificationRequired: true, email: user.email });
-  expect(response.body.accountStatus).toBeUndefined();
   expect(await AuthSession.countDocuments()).toBe(0);
 });
 

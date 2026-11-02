@@ -11,10 +11,11 @@ afterAll(closeDatabase);beforeEach(clearDatabase);
 for(const role of ['attorney','paralegal'])test(`${role} Settings requires password proof and persists a session-bound setup challenge`,async()=>{
  const user=await User.create({firstName:'Morgan',lastName:'Member',email:`${role}@example.test`,password,role,status:'approved',emailVerified:true});
  const agent=request.agent(app);expect((await agent.post('/api/auth/login').send({email:user.email,password})).status).toBe(200);
- expect((await agent.post('/api/account/passkeys/registration-options').send({currentPassword:'incorrect'})).status).toBe(400);
- const begun=await agent.post('/api/account/passkeys/registration-options').send({currentPassword:password});expect(begun.status).toBe(200);expect(begun.body.options.authenticatorSelection.userVerification).toBe('required');
+ const security=await agent.get(`/api/account/2fa?expectedOwnerId=${user._id}`);expect(security.status).toBe(200);const proof={expectedOwnerId:String(user._id),expectedSecurityRevision:security.body.securityRevision};
+ expect((await agent.post('/api/account/passkeys/registration-options').send({...proof,currentPassword:'incorrect'})).status).toBe(400);
+ const begun=await agent.post('/api/account/passkeys/registration-options').send({...proof,currentPassword:password});expect(begun.status).toBe(200);expect(begun.body.options.authenticatorSelection.userVerification).toBe('required');
  const challenge=await AuthChallenge.findOne({challengeId:begun.body.challengeId}).select('+metadata');expect(String(challenge.userId)).toBe(String(user._id));expect(challenge.metadata.securityContext.sessionId).toBeTruthy();
- const invalid=await agent.post('/api/account/passkeys/register').send({challengeId:begun.body.challengeId,response:{}});expect(invalid.status).toBe(400);expect(await PasskeyCredential.countDocuments({userId:user._id})).toBe(0);
+ const invalid=await agent.post('/api/account/passkeys/register').send({...proof,challengeId:begun.body.challengeId,response:{}});expect(invalid.status).toBe(400);expect(await PasskeyCredential.countDocuments({userId:user._id})).toBe(0);
  const other=await User.create({firstName:'Other',lastName:'Member',email:`other-${role}@example.test`,password,role,status:'approved',emailVerified:true});
  const owned=await PasskeyCredential.create({userId:user._id,credentialId:`${role}-owned`,publicKey:Buffer.from('synthetic-public-key'),name:'Owned key'});
  const foreign=await PasskeyCredential.create({userId:other._id,credentialId:`${role}-foreign`,publicKey:Buffer.from('synthetic-public-key'),name:'Other key'});

@@ -391,7 +391,7 @@ describe("Auth workflows", () => {
     expect(res.body.emailVerificationRequired).toBe(true);
   });
 
-  test.each(["attorney", "paralegal"])("Approved %s with an unverified email remains blocked until verification", async (role) => {
+  test.each(["attorney", "paralegal"])("Approved %s with an unverified email can sign in without changing verification", async (role) => {
     const user = await User.create({
       firstName: "Dana",
       lastName: "Price",
@@ -408,11 +408,10 @@ describe("Auth workflows", () => {
       password: "Password123!",
     });
 
-    expect(res.status).toBe(403);
-    expect(res.body.msg).toMatch(/verify your email/i);
-    expect(res.body.emailVerificationRequired).toBe(true);
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty("emailVerificationRequired");
     expect(sendEmail).not.toHaveBeenCalled();
-    expect(await AuthSession.countDocuments({ userId: user._id })).toBe(0);
+    expect(await AuthSession.countDocuments({ userId: user._id })).toBe(1);
 
     const updated = await User.findById(user._id);
     expect(updated.emailVerified).toBe(false);
