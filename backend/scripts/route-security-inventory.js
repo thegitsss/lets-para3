@@ -23,6 +23,10 @@ const mountByFile = {
   "autonomousActions.js": "/api/admin/autonomous-actions",
   "blocks.js": "/api/blocks",
   "caseDrafts.js": "/api/case-drafts",
+  "clioIntegration.js": "/api/integrations/clio",
+  "documentCollaboration.js": "/api/document-collaboration",
+  "matterPreparation.js": "/api/matter-preparation",
+  "paralegalMatching.js": "/api/paralegal-matching",
   "cases.js": "/api/cases",
   "ccoAutonomyHarness.js": "/api/admin/support/dev/cco-autonomy",
   "checklist.js": "/api/checklist",
@@ -144,6 +148,7 @@ function hasBefore(src, line, pattern) {
 }
 
 function classify(file, call, beforeLineText) {
+  if (file === "documentCollaboration.js" && firstRoutePath(call) === "/callback/:sessionId") return "webhook/system-only";
   const whole = `${beforeLineText}\n${call}`;
   if (file === "resumeImport.js") {
     if (!/authorize = \[require\("\.\.\/middleware\/requireApprovedUser"\), require\("\.\.\/middleware\/requireRole"\)\("paralegal"\)\]/.test(beforeLineText)) {
@@ -176,6 +181,7 @@ function rowStatus({ csrf, classification, file, call }) {
 
 function csrfNote({ csrf, status, classification, file }) {
   if (csrf) return "Protected by csrfProtection/protectMutations/mutatingGuards.";
+  if (file === "documentCollaboration.js" && classification === "webhook/system-only") return "Exempt: document-scoped provider JWT authenticates signed callback parameters; cookie authentication cannot authorize saves. See documentCollaborationPolicy.test.js and documentCollaboration.test.js.";
   if (classification === "webhook/system-only") return "Exempt: Stripe webhook requires raw body/signature verification, not browser CSRF.";
   if (classification === "public/telemetry") return "Exempt: anonymous same-origin metrics intake stores only allowlisted, bounded values and has a dedicated rate limit.";
   if (file === "controlRoomE2eHarness.js") return "Exempt: dev E2E harness route gated by harness enablement and shared secret; not mounted as a normal production browser surface.";

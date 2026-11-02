@@ -536,6 +536,7 @@ async function purgeExpiredCases(limit = PURGE_BATCH_LIMIT) {
       purgeScheduledFor: null,
       purgedAt: new Date(),
     };
+    await require("./connectedWorkspace/lifecycle").cleanupMatter(caseId);
     await Case.updateOne({ _id: caseId }, { $set: purgeFields });
   }
 }

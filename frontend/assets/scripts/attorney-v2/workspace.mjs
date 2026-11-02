@@ -18,6 +18,7 @@ import { createWorkspaceFiles } from "./workspace-files.mjs";
 import { createMatterReceipt } from "./matter-receipts.mjs";
 import { createMatterNotes } from "./matter-notes.mjs";
 import { createWorkspaceWork } from "./workspace-work.mjs";
+import { createNativePreparation, preparationEntry } from "../connected-workspace/native-preparation.mjs";
 import { createWorkspaceMessages } from "./workspace-messages.mjs";
 import { createWorkspaceDates } from "./workspace-dates.mjs";
 import { financialRefresh } from "./financial-section.mjs";
@@ -193,7 +194,14 @@ export function createMatterWorkspace(route, identity, context) {
       archiveAction.hidden = !value.archived && !value.archiveReadyAt; actionLinks.append(archiveAction); const actions = node("details", { className:"av2-workspace-options" }, [node("summary", {text:"Matter options"}), actionLinks]); if (!embeddedConversation) header.querySelector(".av2-matter-navigation").append(actions);
       actions.addEventListener("keydown", event => { if (event.key === "Escape") { actions.open = false; actions.querySelector("summary").focus(); } });
       document.addEventListener("pointerdown", event => { if (!actions.contains(event.target)) actions.open = false; }, {signal:child.signal});
-      const panels = { overview, manage: overview, invitations: (_matter, opts) => createMatterInvitations(caseId, {...opts, showMatterTitle:false, query:route.query}), archive: (_matter, opts) => createMatterArchive(caseId, {...opts, compact:true, onRecorded:() => void load()}), work: (_matter, opts) => { const review = createMatterReviewSummary(value, opts, {work:true}); const work = createWorkspaceWork(caseId, {...opts,onRecorded:()=>void review.sync()}); const workSync=work.sync;work.sync=()=>Promise.all([workSync(),review.sync()]); work.prepend(review); const ready = work.readiness; work.readiness = Promise.all([ready,review.readiness]); return work; }, deadlines, activity, financials, applications: (_matter, opts) => createMatterApplications(caseId, { ...opts, showMatterTitle: false, query: route.query, onDecisionRecorded: receipt => {
+      const panels = { overview, manage: overview, invitations: (_matter, opts) => createMatterInvitations(caseId, {...opts, showMatterTitle:false, query:route.query}), archive: (_matter, opts) => createMatterArchive(caseId, {...opts, compact:true, onRecorded:() => void load()}), work: (_matter, opts) => { const review = createMatterReviewSummary(value, opts, {work:true}); const work = createWorkspaceWork(caseId, {...opts,onRecorded:()=>void review.sync()}); const workSync=work.sync;work.sync=()=>Promise.all([workSync(),review.sync()]); work.prepend(review); const ready = work.readiness; let preparation;
+        if (String(value.status).toLowerCase() === "in progress" && value.matterExperience.work?.readOnly !== true) {
+          preparation = createNativePreparation({ caseId, ownerId: identity.id, role: "attorney", api: opts.connectedApi, signal: opts.signal, privateState: context.privateState });
+          work.append(preparation);
+          const heading = work.querySelector(':scope > h2');
+          if (heading) { const row = node('div', { className: 'lpc-connected-work-entry' }, [preparationEntry(preparation)]); heading.before(row); row.prepend(heading); }
+        }
+        work.readiness = Promise.all([ready, review.readiness, preparation?.readiness]); return work; }, deadlines, activity, financials, applications: (_matter, opts) => createMatterApplications(caseId, { ...opts, showMatterTitle: false, query: route.query, onDecisionRecorded: receipt => {
         if (opts.signal.aborted || context.signal.aborted) return;
         decisions.set(receipt.applicantId, receipt); decisionRefresh = true; void checkAccess();
       } }), receipt: (_matter, opts) => createMatterReceipt(caseId, {...opts,showMatterTitle:false,receiptId:route.query.get("receiptId") || undefined}), export: (_matter, opts) => createMatterExport(caseId,opts), files: (_matter, opts) => createWorkspaceFiles(caseId, opts), messages: (_matter, opts) => createWorkspaceMessages(caseId, opts) };

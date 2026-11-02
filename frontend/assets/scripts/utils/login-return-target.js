@@ -2,11 +2,13 @@
   const paralegalPages = new Set([
     "/dashboard-paralegal.html", "/case-detail.html", "/browse-jobs.html",
     "/profile-settings.html", "/profile-paralegal.html", "/profile-attorney.html", "/help.html", "/paralegalhelp.html",
+    "/matter-tools.html", "/document-editor.html",
   ]);
   const attorneyPages = new Set([
     "/dashboard-attorney.html", "/create-case.html", "/case-detail.html", "/case-applications.html",
     "/browse-paralegals.html", "/profile-paralegal.html", "/profile-attorney.html",
     "/profile-settings.html", "/help.html", "/attorney-faq.html", "/contact.html",
+    "/matter-tools.html", "/document-editor.html", "/clio-connect.html", "/paralegal-match.html",
   ]);
   function resolve(requested, role, origin = "https://lpc.invalid") {
     const memberRole = String(role || "").toLowerCase();

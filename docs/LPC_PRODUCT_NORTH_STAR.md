@@ -4,7 +4,7 @@ This document controls future authenticated LPC product work. LPC's approved, wo
 
 ## Preserve first
 
-- Preserve existing LPC colors, Cormorant Garamond/Sarabun typography, role-specific character, successful layouts, and working workflows.
+- Preserve the current approved portal styles, role-specific character, successful layouts, and working workflows. Authenticated portals use their existing system-font stack, flat white sections, neutral dividers and native active/control colors. Do not reintroduce historical gold/cream palettes, serif UI headings, or boxed cards. Public-page or document typography does not define the authenticated portal UI.
 - If an experience is already modern, professional, clear, and intentional, leave it alone.
 - Rearrangement is appropriate only when it clearly improves organization, hierarchy, navigation, or ease.
 - Broad visual redesign requires explicit owner approval.

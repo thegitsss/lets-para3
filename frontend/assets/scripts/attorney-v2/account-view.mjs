@@ -6,6 +6,7 @@ import { createSecurityView, isSecurityRoute } from "./security-view.mjs";
 import { createBlockedView, isBlockedRoute } from "./blocked-view.mjs";
 import { createClosureView, isClosureRoute } from "./closure-view.mjs";
 import { accountNavigation } from "./account-navigation.mjs";
+import { createClioConnection } from '../connected-workspace/native-clio.mjs';
 
 const clone = value => structuredClone(value);
 const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
@@ -29,6 +30,12 @@ export function createAccountView(route, identity, context = {}) {
   if (isClosureRoute(route)) return createClosureView(route, identity, context);
   if (isBlockedRoute(route)) return createBlockedView(route, identity, context);
   if (isSecurityRoute(route)) return createSecurityView(route, identity, context);
+  if (route.query.get('tab') === 'connections') {
+    const view = page('Connections'); view.classList.add('av2-account');
+    const connection = createClioConnection({ ownerId: identity.id, api: context.connectedApi, signal: context.signal, route });
+    view.append(accountNavigation('connections'), connection); view.readiness = connection.readiness;
+    return view;
+  }
   const { accountApi, signal, privateState, onAccountConfirmed } = context;
   const view = page("Profile Settings"); view.classList.add("av2-account");
   const state = privateState.account, ownerId = identity.id, options = { ownerId, signal };

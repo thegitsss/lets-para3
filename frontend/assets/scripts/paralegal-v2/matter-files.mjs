@@ -1,6 +1,7 @@
 import {showDocumentQuickLook} from "../utils/document-quick-look.mjs";
 import { fileProgress } from "../utils/file-progress.mjs";
 import { LpcApiError } from "./api-client.mjs";
+import { createNativeDocumentEditor } from "../connected-workspace/native-editor.mjs";
 
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const POLL_INTERVAL_MS = 15_000;
@@ -50,6 +51,14 @@ function fileId(file) {
 
 function fileName(file) {
   return String(file?.originalName || file?.original || file?.filename || "Matter file");
+}
+
+function canEditDocument(state, file) {
+  return state.editorAvailable === true && state.writable && !state.historical && !state.compact && !state.result?.unavailable && Boolean(state.connectedApi)
+    && /^[a-f0-9]{24}$/i.test(fileId(file)) && /\.docx$/i.test(fileName(file))
+    && String(file?.mimeType || file?.mime || "").toLowerCase() === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    && Number.isSafeInteger(file.size) && file.size > 0 && file.size <= MAX_FILE_BYTES
+    && securityPresentation(file).ready && !file.revisionResolution;
 }
 
 export function filePreviewable(file) {
@@ -337,6 +346,13 @@ function renderFiles(state) {
             "data-v2-file-download": id,
             text: "Download",
           }),
+          canEditDocument(state, file) ? node("button", {
+            className: "v2-matter-file-action is-secondary",
+            type: "button",
+            "data-v2-file-edit": id,
+            "data-native-document-file": id,
+            text: "Edit in LPC",
+          }) : null,
         ])
       : (security.status === "error" || security.status === "pending" && (state.securityAttempts.get(id) || 0) >= SECURITY_RECHECK_DELAYS_MS.length) && !state.historical
         ? node("button", {
@@ -508,6 +524,8 @@ export function createMatterFilesController({
     uploadControllers.clear();
     refreshController = null;
     if (current) {
+      current.editorAbort?.abort();
+      current.editorController?.dispose();
       current.securityTimers.forEach((timer) => window.clearTimeout(timer));
       current.securityTimers.clear();
     }
@@ -516,6 +534,9 @@ export function createMatterFilesController({
   }
 
   function lockPanel(state, message) {
+    state.editorAbort?.abort();
+    state.editorController?.dispose();
+    state.editorAvailable = false;
     state.writable = false;
     state.result = { unavailable: true, message: message || "File access is no longer available for this matter." };
     state.panel.querySelector("[data-v2-file-form]")?.remove();
@@ -525,6 +546,7 @@ export function createMatterFilesController({
 
   function handleAccessError(state, error, { matterResource = true } = {}) {
     if (error instanceof LpcApiError && error.status === 401) {
+      state.editorAbort?.abort(); state.editorController?.dispose();
       onSessionLost?.();
       return true;
     }
@@ -559,6 +581,7 @@ export function createMatterFilesController({
       const changed = fileStateFingerprint(state.result) !== fileStateFingerprint(result);
       state.result = result;
       if (changed) renderFiles(state);
+      maybeOpenEditor(state);
       schedulePendingSecurityChecks(state);
       if (announce) setStatus(state, "");
       if (changed) onChanged?.({ reason: "refresh", matterId: state.matterId });
@@ -571,6 +594,86 @@ export function createMatterFilesController({
         setStatus(state, error?.message || "Files could not be updated right now.", "error");
       }
     }
+  }
+
+  function nativeAccessLost(state, error = {}) {
+    if (state !== current) return;
+    state.editorAbort?.abort(); state.editorController?.dispose(); state.editorAvailable = false;
+    if (error.status === 401) { onSessionLost?.(); return; }
+    lockPanel(state, "File access is no longer available for this account.");
+    stopRealtime(); onAccessLost?.(state.matterId); onMatterChanged?.();
+  }
+
+  function editorNotice(state, message, retry = false) {
+    const notice = state.panel.querySelector("[data-v2-file-editor-notice]");
+    if (!notice) return;
+    notice.hidden = !message;
+    notice.querySelector("p").textContent = message || "";
+    notice.querySelector("button").hidden = !retry;
+  }
+
+  function consumeEditorReturn(state, targetId) {
+    const hash = window.location.hash, marker = hash.indexOf("?");
+    if (marker < 0 || hash.slice(0, marker) !== `#/matter/${state.matterId}`) return;
+    const query = new URLSearchParams(hash.slice(marker + 1));
+    if (query.get("editFile") !== targetId) return;
+    query.delete("editFile"); if (!query.has("fileId")) query.set("fileId", targetId);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash.slice(0, marker)}?${query}`);
+  }
+
+  function openEditor(state, targetId, trigger) {
+    if (state !== current || state.signal?.aborted || state.editorAbort?.signal.aborted) return;
+    const target = filesFrom(state.result).find(file => fileId(file) === targetId);
+    if (!target || !canEditDocument(state, target)) return;
+    state.editorOpenAttempted = true; editorNotice(state, ""); consumeEditorReturn(state, targetId);
+    if (!state.editorController || state.editingFileId !== targetId) {
+      state.editorController?.dispose(); state.editingFileId = targetId;
+      state.editorController = createNativeDocumentEditor({ caseId: state.matterId, fileId: targetId, ownerId: state.ownerId, role: "paralegal", api: state.connectedApi, signal: state.editorSignal, trigger,
+        onAccessLost: error => nativeAccessLost(state, error),
+        onSaved: () => {
+          if (state !== current || state.signal?.aborted || state.editorAbort.signal.aborted) return;
+          state.highlightedFileId = targetId;
+          void refresh(state, { announce: true }).then(() => {
+            if (state !== current || state.signal?.aborted) return;
+            const row = state.panel.querySelector(`[data-file-id="${CSS.escape(targetId)}"]`);
+            if (row && !row.hasAttribute("tabindex")) row.tabIndex = -1;
+            (row?.querySelector("[data-v2-file-edit]") || row)?.focus({ preventScroll: true });
+          });
+        },
+      });
+    }
+    void state.editorController.open();
+  }
+
+  function maybeOpenEditor(state) {
+    if (state !== current || state.editorOpenAttempted || !state.editFileId || state.editorAvailable !== true || state.compact || state.historical || !state.writable || !state.panel.isConnected) return;
+    const target = filesFrom(state.result).find(file => fileId(file) === state.editFileId);
+    if (target && canEditDocument(state, target)) {
+      const trigger = state.panel.querySelector(`[data-v2-file-edit="${CSS.escape(state.editFileId)}"]`);
+      openEditor(state, state.editFileId, trigger);
+    } else if (target && !securityPresentation(target).ready) {
+      editorNotice(state, "This file must pass its security check before it can open in the editor.");
+    } else {
+      state.editorOpenAttempted = true;
+      editorNotice(state, "This file is not available for editing. You can download an available file or choose a DOCX document below.");
+    }
+  }
+
+  async function checkEditorAvailability(state) {
+    if (state !== current || state.compact || state.historical || !state.writable || !state.connectedApi || !/^[a-f0-9]{24}$/i.test(state.ownerId) || state.editorChecking || state.signal?.aborted) return;
+    state.editorChecking = true;
+    try {
+      const result = await state.connectedApi.read("/api/document-collaboration/status");
+      if (state !== current || state.signal?.aborted || state.editorAbort.signal.aborted) return;
+      state.editorAvailable = result.configured === true && Array.isArray(result.formats) && result.formats.includes("docx");
+      renderFiles(state);
+      if (state.editorAvailable) { editorNotice(state, ""); maybeOpenEditor(state); }
+      else if (state.editFileId && !state.editorOpenAttempted) editorNotice(state, "Document editing is not connected yet. You can continue downloading and sharing revisions in Files.", true);
+    } catch (error) {
+      if (state !== current || state.signal?.aborted || state.editorAbort.signal.aborted || error?.name === "AbortError") return;
+      if ([401, 403].includes(error.status)) { nativeAccessLost(state, error); return; }
+      if (state.editFileId && !state.editorOpenAttempted) editorNotice(state, "Document editing could not be checked. You can still use the other file actions.", true);
+    } finally { state.editorChecking = false; }
   }
 
   function scheduleRefresh() {
@@ -857,7 +960,7 @@ export function createMatterFilesController({
     }
   }
 
-  function panel({ matterId, filesResult, highlightedFileId = "", writable = false, historical = false, compact = false } = {}) {
+  function panel({ matterId, filesResult, highlightedFileId = "", writable = false, historical = false, compact = false, connectedApi, ownerId = "", signal, editFileId = "" } = {}) {
     const content = node("div", { className: "v2-matter-file-content", "data-v2-file-content": "" });
     const status = node("p", {
       className: "v2-matter-file-status",
@@ -907,6 +1010,7 @@ export function createMatterFilesController({
       node("div", { className: "v2-matter-panel-heading v2-matter-file-summary" }, [
         node("span", { className: "v2-matter-panel-note", "data-v2-file-count": "" }),
       ]),
+      !compact ? node("div", { "data-v2-file-editor-notice": "", hidden: true }, [node("p", { className: "v2-matter-file-help", role: "status" }), node("button", { type: "button", className: "v2-matter-file-action is-secondary", "data-v2-file-editor-retry": "", text: "Check document editing", hidden: true })]) : null,
       content,
       writable ? node("div", { className: "v2-matter-file-compose-slot", "data-v2-file-compose-slot": "" }, [form]) : null,
       status,
@@ -923,6 +1027,10 @@ export function createMatterFilesController({
       highlightedFileId: String(highlightedFileId || ""),
       writable: Boolean(writable),
       historical: Boolean(historical),
+      compact: Boolean(compact), connectedApi, ownerId: String(ownerId || ""), signal,
+      editFileId: /^[a-f0-9]{24}$/i.test(String(editFileId || "")) ? String(editFileId) : "",
+      editorAvailable: false, editorChecking: false, editorOpenAttempted: false,
+      editorAbort: new AbortController(),
       result: filesResult,
       uploading: false,
       selectedFiles: drafts.get(String(matterId || "")) || [],
@@ -932,6 +1040,8 @@ export function createMatterFilesController({
       securityAttempts: new Map(),
       securityTimers: new Map(),
     };
+    state.editorSignal = signal ? AbortSignal.any([signal, state.editorAbort.signal]) : state.editorAbort.signal;
+    signal?.addEventListener("abort", () => { state.editorAbort.abort(); state.editorController?.dispose(); }, { once: true });
     panelStates.set(section, state);
     renderFiles(state);
     const input = section.querySelector("[data-v2-file-input]");
@@ -977,6 +1087,10 @@ export function createMatterFilesController({
       addSelectedFiles(state, files);
     });
     section.addEventListener("click", (event) => {
+      const edit = event.target.closest("[data-v2-file-edit]");
+      if (edit) { event.preventDefault(); openEditor(state, edit.dataset.v2FileEdit, edit); return; }
+      const editorRetry = event.target.closest("[data-v2-file-editor-retry]");
+      if (editorRetry) { event.preventDefault(); void checkEditorAvailability(state); return; }
       const preview=event.target.closest('[data-v2-file-preview]');if(preview&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();void previewFile(state,preview.dataset.v2FilePreview,preview);return;}
       const downloadButton = event.target.closest("[data-v2-file-download]");
       if (downloadButton) {
@@ -1005,6 +1119,7 @@ export function createMatterFilesController({
     const section = root?.querySelector?.("[data-v2-file-panel]");
     const state = section ? panelStates.get(section) : null;
     if (!state) return;
+    if (current && current !== state) { current.editorAbort?.abort(); current.editorController?.dispose(); }
     current = state;
     generation += 1;
     const highlighted = state.highlightedFileId
@@ -1027,6 +1142,7 @@ export function createMatterFilesController({
     startPolling();
     startStream(state);
     schedulePendingSecurityChecks(state);
+    void checkEditorAvailability(state);
   }
 
   function handleVisibilityChange() {
@@ -1047,6 +1163,7 @@ export function createMatterFilesController({
     refresh: () => current ? refresh(current, { announce: true }) : Promise.resolve(),
     hasDrafts: () => drafts.size > 0,
     clearDrafts() {
+      current?.editorAbort?.abort(); current?.editorController?.dispose();
       uploadControllers.forEach((controller) => controller.abort());
       uploadControllers.clear();
       drafts.clear();

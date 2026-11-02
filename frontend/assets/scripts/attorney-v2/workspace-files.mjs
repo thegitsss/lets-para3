@@ -10,7 +10,10 @@ import { readFiles, readFileReview, fileStatus, previewType, reviewError } from 
 import { fileDescription, fileName, downloadAccess, downloadError } from "./download-model.mjs";
 import { createWorkspaceFileHistory } from "./workspace-file-history.mjs";
 import { createWorkspaceFileUploads } from "./workspace-file-uploads.mjs";
-export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, privateState }) {
+import { createNativePreparation } from "../connected-workspace/native-preparation.mjs";
+import { createNativeDocumentEditor } from "../connected-workspace/native-editor.mjs";
+import { createClioMatterTransfers } from "../connected-workspace/native-clio.mjs";
+export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, privateState, connectedApi }) {
   const section = node("section", { "aria-label": "Matter files", "data-workspace-files": "" });
   const feedback = node("p", { role: "status", "data-file-feedback": "" }), notice = node("p"), list = node("ul", { className: "av2-file-list" }), detail = node("section", { "aria-label": "Document review", className: "av2-file-detail" });
   const state = privateState.fileReviews.get(caseId) || { drafts: {}, pending: null }; privateState.fileReviews.set(caseId, state);
@@ -42,6 +45,52 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   const upload = createWorkspaceFileUploads(caseId, { api, signal, ownerId, state: state.upload, route, onSaved: () => void load({ quiet: true }) }); browser.before(upload);
   const removal = createWorkspaceFileRemoval(caseId, { api, signal, ownerId, state: state.removal, onRemoved: async fileId => { if (signal.aborted) return; if (selected?.id === fileId) { selected = null; rememberSelection(null); } await load(); earlier.invalidate(); }, onDenied: denied, onClose: () => { const heading = section.querySelector("h2"); heading.tabIndex = -1; heading.focus(); } }); section.append(removal);
   const earlier = createWorkspaceEarlierFiles(caseId, { api, signal, ownerId, route, onDenied: denied }); section.append(node("details", {className:"av2-secondary-disclosure", ...(route.query.has("earlierFileId") ? {open:""} : {})}, [node("summary", {text:"Earlier documents and retained versions"}), earlier]));
+  let preparation, clio, editor, editorConfigured = false, editorStatusFailed = false, automaticEditorOpened = false, connectedFingerprint = "";
+  const connectedSlot = node("div"); section.append(connectedSlot);
+  async function checkEditor() {
+    if (!connectedApi || signal.aborted) return;
+    try { const status = await connectedApi.read("/api/document-collaboration/status"); if (typeof status.configured !== "boolean" || status.configured && !Array.isArray(status.formats)) throw new Error("Unconfirmed document editing availability"); editorConfigured = status.configured === true && status.formats.includes("docx"); editorStatusFailed = false; }
+    catch (error) { if (signal.aborted || error.name === "AbortError") return; editorStatusFailed = true; }
+    const slot = detail.querySelector("[data-native-editor-slot]"); if (slot && selected && !signal.aborted) renderEditorAction(slot, selected);
+  }
+  const editorReadiness = checkEditor();
+  function connectedTools() {
+    if (!connectedApi || signal.aborted) return;
+    if (!value?.canUpload || value.access !== "available") { editor?.dispose(); preparation?.dispose(); clio?.dispose(); preparation = null; clio = null; connectedSlot.replaceChildren(); connectedFingerprint = ""; return; }
+    const fingerprint = JSON.stringify([value.counts, files.map(file => [file.id, file.version, file.status, file.securityStatus, file.revision])]);
+    if (preparation) { if (fingerprint !== connectedFingerprint) { connectedFingerprint = fingerprint; void Promise.allSettled([preparation.refresh(), clio.refresh()]); } return; }
+    connectedFingerprint = fingerprint;
+    preparation = createNativePreparation({ caseId, ownerId, role: "attorney", api: connectedApi, signal, mode: "submission", privateState });
+    clio = createClioMatterTransfers({ caseId, ownerId, api: connectedApi, signal, files: async () => {
+      const selected = [], cursors = new Set(), filters = { q: "", status: "approved", sort: "newest" }; let cursor;
+      do {
+        const page = readFiles(await api.readWorkspaceFiles(caseId, { ownerId, signal, ...filters, ...(cursor ? { cursor } : {}) }), caseId, ownerId, filters);
+        selected.push(...page.files); cursor = page.nextCursor;
+        if (selected.length > 500) throw new Error("Narrow the approved document inventory before sending to Clio.");
+        if (cursor && cursors.has(cursor)) throw new Error("The document inventory changed. Refresh Files before sending to Clio.");
+        if (cursor) cursors.add(cursor);
+      } while (cursor && !signal.aborted);
+      return selected;
+    }, readOnly: () => !value?.canUpload, onFilesChanged: () => load() });
+    connectedSlot.append(preparation, clio);
+  }
+  function renderEditorAction(slot, file) {
+    slot.replaceChildren();
+    if (!value?.canUpload || !/\.docx$/i.test(file.name || "") || !["clean", "not_required"].includes(file.securityStatus)) return;
+    if (editorStatusFailed) {
+      const retry = button("Check document editing", () => { retry.disabled = true; void checkEditor(); }, "lpc-connected-button is-secondary");
+      slot.append(node("p", { className: "av2-muted", text: "Document editing could not be checked. Your other file actions are available." }), retry); return;
+    }
+    if (!editorConfigured) { if (route.query.get("editFile") === file.id) slot.append(node("p", { className: "av2-muted", text: "Document editing is unavailable. You can download and share revisions in Files." })); return; }
+    const edit = button("Edit in LPC", () => {
+      if (busy || reading || signal.aborted) return;
+      editor?.dispose();
+      editor = createNativeDocumentEditor({ caseId, fileId: file.id, ownerId, role: "attorney", api: connectedApi, signal, trigger: edit, onSaved: () => load(), onAccessLost: denied });
+      void editor.open();
+    }, "lpc-connected-button is-secondary");
+    edit.dataset.fileTransferControl = ""; edit.dataset.nativeDocumentFile = file.id; slot.append(edit);
+    if (!automaticEditorOpened && route.query.get("editFile") === file.id) { automaticEditorOpened = true; requestAnimationFrame(() => { if (!signal.aborted && edit.isConnected) edit.click(); }); }
+  }
   const options = { signal, ownerId };
   const controls = () => {
     const blocked = busy || reading && !quietReading;
@@ -71,6 +120,7 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   }
   function render({ preserveDetail = false } = {}) {
     if (!value) return;
+    connectedTools();
     notice.textContent = value.access === "available" ? "" : downloadAccess(value);
     list.replaceChildren(...files.map(file => {
       const name = button(file.name, () => choose(file), "av2-file-name"); name.setAttribute("aria-pressed",String(selected?.id === file.id));
@@ -91,6 +141,7 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
     replacementController?.abort(); replacementController = null; historyView?.dispose(); historyView = null; closePreview(); const file = selected; detail.replaceChildren(); if (!file) return;
     detail.append(button("Back to files", () => {closePreview();selected=null;rememberSelection(null);render();list.querySelector("button")?.focus({preventScroll:true});},"av2-text-link"));
     detail.append(node("h3", { text: file.name }), node("p", { text: `${fileStatus(file)} · ${fileDescription(file)}` }));
+    const editorSlot = node("div", { className: "lpc-connected-editor-action", "data-native-editor-slot": "" }); detail.append(editorSlot); renderEditorAction(editorSlot, file);
     if (file.replacedAt) detail.append(node("p", { text: `Replaced ${new Date(file.replacedAt).toLocaleString()}. Earlier versions remain in the document history.` }));
     if (file.approvedAt) detail.append(node("p", { text: `Approved ${new Date(file.approvedAt).toLocaleString()}` }));
     if (file.requestedAt) detail.append(node("p", { text: `Revisions requested ${new Date(file.requestedAt).toLocaleString()}` }));
@@ -260,5 +311,6 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   }
   section.sync = () => Promise.all([load({ quiet: true }), upload.sync(), earlier.sync()]);
   signal.addEventListener("abort", () => { sequence++; controller?.abort(); closePreview(); reset(); section.replaceChildren(); }, { once: true });
-  section.readiness = load(); return section;
+  signal.addEventListener("abort", () => { editor?.dispose(); preparation?.dispose(); clio?.dispose(); }, { once: true });
+  section.readiness = Promise.all([load(), editorReadiness]); return section;
 }
