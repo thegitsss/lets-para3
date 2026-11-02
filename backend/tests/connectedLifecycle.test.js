@@ -3,6 +3,7 @@ const express = require("express"), cookieParser = require("cookie-parser"), req
 jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
 const User = require("../models/User"), Case = require("../models/Case"), CaseDraft = require("../models/CaseDraft");
 const Vector = require("../models/ParalegalSearchVector"), Preparation = require("../models/MatterPreparation"), Session = require("../models/DocumentEditorSession");
+const PreparationJob = require("../models/MatterPreparationJob");
 const Connection = require("../models/ClioConnection"), OAuthState = require("../models/ClioOAuthState"), Handoff = require("../models/ClioHandoff"), Transfer = require("../models/ClioTransfer");
 const lifecycle = require("../services/connectedWorkspace/lifecycle");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -25,6 +26,7 @@ async function seedOwner(userId, label) {
   await Transfer.collection.insertOne({ ownerId: userId, caseId, requestId: label, direction: "export" });
   await Vector.collection.insertOne({ userId, profileHash: label, model: "synthetic", embedding: [1, 0] });
   await Session.collection.insertOne({ caseId, fileId: oid(), documentKey: label, participants: [{ userId, role: "attorney", authVersion: 0 }], state: "open" });
+  await PreparationJob.collection.insertOne({ caseId, createdBy: userId, assignmentKey: label, requestId: label, requestHash: label, activeKey: label, kind: "preparation", status: "running", stage: "ocr", attempts: 1, processedFiles: 0, totalFiles: 1, leaseToken: label, leaseUntil: new Date(Date.now() + 120000), encryptedContext: "SYNTHETIC-PROTECTED-OCR-CHECKPOINT" });
   return { caseId, draftId };
 }
 const ownerModels = [Connection, OAuthState, Handoff, Transfer];
@@ -40,6 +42,8 @@ test("the actual account deactivation route removes credentials, OAuth state, ha
   expect(await Vector.countDocuments({ userId: other._id })).toBe(1);
   expect(await Session.countDocuments({ "participants.userId": owner._id })).toBe(0);
   expect(await Session.countDocuments({ "participants.userId": other._id })).toBe(1);
+  expect(await PreparationJob.countDocuments({ createdBy: owner._id })).toBe(0);
+  expect(await PreparationJob.countDocuments({ createdBy: other._id })).toBe(1);
   expect((await User.findById(owner._id)).disabled).toBe(true);
 });
 test("owner cleanup participates in its caller's transaction and an aborted closure retains every record", async () => {
@@ -50,13 +54,14 @@ test("owner cleanup participates in its caller's transaction and an aborted clos
   for (const Model of ownerModels) expect(await Model.countDocuments({ ownerId: owner._id })).toBe(1);
   expect(await Vector.countDocuments({ userId: owner._id })).toBe(1);
   expect(await Session.countDocuments({ "participants.userId": owner._id })).toBe(1);
+  expect(await PreparationJob.countDocuments({ createdBy: owner._id })).toBe(1);
 });
 test("Matter cleanup removes only its preparation, editing, transfer and linked published-draft handoff records", async () => {
   const first = await seedOwner(owner._id, "first"), second = await seedOwner(other._id, "second");
   await CaseDraft.collection.insertMany([{ _id: first.draftId, owner: owner._id, publishedCaseId: first.caseId }, { _id: second.draftId, owner: other._id, publishedCaseId: second.caseId }]);
   await Preparation.collection.insertMany([{ caseId: first.caseId, assignmentKey: "first", requestId: "first", encryptedPayload: "SYNTHETIC-FIRST" }, { caseId: second.caseId, assignmentKey: "second", requestId: "second", encryptedPayload: "SYNTHETIC-SECOND" }]);
   await lifecycle.cleanupMatter(first.caseId);
-  for (const Model of [Preparation, Session, Transfer]) {
+  for (const Model of [Preparation, PreparationJob, Session, Transfer]) {
     expect(await Model.countDocuments({ caseId: first.caseId })).toBe(0);
     expect(await Model.countDocuments({ caseId: second.caseId })).toBe(1);
   }

@@ -25,7 +25,13 @@ router.post("/callback/:sessionId", async (req, res) => {
   catch (error) { res.status(error.status || error.statusCode || 503).json({ error: 1, code: error.publicCode || "DOCUMENT_EDITOR_SAVE_UNCONFIRMED" }); }
 });
 router.use(verifyToken, requireApproved, requireRole("attorney", "paralegal"));
+router.use((req, res, next) => {
+  const expected = req.get("X-LPC-Owner-Id");
+  if (expected !== undefined && expected !== String(req.user.id)) return res.status(403).json({ code: "DOCUMENT_EDITOR_ACCOUNT_CHANGED", error: "The signed-in account changed. Refresh Files before continuing." });
+  next();
+});
 router.get("/status", (_req, res) => res.json(editor.publicStatus()));
 router.get("/sessions/:sessionId", handle(async (req, res) => res.json(await editor.status(req))));
+router.post("/sessions/:sessionId/save", csrfProtection, rateLimit({ windowMs: 60000, limit: 12, keyGenerator: req => String(req.user.id), standardHeaders: true, legacyHeaders: false }), handle(async (req, res) => res.json(await editor.requestSave(req))));
 router.post("/matters/:caseId/files/:fileId/session", csrfProtection, rateLimit({ windowMs: 60000, limit: 12, keyGenerator: req => String(req.user.id), standardHeaders: true, legacyHeaders: false }), handle(async (req, res) => res.json(await editor.open(req))));
 module.exports = router;

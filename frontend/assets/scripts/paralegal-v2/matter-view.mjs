@@ -12,6 +12,8 @@ import { createMatterMessagesController } from "./matter-messages.mjs";
 import { createMatterDeadlinesController, readMatterDeadlineEvents } from "./matter-deadlines.mjs";
 import { createWorkspacePresenceController } from "./workspace-presence.mjs";
 import { readStableMatterSnapshot } from '../utils/matter-snapshot-read.mjs';
+import { createConnectedApi } from '../connected-workspace/native-api.mjs';
+import { createNativePreparation, preparationEntry } from '../connected-workspace/native-preparation.mjs';
 
 const HISTORICAL_STATUSES = new Set(["completed", "closed", "cancelled", "canceled", "expired"]);
 const MATTER_POLL_INTERVAL_MS = 15_000;
@@ -370,7 +372,7 @@ function workPanel(matter, experience, context = {}) {
     onSessionLost: context.onSessionLost,
     trigger: dispute,
   }));
-  return node("section", { className: "v2-matter-panel", "aria-labelledby": "v2-matter-work-title" }, [
+  const panel = node("section", { className: "v2-matter-panel", "aria-labelledby": "v2-matter-work-title" }, [
     node("div", { className: "v2-matter-panel-heading" }, [
       node("div", {}, [node("h2", { id: "v2-matter-work-title", text: "Work" })]),
       work.total ? node("span", { className: "v2-matter-panel-note", text: `${work.completed} of ${work.total} complete` }) : null,
@@ -404,6 +406,11 @@ function workPanel(matter, experience, context = {}) {
       ]) : null,
     ]),
   ]);
+  if (canSubmit && context.connectedApi) {
+    const preparation = createNativePreparation({ caseId: context.matterId, ownerId: context.ownerId, role: 'paralegal', api: context.connectedApi, signal: context.signal, drafts: context.preparationDrafts });
+    panel.querySelector('.v2-matter-panel-heading').append(preparationEntry(preparation)); panel.append(preparation);
+  }
+  return panel;
 }
 
 function activityPanel(experience) {
@@ -444,13 +451,21 @@ function panelFor(tab, context) {
   if (tab === "overview") return overviewPanel(context.experience, context.matter);
   if (tab === "applications") return applicationPanel(context.experience);
   if (tab === "work") return workPanel(context.matter, context.experience, context);
-  if (tab === "files") return context.fileController.panel({
+  if (tab === "files") {
+    const panel = context.fileController.panel({
     matterId: context.matterId,
     filesResult: context.files,
     highlightedFileId: context.fileId,
     writable: context.filesWritable,
     historical: context.historical,
+    connectedApi: context.connectedApi,
+    ownerId: context.ownerId,
+    signal: context.signal,
+    editFileId: context.editFileId,
   });
+    if (context.filesWritable && context.connectedApi) panel.append(createNativePreparation({ caseId: context.matterId, ownerId: context.ownerId, role: 'paralegal', api: context.connectedApi, signal: context.signal, mode: 'submission', drafts: context.preparationDrafts }));
+    return panel;
+  }
   if (tab === "messages") return context.messageController.panel({
     matterId: context.matterId,
     messagesResult: context.messages,
@@ -544,6 +559,8 @@ function workspace(matter, route, messages, files, deadlines, messageController,
       fileController,
       deadlineController,
       api: actions.api,
+      connectedApi: actions.connectedApi,
+      preparationDrafts: actions.preparationDrafts,
       ownerId: actions.ownerId,
       signal: actions.signal,
       isCurrent: actions.isCurrent,
@@ -558,6 +575,7 @@ function workspace(matter, route, messages, files, deadlines, messageController,
       deadlinesWritable: !historical && experience.work?.readOnly !== true,
       historical,
       fileId: objectId(route.query.get("fileId")),
+      editFileId: objectId(route.query.get("editFile")),
       messageId: objectId(route.query.get("messageId")),
       eventId: objectId(route.query.get("eventId")),
     }),
@@ -566,6 +584,7 @@ function workspace(matter, route, messages, files, deadlines, messageController,
 }
 
 export function createMatterView({ openAssistant, api, getIdentity, showToast, onAccessLost, onSessionLost, onMessagesChanged, onFilesChanged, onDeadlinesChanged, onMatterChanged, onMatterWithdrawn } = {}) {
+  const preparationDrafts = new Map();
   let controller = null;
   let currentRoot = null, tabObserver = null;
   let clearAssistantContext = () => {};
@@ -711,6 +730,8 @@ export function createMatterView({ openAssistant, api, getIdentity, showToast, o
           api,
           ownerId,
           signal,
+          connectedApi: createConnectedApi({ ownerId, role: 'paralegal', signal, onAccessLost: onSessionLost }),
+          preparationDrafts,
           isCurrent: () => isCurrent() && !signal.aborted && ownerId === objectId(getIdentity?.()?.id || getIdentity?.()?._id),
           onRefresh: onRetry,
           showToast,
@@ -868,6 +889,7 @@ export function createMatterView({ openAssistant, api, getIdentity, showToast, o
       return messageController.hasDrafts() || fileController.hasDrafts() || deadlineController.hasDrafts();
     },
     clearDrafts() {
+      preparationDrafts.clear();
       messageController.clearDrafts();
       fileController.clearDrafts();
       deadlineController.clearDrafts();

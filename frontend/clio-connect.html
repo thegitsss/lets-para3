@@ -8,26 +8,15 @@
   <title>Clio connection · Let’s-ParaConnect</title>
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/assets/styles/fonts.css">
-  <link rel="stylesheet" href="/assets/styles/connected-workspace.css">
-  <script type="module" src="/assets/scripts/connected-workspace/clio.mjs"></script>
+  <link rel="stylesheet" href="/assets/styles/portal-system-font.css">
+  <script type="module" src="/assets/scripts/connected-workspace/native-redirect.mjs"></script>
 </head>
-<body class="">
-  <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="cw-header">
-    <a class="cw-brand" href="/">Let’s-ParaConnect</a>
-    <nav aria-label="Workspace navigation">
-      <a data-return href="/attorney-v2.html#/home">Back to workspace</a>
-      <a data-attorney-link hidden href="/paralegal-match.html">Find by experience</a>
-      <a data-attorney-link hidden href="/clio-connect.html">Clio connection</a>
-    </nav>
-  </header>
-  <main id="main" tabindex="-1">
-    <p class="cw-eyebrow">Clio connection</p>
-    <h1>Connect the work you already have.</h1>
-    <p class="cw-intro">Choose what to share between Clio and LPC. Review the scope and every document transfer.</p>
-    <p class="cw-status" data-status role="status" aria-live="polite">Checking your workspace…</p>
-    <div data-content></div>
-    <noscript><p>JavaScript is required for this workspace.</p><a href="/login.html">Sign in to LPC</a></noscript>
+<body data-connected-destination="clio">
+  <main>
+    <h1>Clio connection</h1>
+    <p data-redirect-status role="status">Opening your LPC workspace…</p>
+    <a data-redirect-link href="/login.html" hidden>Sign in</a>
+    <noscript><p>Enable JavaScript to open your LPC workspace.</p><a href="/login.html">Sign in to LPC</a></noscript>
   </main>
 </body>
 </html>

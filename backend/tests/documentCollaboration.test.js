@@ -157,3 +157,65 @@ test("a missing commit acknowledgement is recovered from the transactional save 
   jest.spyOn(mongoose, "startSession").mockImplementation(async (...args) => { const session = await start(...args), commit = session.commitTransaction.bind(session); session.commitTransaction = async () => { await commit(); throw new Error("Synthetic lost acknowledgement"); }; return session; });
   expect((await save(opened)).body.error).toBe(0); expect((await stored()).version).toBe(2); expect(await Audit.countDocuments({ action: "document.collaboration.saved" })).toBe(1);
 });
+
+const commandResponse = (key, error = 0) => ({ status: 200, headers: new Headers({ "content-type": "application/json" }), body: Readable.from([JSON.stringify({ error, key })]) });
+const requestSave = (opened, actor = owner, body = {}) => request(app).post(`/api/document-collaboration/sessions/${opened.sessionId}/save`).set("Cookie", cookie(actor)).set("X-LPC-Owner-Id", String(actor._id)).send({ expectedOwnerId: String(actor._id), ...body });
+test("a native save request stays pending until its exact callback receipt is committed", async () => {
+  const opened = (await open()).body;
+  mockFetch.mockResolvedValueOnce(commandResponse(opened.config.document.key));
+  const requested = await requestSave(opened); expect(requested.status).toBe(200); expect(requested.body.pending).toBe(true);
+  const [url, options] = mockFetch.mock.calls[0], command = jwt.verify(JSON.parse(options.body).token, process.env.ONLYOFFICE_JWT_SECRET);
+  expect(url).toBe(`https://editor.synthetic.test/command?shardkey=${opened.config.document.key}`);
+  expect(command).toMatchObject({ c: "forcesave", operation: "command", key: opened.config.document.key, userdata: `lpc-save:${requested.body.requestId}` });
+  const read = () => request(app).get(`/api/document-collaboration/sessions/${opened.sessionId}?saveRequestId=${requested.body.requestId}`).set("Cookie", cookie(owner));
+  expect((await read()).body.saveRequest).toMatchObject({ state: "requested", version: null });
+  expect((await save(opened, { userdata: command.userdata })).body.error).toBe(0);
+  expect((await read()).body).toMatchObject({ savedVersion: 2, saveRequest: { id: requested.body.requestId, state: "confirmed", version: 2 } });
+});
+test("checking another participant's save request does not expose their receipt and repeating an unresolved request does not resend the command", async () => {
+  const opened = (await open()).body; await open(para);
+  mockFetch.mockResolvedValueOnce(commandResponse(opened.config.document.key));
+  const first = await requestSave(opened), second = await requestSave(opened);
+  expect(second.body.requestId).toBe(first.body.requestId); expect(mockFetch).toHaveBeenCalledTimes(1);
+  const otherReceipt = await request(app).get(`/api/document-collaboration/sessions/${opened.sessionId}?saveRequestId=${first.body.requestId}`).set("Cookie", cookie(para));
+  expect(otherReceipt.body.saveRequest).toBeNull();
+});
+test("a provider no-changes response never invents confirmation of a preceding callback", async () => {
+  const opened = (await open()).body; mockFetch.mockResolvedValueOnce(commandResponse(opened.config.document.key, 4));
+  const result = await requestSave(opened);
+  expect(result.body).toMatchObject({ pending: false, noChanges: true, savedVersion: 1 }); expect((await stored()).version).toBe(1);
+  const state = await request(app).get(`/api/document-collaboration/sessions/${opened.sessionId}?saveRequestId=${result.body.requestId}`).set("Cookie", cookie(owner));
+  expect(state.body.saveRequest).toMatchObject({ state: "unknown", version: null });
+});
+test("a lost command response retains uncertainty and an eventual correlated callback can still confirm the save", async () => {
+  const opened = (await open()).body;
+  mockFetch.mockRejectedValueOnce(new Error("Synthetic command response lost"));
+  expect((await requestSave(opened)).status).toBe(502);
+  const session = await Session.findById(opened.sessionId).lean(), marker = session.saveRequests[0].requestId;
+  expect(session.saveRequests[0].state).toBe("unknown"); expect((await stored()).version).toBe(1);
+  expect((await save(opened, { userdata: `lpc-save:${marker}` })).body.error).toBe(0);
+  expect((await Session.findById(opened.sessionId)).saveRequests[0].state).toBe("confirmed");
+});
+test("provider save errors fail their exact request without claiming a saved document version", async () => {
+  const opened = (await open()).body; mockFetch.mockResolvedValueOnce(commandResponse(opened.config.document.key));
+  const result = await requestSave(opened);
+  expect((await save(opened, { status: 7, userdata: `lpc-save:${result.body.requestId}` })).body.error).toBe(1);
+  expect((await Session.findById(opened.sessionId)).saveRequests[0].state).toBe("failed"); expect((await stored()).version).toBe(1);
+});
+test("authenticated editor routes reject account drift before reading provider or document metadata", async () => {
+  const opened = (await open()).body, changedOwner = String(other._id);
+  const status = await request(app).get("/api/document-collaboration/status").set("Cookie", cookie(owner)).set("X-LPC-Owner-Id", changedOwner);
+  const saveResult = await request(app).post(`/api/document-collaboration/sessions/${opened.sessionId}/save`).set("Cookie", cookie(owner)).set("X-LPC-Owner-Id", changedOwner).send({});
+  expect(status.status).toBe(403); expect(saveResult.status).toBe(403); expect(saveResult.body.code).toBe("DOCUMENT_EDITOR_ACCOUNT_CHANGED"); expect(mockFetch).not.toHaveBeenCalled();
+});
+test("a client-bound save nonce survives a lost response without adopting a later edit epoch or sending another command", async () => {
+  const opened = (await open()).body, clientRequestId = require("crypto").randomUUID();
+  mockFetch.mockRejectedValueOnce(new Error("Synthetic lost response after command"));
+  expect((await requestSave(opened, owner, { clientRequestId })).status).toBe(502);
+  const retry = await requestSave(opened, owner, { clientRequestId });
+  expect(retry.body).toMatchObject({ requestId: clientRequestId, pending: true }); expect(mockFetch).toHaveBeenCalledTimes(1);
+  expect((await save(opened, { userdata: `lpc-save:${clientRequestId}` })).body.error).toBe(0);
+  const repeated = await requestSave(opened, owner, { clientRequestId });
+  expect(repeated.body).toMatchObject({ requestId: clientRequestId, pending: false, confirmed: true });
+  expect(mockFetch).toHaveBeenCalledTimes(2); expect((await stored()).version).toBe(2);
+});

@@ -1,75 +1,67 @@
-# LPC connected workspace
+# Connected work in LPC
 
-Controlling product direction: [LPC Product North Star](LPC_PRODUCT_NORTH_STAR.md). These additions preserve LPC’s existing appearance, matter lifecycle, funding boundary, file authority, and attorney decisions.
+This branch completes four connected features inside the existing attorney and paralegal portals. The existing matter, file, posting, account and payment systems remain the authority.
 
-## Delivered code
-
-| Capability | Entry point | Implementation |
+| Feature | Native location | Experience |
 | --- | --- | --- |
-| Matter preparation and submission checks | Work/Files → Prepare workspace; /matter-tools.html?caseId=… | Reads selected source documents, proposes a working checklist and clarification/review observations with literal source quotations. Attorney can edit and accept the working aid. Does not amend agreed scope or mark work complete. |
-| DOCX collaboration | Matter preparation → Work on a document; /document-editor.html?caseId=…&fileId=… | ONLYOFFICE integration with co-editing, comments, tracked changes, signed source delivery, guarded callbacks, recoverable LPC file versions and existing malware checks. |
-| Clio connection | /clio-connect.html, including from a funded Matter | US OAuth, selected private handoffs, selected funded imports, approved-file exports and an optional action inside Clio. |
-| Evidence-based matching | Find a Paralegal → Find by experience; /paralegal-match.html | Current visible professional profile evidence, exact required-skill filters, experience/availability filters, keyword/related-term ranking and configured-provider semantic ranking with cached vectors. No raw resumes or private matter work are indexed. |
+| Document preparation | Matter → Work; submission review in Files | Choose source documents, follow recoverable background progress, review exact quotations and reading coverage, edit/add/remove working items, and accept an attorney-reviewed checklist. |
+| Document collaboration | Files → select a clean DOCX → Edit in LPC | A full-size document dialog with co-editing, comments and tracked changes. Save to LPC follows a correlated callback receipt; closing returns to the same Files view and current version. |
+| Clio | Settings → Connections; Matter → Files | Connect the US Clio account, review selected private source documents, author a public work brief for an LPC posting, import into an existing funded matter, and return an explicitly approved document to a selected Clio matter. Transfer history provides exact-operation recovery. |
+| Matching by work | Find a Paralegal → Find by work | Describe the work, add explicit skill/experience/availability filters, review profile evidence, and open the existing candidate profile. Returning to results preserves the search in page memory. |
 
-All four backend routers are mounted by backend/index.js. New standalone pages use the existing Sarabun/Cormorant typography and LPC palette. Existing portal layouts remain in place.
+The interfaces use LPC's portal shell, typography, responsive layout and existing account lifecycle. Former tool-page URLs are compatibility redirects into the native portal. They retain valid matter/file identifiers and safe provider callback context. Sign-in returns preserve those entry points. Confidential search text and checklist edits never enter URLs or browser storage.
 
-## Authority and privacy
+## Preparation and scanned documents
 
-- Preparation and collaboration require a currently approved actor and an active funded matter. Existing revocation, current-assignment visibility, read-only, completion and dispute boundaries apply.
-- Preparations are encrypted at rest and scoped to the current attorney/paralegal assignment. A replacement paralegal cannot inherit a previous assignment’s preparation.
-- A source quotation must be an exact substring of a selected source section. PDF citations identify a page; DOC/DOCX/TXT citations identify an extracted text section, not a fabricated page.
-- Source versions and scope are checked again after processing. A changed source, security restriction, assignment, or scope requires fresh preparation.
-- An accepted working checklist is separate from contractual scope and authoritative completion tasks. Editing it does not authorize additional work or money movement.
-- Clio source matter descriptions and selected-document context stay in encrypted private handoff records. The separate posting draft starts blank, avoiding accidental publication of client details. The attorney authors and reviews the public scope.
-- Clio transfers require the initiating LPC account and selected Clio connection revision. Reconnecting to another provider account invalidates an old selection.
-- Matching rechecks profile visibility and blocking after processing. Recommendations never select, apply, invite, hire, fund or release payments. Arbitrary mandatory Matter requirements still require the existing confirmation process.
-- Account deactivation/minimization removes connection credentials, cached profile vectors and editing sessions. Draft deletion removes its private Clio handoff in the same transaction. Existing Matter purge also removes derived preparations and connected-workspace records.
+Preparation reads the agreed instructions and up to eight selected PDF, DOC, DOCX or TXT files. Each file is limited to 10 MB; PDFs to 80 pages; each request to 180,000 text characters. PDF text is read locally in a bounded worker. A PDF containing pages without readable text can use Amazon Textract in the existing US S3 region. OCR receives the exact security-checked, immutable S3 object version. No external results bucket is created.
 
-## Limits and truthful fallback
+Background requests persist encrypted actor/input/source context and OCR job checkpoints in MongoDB. The existing server starts the small queue worker after its database connection; no separate service is required. Leases allow an interrupted worker to resume. One active request per participant/matter prevents duplicate presses from opening parallel jobs. An uncertain request is checked with the same request ID. OCR polling and every processing boundary recheck the initiating actor, session, assignment, agreed instructions, file revision and security status. Revoked access stops processing. A changed source requires fresh preparation.
 
-Preparation accepts up to eight readable PDF, DOC, DOCX or TXT files, each up to 10 MB. PDFs are limited to 80 pages and one request to 180,000 extracted characters. Password-protected, malformed and image-only documents cannot be treated as fully read. Unreadable PDF pages are explicitly reported. OCR for image-only content is not implemented in this version.
+Progress reports actual stages and document counts, without estimated percentages. Provider failures retain a recoverable request when retry is safe. Exact source quotes are validated before saving suggestions. PDF citations identify a page; Word/text citations identify an extracted section. OCR, partial scan results and unreadable pages are visible in reading coverage. Handwriting, diagrams and images may contain information that text extraction cannot represent.
 
-Without the configured AI provider, preparation reports unavailable and retains normal Files/Work access. Matching remains usable through profile evidence and related work terms; if semantic ranking fails, the response states that fallback. At LPC’s current size the service ranks a bounded set (up to 500 filtered profiles) using cached vectors stored in MongoDB. It does not require a paid Atlas vector index, a separate vector database, training on completed matters, or a migration of resumes.
+Only the attorney accepts a working checklist. Source-derived items retain their quotations when edited; attorney-added items are explicitly marked as authored by the attorney. This record remains separate from agreed scope, canonical work completion, posted deadlines and payments. Submission review identifies possible issues in selected text for human review.
 
-Document collaboration supports DOCX. Existing LPC file history is the revision authority. The provider’s separate history ZIP/viewer is not integrated. Complex Word layout fidelity still requires a paired provider rehearsal with representative legal documents before activation.
+## File editing and transfer receipts
 
-Provider requests and external document transfers are implemented but were not exercised against live customer accounts during this work. Test fixtures exist only in tests; runtime adapters report missing configuration honestly.
+DOCX editing opens only for an active funded matter, an authorized current participant and a safe current file. The provider has signed source/callback access and an exact configured origin in CSP. Source versions and assignment authority are checked before recording a new LPC version. Saves use LPC's existing encryption, quarantine, malware checks, file history and transactions.
 
-## Configuration and activation
+Provider editing/autosave is distinguished from a saved LPC version. The native Save to LPC command uses a client request nonce correlated through the signed callback. A timeout or uncertain acknowledgement keeps editing/recovery available. The interface never substitutes an elapsed timer or provider event for a confirmed LPC file receipt. The editor owns its full-viewport dialog geometry; the general confirmation-dialog adapter does not shrink it. Existing discard confirmation and focus return apply.
 
-Use the current environment’s existing MongoDB, authentication, S3, KMS/encryption, malware-scanning and notification configuration. Never copy production credentials into tests or GitHub.
+Clio transfers are explicit and pinned to the initiating LPC owner, current Clio connection revision, reviewed source-document versions and selected destination. Approved-file exports also pin the reviewed LPC file version. Source descriptions and selected-document details remain encrypted private handoff data. Public posting content comes only from the attorney-authored and reviewed brief. An existing funded matter can receive a direct handoff without creating a duplicate posting.
 
-1. **Preparation and semantic matching:** existing OPENAI_API_KEY and the existing AI model configuration. OPENAI_MATCH_EMBEDDING_MODEL optionally selects the embedding model. Review the existing provider budget/data-handling configuration and verify costs with bounded synthetic samples before sending confidential documents.
-2. **Document collaboration:** see [document collaboration activation](CONNECTED_DOCUMENT_COLLABORATION.md). Requires an appropriately licensed ONLYOFFICE service, ONLYOFFICE_DOCUMENT_SERVER_URL, ONLYOFFICE_JWT_SECRET, and an APP_BASE_URL reachable by that service. Production uses HTTPS and the existing confidential-storage encryption policy. CSP allows only the configured editor origin.
-3. **Clio:** see [Clio activation](CLIO_CONNECTED_WORKSPACE.md). Requires the US developer app, current permissions, CLIO_CLIENT_ID, CLIO_CLIENT_SECRET, an exact redirect URI and applicable Clio distribution approval.
-4. Rehearse both roles using synthetic matters: hire/fund through the existing workflow; prepare and accept a checklist; co-edit and save a DOCX; review its new LPC version; select an explicit Clio import; approve a deliverable and export it. Test disconnect, account switch, revoked access and a provider failure.
+Durable import/export receipts preserve original operation identity across refresh, reconnect and lost acknowledgements. Recovery checks the saved transfer, rather than silently making another external upload. Disconnect and provider-account changes invalidate stale selections. Clio custom-action parameters are removed from the address bar after capture; an uncertain nonce acknowledgement uses an explicit authorized read to recover the selected matter.
 
-No provider subscription was purchased, no production configuration was changed, and no production deployment was performed as part of this branch.
+## Matching and account boundaries
+
+Matching indexes only approved, visible public professional profile fields. Private documents, resumes, matter content and communications are excluded. Embeddings are cached by public profile content in MongoDB. Ranking is bounded to 500 filtered profiles; it needs no separate vector database. A related-term/profile-evidence fallback remains available when the embedding service is unavailable, and the response states the fallback.
+
+Experience is self-reported; the UI exposes the supporting profile text and requirements that still need confirmation. Profile visibility, blocking, availability and applicable hard requirements are rechecked after ranking. Existing profile, save, invitation and application flows remain the decision points. Search never automatically invites, selects, applies, hires or moves money.
+
+Native API requests verify the current approved owner and role before and after operations, use fresh CSRF protection for mutations, and abort with the route. Session/account loss delegates to the existing portal cleanup. Matter purge removes preparation jobs/results, editor sessions, direct/draft Clio handoffs and transfer records. Account deactivation/minimization also removes pending job actor context, tokens, vectors and editing sessions under the existing retention workflow.
+
+## Activation
+
+Use the environment's existing MongoDB, authentication, S3, KMS/encryption and malware configuration. Credentials belong in the deployment's secret configuration.
+
+1. **Preparation and matching:** existing `OPENAI_API_KEY` and AI configuration. `OPENAI_MATCH_EMBEDDING_MODEL` optionally selects the embedding model. Without the AI provider, preparation reports its unavailable state and normal Work/Files remain usable; matching uses its explicit fallback.
+2. **Scanned PDFs:** a versioned S3 bucket in `us-east-1`, `us-east-2` or `us-west-2`, using the existing S3 region/credentials. The application role needs `textract:StartDocumentTextDetection` and `textract:GetDocumentTextDetection`, plus authorized `s3:GetObjectVersion`/object access and applicable KMS decryption for the existing file prefix. Textract permissions use resource `*`; keep storage/KMS permissions limited to LPC's existing confidential document scope. Verify with a synthetic scanned PDF before confidential use. Missing permissions, unsupported locations and unversioned objects produce an explicit reading failure; they do not appear as complete coverage.
+3. **DOCX collaboration:** see [document collaboration activation](CONNECTED_DOCUMENT_COLLABORATION.md). Requires an appropriately licensed ONLYOFFICE deployment, `ONLYOFFICE_DOCUMENT_SERVER_URL`, `ONLYOFFICE_JWT_SECRET`, and an `APP_BASE_URL` reachable by it. Production uses HTTPS and the existing confidential-storage encryption policy.
+4. **Clio:** see [Clio activation](CLIO_CONNECTED_WORKSPACE.md). Requires the US developer app, applicable permissions/distribution approval, `CLIO_CLIENT_ID`, `CLIO_CLIENT_SECRET`, and the exact configured redirect URI.
+5. Rehearse with synthetic matters in staging: both roles, a scanned PDF, accepted edited checklist, co-edit/save and file-history receipt, selected Clio import, approved export, provider failure, session/account switch, disconnect and revoked access. Check representative legal Word layout fidelity with the actual document service.
+
+Implementation and test fixtures are in this review branch. Production provider accounts, commercial licensing, live interoperability and deployment require the actual environment and have not been activated by this change.
 
 ## Verification
 
-Focused suites:
+Focused database suites cover preparation, durable background jobs, matching, document collaboration, Clio and account/matter cleanup. Independent checks cover OCR pagination/partial results/version pinning, policy parsers and the native API's ownership, path and CSRF boundaries. Browser journeys serve the actual LPC portals with controlled synthetic API/provider responses; fixtures are restricted to tests. They cover desktop/mobile navigation, source escaping, editable checklist review, exact-request recovery, native document save receipts, profile round trips and Clio review dialogs.
 
-- connectedMatching.test.js, connectedPreparation.test.js, connectedPolicies.test.js
-- documentCollaboration.test.js, documentCollaborationPolicy.test.js
-- clioIntegration.test.js, clioPolicy.test.js
+The checks and their results for the final branch head are recorded in the pull request. Existing repository baseline failures are identified separately and are not relabeled as regressions or silently disabled.
 
-Independent parser tests use actual synthetic PDF, DOCX and TXT files, including malformed-file rejection. Database suites exercise authorization, confidentiality, stale sources, account changes, imports/exports, duplicate callbacks, encrypted storage, transactional saves and replay recovery.
+## Primary provider references
 
-The execution host initially could not start the default Mongo test process. A scratch-only wrapper around the existing global setup used MongoDB 7.0.14 with a workspace database path, --nounixsocket and diagnosticDataCollectionEnabled=false. This exercised the same application and transaction suites without modifying the repository’s normal harness or production database settings.
-
-Executed verification: 86 feature database checks (matching 14, preparation 20, editor 21, Clio 31), 4 connected-lifecycle checks, 51 existing account/draft regressions, 41 isolated policy/parser checks, and 9 browser journeys: 191 passing checks in total. Browser journeys used actual served frontend files and synthetic API/provider fixtures, including source HTML escaping, missing-provider recovery, attorney/paralegal differences, narrow layouts and keyboard navigation.
-
-The frontend build, API contract, route uniqueness, whitespace checks and binding checks for the new runtime files passed. The full syntax check parsed 1,819 JavaScript files. Two broader pre-existing checks remain failing: the original branch has the same 100 frontend-hygiene findings and the same unmounted waitlist route flagged by the static route-security inventory. Comparison against a separate checkout of the exact base commit found no new frontend-hygiene findings and no additional open mutating routes from these changes.
-
-Provider activation, live compatibility and production deployment are separate from tested code implementation. This is a review branch, not a new production release certification.
-
-## Primary integration references
-
+- [Amazon Textract StartDocumentTextDetection](https://docs.aws.amazon.com/textract/latest/dg/API_StartDocumentTextDetection.html)
+- [Amazon Textract GetDocumentTextDetection](https://docs.aws.amazon.com/textract/latest/dg/API_GetDocumentTextDetection.html)
 - [ONLYOFFICE Docs API](https://api.onlyoffice.com/docs/docs-api/)
 - [ONLYOFFICE callback handler](https://api.onlyoffice.com/docs/docs-api/usage-api/callback-handler/)
 - [Clio Manage API](https://docs.developers.clio.com/clio-manage/api-reference/)
 - [Clio custom actions](https://docs.developers.clio.com/guides/clio-manage/custom-actions/)
-- [Clio public/private application requirements](https://docs.developers.clio.com/api-docs/clio-platform/applications/)
-
-Verify commercial licensing, current prices, account permissions and distribution conditions with each provider before activation. Current source and observed provider behavior govern implementation choices.

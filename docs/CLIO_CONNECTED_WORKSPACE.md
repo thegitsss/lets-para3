@@ -8,15 +8,18 @@ Mount `backend/routes/clioIntegration.js` at `/api/integrations/clio`.
 
 - `GET /status`: configuration and connection state; no credentials.
 - `POST /connect`: returns an authorization URL for the attorney to review in Clio.
-- `GET /callback`: consumes an account- and session-bound OAuth state and redirects to `/clio-connect.html?connected=1` after connection.
+- `GET /callback`: consumes an account- and session-bound OAuth state, then returns through the compatibility redirect into native Connections or the originating matter Files view.
 - `DELETE /connection`: removes local credentials, invalidates pending authorizations, and attempts provider access-token deauthorization.
 - `GET /matters?q=&cursor=` and `GET /matters/:clioMatterId/documents?cursor=`: the connected attorney's permitted Clio records.
-- `POST /handoffs`: explicitly selected Clio matter/document references, a private encrypted source snapshot, and a blank LPC draft for the attorney to scope and review.
-- `GET /handoffs?caseId=`: original handoffs whose drafts have published to the owned LPC matter. Without `caseId`, returns the owner's recent handoffs.
+- `POST /handoffs`: explicitly reviewed Clio source versions and a private encrypted snapshot, plus an attorney-authored public work brief that creates a draft in the existing LPC posting flow. Private source descriptions never populate the public posting.
+- `GET /handoffs?caseId=`: original published-draft and direct handoffs for the owned LPC matter. Without `caseId`, returns the owner's recent handoffs.
+- `POST /matters/:caseId/handoffs`: a reviewed private source selection linked directly to an existing active funded matter, without a duplicate posting.
+- `GET /transfers?caseId=`: authoritative import/export receipts and exact-operation retry descriptors, scoped to the current account/matter.
 - `POST /matters/:caseId/import`: explicitly selected original source versions, only after the linked LPC matter is funded and assigned. These use LPC's normal file ledger, transaction, storage quarantine, notification obligation, and current-assignment creation time.
 - `POST /matters/:caseId/export`: an explicitly approved current LPC document to an explicitly chosen Clio matter. The exact source revision and request identity are retained. Replays reuse the recorded transfer, and lost document-creation acknowledgements require provider reconciliation instead of creating another document.
 - `POST /custom-action`: registers the optional Clio matter menu action.
 - `POST /action-context`: validates the Clio nonce and exact matter subject path. Merely supplying a Clio matter URL is not authorization.
+- `GET /matters/:clioMatterId/context`: explicit read-only recovery after an uncertain custom-action nonce response; requires the original Clio user and current connection revision, and reauthorizes the provider matter read.
 
 All mutations require the current `expectedOwnerId` and existing CSRF protection. Handoff, import, export and custom-action requests also require `expectedConnectionRevision` from the last status response. The server pins all provider calls in an operation to that connection revision, so a stale page cannot transfer records through a newly connected Clio account. Imports and exports additionally require `confirmed: true` and a stable `requestId` (16–100 letters, digits, underscores or hyphens). The client should retain that identity on an uncertain retry. A unique owner/direction/fingerprint index also recovers the same transfer when a refreshed page issues a new UUID. Accepted UUID aliases remain bound to their original inputs through a unique owner/request-alias index; they cannot later identify another document or destination. Import file receipts are independently bound to the source account, document, version and LPC matter. The service fails closed if these duplicate-protection indexes are missing. Up to ten documents can be selected in a handoff/import. Each file is bounded to 20 MB.
 

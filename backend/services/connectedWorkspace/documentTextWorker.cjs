@@ -57,8 +57,8 @@ function inspectDocx(buffer) {
       if (text.includes("\0") || text.length > MAX_TEXT) throw new Error("Invalid text");
       pages = text.split(/\n\s*\n/).filter(text => text.trim()).map((text, index) => ({ page: null, section: index + 1, text: text.trim() }));
     }
-    if (!pages.some(page => page.text)) throw new Error("No readable text");
-    parentPort.postMessage({ pages, unreadablePages: pages.filter(page => !page.text).map(page => page.page) });
+    if (type !== "pdf" && !pages.some(page => page.text)) throw new Error("No readable text");
+    parentPort.postMessage({ pages, needsOcr: type === "pdf" && pages.some(page => !page.text), unreadablePages: pages.filter(page => !page.text).map(page => page.page) });
   } catch { parentPort.postMessage({ error: true }); }
   finally { await pdf?.destroy(); }
 })();

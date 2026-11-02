@@ -140,6 +140,50 @@ test('handoffs require explicit consent and cannot select a document from anothe
   const original = mockFetch.getMockImplementation(); mockFetch.mockImplementation(async (...args) => new URL(String(args[0])).pathname === '/api/v4/documents/21.json' ? json({ data: sourceDocument({ matter: { id: 999 } }) }) : original(...args));
   expect((await mutation('post','/handoffs', { clioMatterId: '123', documentIds: ['21'], requestId: crypto.randomUUID(), confirmed: true })).status).toBe(403); expect(await CaseDraft.countDocuments()).toBe(0);
 });
+test('an explicitly reviewed public brief fills the posting draft without copying private Clio context', async () => {
+  await establishConnection();
+  const body = { clioMatterId: '123', documentIds: ['21'], expectedDocuments: [{ id: '21', versionId: '31', versionUuid: 'source-version-31' }], publicWorkBrief: { title: 'Prepare a document chronology', description: 'Organize the supplied records into a chronology for attorney review.', tasks: ['Prepare the chronology'] }, publicBriefConfirmed: true, requestId: crypto.randomUUID(), confirmed: true };
+  const result = await mutation('post','/handoffs',body); expect(result.status).toBe(200);
+  const draft = await CaseDraft.findById(result.body.draftId); expect(draft.title).toBe(body.publicWorkBrief.title); expect(draft.description).toBe(body.publicWorkBrief.description); expect(draft.tasks.map(item => item.title)).toEqual(body.publicWorkBrief.tasks); expect(JSON.stringify(draft)).not.toContain('Confidential client facts');
+  expect((await mutation('post','/handoffs',{ ...body, publicWorkBrief: { ...body.publicWorkBrief, title: 'A different assignment' } })).status).toBe(409);
+  expect((await mutation('post','/handoffs',{ ...body, requestId: crypto.randomUUID(), publicBriefConfirmed: false })).status).toBe(400);
+});
+test('source versions changed before handoff confirmation are rejected before any draft is created', async () => {
+  await establishConnection();
+  const result = await mutation('post','/handoffs',{ clioMatterId: '123', documentIds: ['21'], expectedDocuments: [{ id: '21', versionId: '30', versionUuid: 'old-version' }], requestId: crypto.randomUUID(), confirmed: true });
+  expect(result.status).toBe(409); expect(result.body.code).toBe('CLIO_SOURCE_CHANGED'); expect(await CaseDraft.countDocuments()).toBe(0); expect(await Handoff.countDocuments()).toBe(0);
+});
+test('a direct funded-matter selection imports documents without creating another posting draft', async () => {
+  await establishConnection(); const selected = await mutation('post',`/matters/${matter._id}/handoffs`,{ clioMatterId: '123', documentIds: ['21'], expectedDocuments: [{ id: '21', versionId: '31', versionUuid: 'source-version-31' }], requestId: crypto.randomUUID(), confirmed: true });
+  expect(selected.status).toBe(200); expect(selected.body).toMatchObject({ caseId: String(matter._id), draftId: null, documentsDeferredUntilFunding: false }); expect(await CaseDraft.countDocuments()).toBe(0);
+  const imported = await mutation('post',`/matters/${matter._id}/import`,{ handoffId: selected.body.handoffId, documentIds: ['21'], requestId: crypto.randomUUID(), confirmed: true }); expect(imported.status).toBe(200);
+  const choices = await get(`/handoffs?caseId=${matter._id}`); expect(choices.body.items.map(item => item.handoffId)).toContain(selected.body.handoffId);
+  const receipt = await get(`/transfers?caseId=${matter._id}`); expect(receipt.status).toBe(200); expect(receipt.body.items[0]).toMatchObject({ direction: 'import', status: 'recorded', label: 'SYN-123', handoffId: selected.body.handoffId, documentCount: 1, retry: null }); expect(JSON.stringify(receipt.body)).not.toMatch(/synthetic-access-token|X-Amz-Signature|putUrl/);
+});
+test('direct Clio selections require current funding, ownership and reviewed source versions', async () => {
+  await establishConnection(); const body = { clioMatterId: '123', documentIds: ['21'], requestId: crypto.randomUUID(), confirmed: true };
+  expect((await mutation('post',`/matters/${matter._id}/handoffs`, body, cookie(other))).status).toBe(403);
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { escrowStatus: 'pending' } });
+  expect((await mutation('post',`/matters/${matter._id}/handoffs`, body)).status).toBe(403); expect(await Handoff.countDocuments()).toBe(0); expect(mockFetch).not.toHaveBeenCalled();
+});
+test('OAuth can return to the owned matter that initiated the connection without accepting arbitrary destinations', async () => {
+  const start = await mutation('post','/connect',{ returnCaseId: String(matter._id) }), state = new URL(start.body.authorizationUrl).searchParams.get('state');
+  expect((await get(`/callback?state=${state}&code=synthetic-code`)).headers.location).toBe(`/clio-connect.html?connected=1&caseId=${matter._id}`);
+  expect((await mutation('post','/connect',{ returnCaseId: 'https://evil.test' })).status).toBe(400);
+  const foreign = await Case.create({ attorney: other._id, attorneyId: other._id, title: 'Foreign', details: 'A foreign matter', status: 'open', totalAmount: 50000 });
+  expect((await mutation('post','/connect',{ returnCaseId: String(foreign._id) })).status).toBe(404);
+});
+test('stale owner headers cannot read another account connection or transfer history', async () => {
+  expect((await get('/status').set('X-LPC-Owner-Id', String(other._id))).status).toBe(403);
+  expect((await get(`/transfers?caseId=${matter._id}`).set('X-LPC-Owner-Id', String(other._id))).status).toBe(403); expect(mockFetch).not.toHaveBeenCalled();
+});
+test('recovery reads the selected matter through the original Clio account without replaying a nonce', async () => {
+  const connection = await establishConnection();
+  const result = await get(`/matters/123/context?expectedUserId=1001&expectedConnectionRevision=${connection.revision}`); expect(result.status).toBe(200); expect(result.body.matter.id).toBe('123');
+  expect((await get(`/matters/123/context?expectedUserId=2002&expectedConnectionRevision=${connection.revision}`)).status).toBe(409);
+  expect((await get('/matters/123/context?expectedUserId=1001&expectedConnectionRevision=stale')).status).toBe(409);
+  expect(mockFetch.mock.calls.some(([input]) => new URL(String(input)).searchParams.has('custom_action_nonce'))).toBe(false);
+});
 test('a stale Clio account selection cannot create a handoff under a new connection', async () => {
   const connection = await establishConnection(), oldRevision = connection.revision;
   await Connection.updateOne({ _id: connection._id }, { $set: { revision: crypto.randomUUID(), clioUserId: '2002' } });
@@ -179,6 +223,11 @@ test('exports require approval and explicit consent before sending document byte
   await CaseFile.updateOne({ _id: file._id }, { $set: { status: 'pending_review' } });
   expect((await mutation('post',`/matters/${matter._id}/export`, { fileId: String(file._id), clioMatterId: '123', requestId: crypto.randomUUID(), confirmed: true })).status).toBe(403); expect(mockStorage).not.toHaveBeenCalled(); expect(mockFetch).not.toHaveBeenCalled();
 });
+test('a document replaced after native review cannot be exported as the reviewed earlier version', async () => {
+  await establishConnection(); await CaseFile.updateOne({ _id: file._id }, { $set: { version: 2 } });
+  const result = await mutation('post',`/matters/${matter._id}/export`,{ fileId: String(file._id), expectedFileVersion: 1, clioMatterId: '123', requestId: crypto.randomUUID(), confirmed: true });
+  expect(result.status).toBe(409); expect(result.body.code).toBe('CLIO_FILE_CHANGED'); expect(mockFetch).not.toHaveBeenCalled(); expect(mockStorage).not.toHaveBeenCalled();
+});
 test('export creates, uploads and finalizes one Clio document; exact retry returns the recorded result', async () => {
   await establishConnection(); const body = { fileId: String(file._id), clioMatterId: '123', requestId: crypto.randomUUID(), confirmed: true };
   const first = await mutation('post',`/matters/${matter._id}/export`, body); expect(first.status).toBe(200); expect(first.body).toMatchObject({ clioDocumentId: '7001', status: 'recorded' });
@@ -209,6 +258,15 @@ test('a refreshed request reconciles a lost create acknowledgement without a sec
   const pending = await Transfer.findOne().lean(); const recovered = await mutation('post',`/matters/${matter._id}/export`, { ...body, requestId: crypto.randomUUID() });
   expect(recovered.status).toBe(200); expect(recovered.body.transferId).toBe(String(pending._id)); expect(remoteCreated).toBe(1); expect(await Transfer.countDocuments()).toBe(1);
 });
+test('an uncertain export exposes only a safe exact retry receipt and retains it after disconnect', async () => {
+  await establishConnection(); const original = mockFetch.getMockImplementation(); let once = false;
+  mockFetch.mockImplementation(async (...args) => { const value = await original(...args); if (!once && new URL(String(args[0])).pathname === '/api/v4/documents.json' && args[1].method === 'POST') { once = true; throw new Error('synthetic lost create acknowledgement'); } return value; });
+  const body = { fileId: String(file._id), clioMatterId: '123', requestId: crypto.randomUUID(), confirmed: true };
+  expect((await mutation('post',`/matters/${matter._id}/export`, body)).status).toBe(503);
+  const receipt = await get(`/transfers?caseId=${matter._id}`); expect(receipt.body.items[0]).toMatchObject({ direction: 'export', status: 'uncertain', label: 'SYN-123', fileName: 'Approved.txt', retry: { path: `${base}/matters/${matter._id}/export`, body: { fileId: String(file._id), clioMatterId: '123', requestId: body.requestId } } }); expect(JSON.stringify(receipt.body)).not.toMatch(/synthetic-access-token|synthetic-refresh-token|X-Amz-Signature|putUrl/);
+  await mutation('delete','/connection'); expect((await get(`/transfers?caseId=${matter._id}`)).body.items).toHaveLength(1);
+  expect((await get(`/transfers?caseId=${matter._id}`, cookie(other))).status).toBe(404);
+});
 test('concurrent fresh request identities cannot create two provider documents for the same export', async () => {
   await establishConnection(); const body = { fileId: String(file._id), clioMatterId: '123', confirmed: true };
   const responses = await Promise.all([mutation('post',`/matters/${matter._id}/export`, { ...body, requestId: crypto.randomUUID() }), mutation('post',`/matters/${matter._id}/export`, { ...body, requestId: crypto.randomUUID() })]);
@@ -220,6 +278,17 @@ test('fresh import identities replay existing source versions without another fi
   const again = await mutation('post',`/matters/${matter._id}/import`, { ...body, requestId: crypto.randomUUID() });
   expect(again.status).toBe(200); expect(again.body).toMatchObject({ transferId: first.body.transferId, replayed: true }); expect(again.body.files[0].id).toBe(first.body.files[0].id);
   expect(mockStorage.mock.calls.filter(([command]) => command.constructor.name === 'PutObjectCommand')).toHaveLength(1);
+});
+test('a replacement assignment gets an explicitly imported current file rather than replaying an earlier hidden copy', async () => {
+  await establishConnection(); const handoff = await fundedHandoff(), body = { handoffId: handoff.handoffId, documentIds: ['21'], requestId: crypto.randomUUID(), confirmed: true };
+  const first = await mutation('post',`/matters/${matter._id}/import`,body); expect(first.status).toBe(200);
+  const replacement = await User.create({ firstName: 'Replacement', lastName: 'Synthetic', email: 'replacement@clio-integration.test', password: 'Synthetic123!', role: 'paralegal', status: 'approved' }), hiredAt = new Date();
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { paralegal: replacement._id, paralegalId: replacement._id, withdrawnParalegalId: para._id, hiredAt }, $inc: { __v: 1 } });
+  expect((await mutation('post',`/matters/${matter._id}/import`,body)).status).toBe(409);
+  const current = await mutation('post',`/matters/${matter._id}/import`,{ ...body, requestId: crypto.randomUUID() }); expect(current.status).toBe(200); expect(current.body.files[0].id).not.toBe(first.body.files[0].id);
+  const fileRecord = await CaseFile.findById(current.body.files[0].id); expect(fileRecord.createdAt.getTime()).toBeGreaterThanOrEqual(hiredAt.getTime());
+  expect(require('../utils/matterAssignmentVisibility').isRecordVisibleToCurrentAssignment(fileRecord, await Case.findById(matter._id), { role: 'paralegal', userId: String(replacement._id) })).toBe(true);
+  const history = (await get(`/transfers?caseId=${matter._id}`)).body; expect(history.items).toHaveLength(2); expect(history.items.filter(item => item.assignmentRevision === history.assignmentRevision)).toHaveLength(1);
 });
 test('transfers fail closed when the durable fingerprint index is missing', async () => {
   await establishConnection(); const indexes = await Transfer.collection.indexes(), index = indexes.find(value => value.key.direction && value.key.fingerprint);

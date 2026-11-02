@@ -378,6 +378,7 @@ function connectWithRetry() {
     })
     .then(() => {
       logger.info("Connected to MongoDB Atlas.");
+      require("./services/connectedWorkspace/preparationJobs").start();
       if (!realtimeProjectionBridge) {
         realtimeProjectionBridge = startRealtimeProjectionBridge({ logger });
       }
@@ -410,6 +411,7 @@ async function shutdown(signal) {
   if (shutdownPromise) return shutdownPromise;
   shutdownPromise = (async () => {
     shuttingDown = true;
+    require("./services/connectedWorkspace/preparationJobs").stop();
     if (mongoRetryTimer) clearTimeout(mongoRetryTimer);
     mongoRetryTimer = null;
     logger.info({ signal, message: "Shutdown requested; draining LPC." });

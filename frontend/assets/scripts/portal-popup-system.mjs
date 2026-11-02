@@ -1,7 +1,7 @@
 /* Presentation adapter for native LPC popups. Existing controls, form owners,
    listeners, focus handling, validation and network operations are untouched. */
 // Crop framing owns its canvas geometry and compact Cancel/Done header.
-const excluded = '.lpc-setup-dialog,.ri-dialog,.lpc-boot-screen,.av2-navigation-dialog,.v2-navigation-dialog,.v2-photo-crop-dialog,.v2-availability-dialog,.lpc-document-quick-look';
+const excluded = '.lpc-setup-dialog,.ri-dialog,.lpc-boot-screen,.av2-navigation-dialog,.v2-navigation-dialog,.v2-photo-crop-dialog,.v2-availability-dialog,.lpc-document-quick-look,.lpc-native-editor,.lc-clio-dialog';
 const layers = '.av2-creation-layer,.v2-onboarding-dialog';
 const footers = 'footer,.av2-actions,.pv2-actions,.av2-delete-actions,.v2-settings-dialog-actions,.ph-dialog-footer,.lpc-dialog__actions,.lpc-invitation-dialog__actions,.lpc-engagement-dialog__actions,[class$="-dialog-actions"],[class$="-conflict-actions"]';
 const primary = '.av2-button,.pv2-button,.v2-work-primary,.v2-settings-primary,.v2-browse-dialog-primary,.v2-matter-dialog-primary,.v2-profile-form-save,.lpc-dialog__button--primary,.ph-primary,[type="submit"],[class$="-primary"]';

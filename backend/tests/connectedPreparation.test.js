@@ -133,6 +133,24 @@ test("an accepted checklist retry cannot report changed edited text as saved", a
   expect(same.reused).toBe(true);
   await expect(service.accept(req(owner, { ...body, items: ["Changed text which was never accepted"] }))).rejects.toMatchObject({ status: 409 });
 });
+test("attorney checklist edits can add and remove rows without attaching model evidence to newly authored work", async () => {
+  propose.mockResolvedValueOnce({ data: { ...proposal(), items: [...proposal().items, { title: "Prepare exhibit index", citations: [{ sourceId: "scope", quote: scopeQuote }] }] } });
+  const result = await generate(), before = await Case.collection.findOne({ _id: matter._id });
+  const body = { preparationId: result.preparation.id, revision: result.preparation.revision, items: [{ title: "Chronology for counsel review", sourceIndex: 0 }, { title: "Attorney-authored working reminder", sourceIndex: null }], confirmed: true };
+  const accepted = await service.accept(req(owner, body));
+  expect(accepted.preparation.items).toHaveLength(2);
+  expect(accepted.preparation.items[0]).toMatchObject({ title: body.items[0].title, originalTitle: "Prepare chronology", editedByAttorney: true, citations: [{ sourceId: "scope", quote: scopeQuote }] });
+  expect(accepted.preparation.items[1]).toEqual({ title: body.items[1].title, citations: [], authoredByAttorney: true });
+  expect(accepted.preparation.items.some(item => item.title === "Prepare exhibit index")).toBe(false);
+  expect((await service.accept(req(owner, body))).reused).toBe(true);
+  expect(authoritativeState(await Case.collection.findOne({ _id: matter._id }))).toEqual(authoritativeState(before));
+});
+test("duplicate or invented source indexes cannot relabel model evidence during checklist acceptance", async () => {
+  const result = await generate(), base = { preparationId: result.preparation.id, revision: result.preparation.revision, confirmed: true };
+  await expect(service.accept(req(owner, { ...base, items: [{ title: "One", sourceIndex: 0 }, { title: "Two", sourceIndex: 0 }] }))).rejects.toMatchObject({ status: 400, publicCode: "PREPARATION_INVALID" });
+  await expect(service.accept(req(owner, { ...base, items: [{ title: "Unprovided source", sourceIndex: 29 }] }))).rejects.toMatchObject({ status: 400, publicCode: "PREPARATION_INVALID" });
+  expect((await service.list(req())).preparation.status).toBe("proposed");
+});
 test("changed sources prevent checklist acceptance and old stored plans are explicitly stale", async () => {
   const result = await generate();
   await File.collection.updateOne({ _id: file._id }, { $set: { version: 2 } });

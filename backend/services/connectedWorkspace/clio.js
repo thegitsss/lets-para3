@@ -37,6 +37,7 @@ const decode = value => JSON.parse(decryptString(value));
 const authVersion = req => Number(req.auth?.payload?.av ?? req.authVersion ?? 0);
 const sessionHash = req => hash(req.authSessionId ? `session:${req.authSessionId}` : `token:${req.auth?.token || ''}`);
 const ownerGuard = req => ({ ownerId: String(req.user.id), authVersion: authVersion(req) });
+function assignmentRevision(matter) { const at = new Date(matter.hiredAt || 0); return hash(JSON.stringify([String(matter.paralegal || matter.paralegalId || ''), Number.isFinite(at.getTime()) ? at.toISOString() : ''])); }
 
 function configuration(env = process.env) {
   try {
@@ -53,7 +54,7 @@ async function readyTransfers() {
   await Transfer.init();
   const indexes = await Transfer.collection.indexes();
   for (const key of [{ ownerId: 1, requestId: 1 }, { ownerId: 1, direction: 1, fingerprint: 1 }, { ownerId: 1, requestIds: 1 }]) {
-    if (!indexes.some(index => index.unique === true && JSON.stringify(index.key) === JSON.stringify(key))) fail(503, 'TRANSFER_INDEX_UNAVAILABLE', 'Document transfers are unavailable until their duplicate-protection indexes are ready.');
+    if (!indexes.some(index => index.unique === true && JSON.stringify(index.key) === JSON.stringify(key))) fail(503, 'TRANSFER_INDEX_UNAVAILABLE', 'Document transfers are temporarily unavailable. Try again later.');
   }
 }
 async function acquireTransfer(req, { direction, key, fingerprint, caseId, fileId, payload = '' }) {
@@ -162,7 +163,9 @@ async function pinConnection(req) {
 }
 async function connect(req) {
   await actor(req); const config = configured(), state = crypto.randomBytes(32).toString('base64url');
-  await withActiveAccountWrite([req.user.id], async session => { const current = await Connection.findOne({ ownerId: req.user.id }).select('revision').session(session).lean(); return OAuthState.create([{ tokenHash: hash(state), ownerId: req.user.id, sessionHash: sessionHash(req), authVersion: authVersion(req), connectionRevision: current?.revision || '', expiresAt: new Date(Date.now() + 10 * 60000) }], { session }); }, ownerGuard(req));
+  let returnCaseId = null;
+  if (req.body.returnCaseId !== undefined) { if (!validId(req.body.returnCaseId)) fail(400, 'INVALID', 'Choose a valid LPC matter to return to.'); await matterOwner({ ...req, params: { caseId: req.body.returnCaseId } }); returnCaseId = req.body.returnCaseId; }
+  await withActiveAccountWrite([req.user.id], async session => { const current = await Connection.findOne({ ownerId: req.user.id }).select('revision').session(session).lean(); return OAuthState.create([{ tokenHash: hash(state), ownerId: req.user.id, sessionHash: sessionHash(req), authVersion: authVersion(req), connectionRevision: current?.revision || '', returnCaseId, expiresAt: new Date(Date.now() + 10 * 60000) }], { session }); }, ownerGuard(req));
   const url = new URL('/oauth/authorize', BASE); for (const [key, value] of Object.entries({ response_type: 'code', client_id: config.clientId, redirect_uri: config.redirectUri, state, redirect_on_decline: 'true' })) url.searchParams.set(key, value);
   return { authorizationUrl: url.href };
 }
@@ -171,7 +174,8 @@ async function callback(req) {
   if (typeof req.query.state !== 'string' || !/^[a-zA-Z0-9_-]{43}$/.test(req.query.state)) fail(400, 'STATE_INVALID', 'This Clio connection request is invalid or expired.');
   const pending = await OAuthState.findOneAndUpdate({ tokenHash: hash(req.query.state), ownerId: req.user.id, sessionHash: sessionHash(req), authVersion: authVersion(req), consumedAt: null, canceledAt: null, expiresAt: { $gt: new Date() } }, { $set: { consumedAt: new Date() } }, { new: true }).lean();
   if (!pending) fail(400, 'STATE_INVALID', 'This Clio connection request is invalid or expired.');
-  if (req.query.error) return { href: '/clio-connect.html?connected=0' };
+  const returnHref = value => `/clio-connect.html?connected=${value}${pending.returnCaseId ? `&caseId=${pending.returnCaseId}` : ''}`;
+  if (req.query.error) return { href: returnHref(0) };
   if (typeof req.query.code !== 'string' || !req.query.code || req.query.code.length > 4096) fail(400, 'CODE_INVALID', 'Clio did not supply an authorization code.');
   const token = await exchange({ grant_type: 'authorization_code', code: req.query.code, redirect_uri: config.redirectUri });
   if (typeof token.refresh_token !== 'string' || !token.refresh_token) fail(502, 'PROVIDER_INVALID', 'Clio did not return a refreshable connection.');
@@ -183,7 +187,7 @@ async function callback(req) {
     if ((current?.revision || '') !== (pending.connectionRevision || '')) fail(409, 'CONNECTION_CHANGED', 'The Clio connection changed while authorization was pending. Start a new connection request.');
     await Connection.findOneAndUpdate({ ownerId: req.user.id }, { $set: { credentials: encode({ accessToken: token.access_token, refreshToken: token.refresh_token }), authVersion: authVersion(req), clioUserId: userId, revision: crypto.randomUUID(), expiresAt: new Date(Date.now() + Number(token.expires_in) * 1000), connectedAt: new Date(), disconnectedAt: null, needsReconnect: false, refreshLease: '', refreshLeaseUntil: null } }, { upsert: true, session });
   }, ownerGuard(req));
-  return { href: '/clio-connect.html?connected=1' };
+  return { href: returnHref(1) };
 }
 async function disconnect(req) {
   await actor(req); const connection = await Connection.findOne({ ownerId: req.user.id, disconnectedAt: null }).select('+credentials').lean();
@@ -209,6 +213,12 @@ async function listMatters(req) {
   if (!Array.isArray(result.data)) fail(502, 'PROVIDER_INVALID', 'Clio did not return a matter list.');
   return { items: result.data.map(matterShape), nextCursor: pageCursor(result) };
 }
+async function matterContext(req) {
+  const connection = await readConnection(req), matterId = clioId(req.params.clioMatterId);
+  if (req.query.expectedUserId !== connection.clioUserId || req.query.expectedConnectionRevision !== connection.revision) fail(409, 'CONNECTION_CHANGED', 'The original Clio account is no longer connected. Select the matter again.');
+  req.clioConnectionRevision = connection.revision;
+  return { matter: matterShape((await api(req, `/matters/${matterId}.json`, { query: { fields: 'id,display_number,description,status' } })).data) };
+}
 async function listDocuments(req) {
   const matterId = clioId(req.params.clioMatterId);
   await api(req, `/matters/${matterId}.json`, { query: { fields: 'id' } });
@@ -230,18 +240,36 @@ async function documentsInMatter(req, matterId, ids) {
   }
   return documents;
 }
+function verifyDocumentReview(documents, expected) {
+  if (expected === undefined) return;
+  if (!Array.isArray(expected) || expected.length !== documents.length || expected.some(item => !item || typeof item.id !== 'string' || typeof item.versionId !== 'string' || typeof item.versionUuid !== 'string') || new Set(expected.map(item => item.id)).size !== expected.length || documents.some(document => !expected.some(item => item.id === document.id && item.versionId === document.versionId && item.versionUuid === document.versionUuid))) fail(409, 'SOURCE_CHANGED', 'A Clio document changed. Choose the source documents again to review their latest versions.');
+}
+function reviewIdentity(expected) {
+  if (expected === undefined) return null;
+  if (!Array.isArray(expected) || expected.length > 10 || expected.some(item => !item || typeof item.id !== 'string' || typeof item.versionId !== 'string' || typeof item.versionUuid !== 'string' || item.versionUuid.length > 200)) fail(409, 'SOURCE_CHANGED', 'Choose the Clio documents again to review their latest versions.');
+  return expected.map(({ id, versionId, versionUuid }) => ({ id, versionId, versionUuid })).sort((a,b) => a.id.localeCompare(b.id));
+}
 async function createHandoff(req) {
   if (req.body.confirmed !== true) fail(400, 'CONFIRMATION_REQUIRED', 'Review and confirm the selected Clio information.');
-  const matterId = clioId(req.body.clioMatterId), ids = selectedIds(req.body.documentIds || []), key = requestId(req.body.requestId), fingerprint = hash(JSON.stringify([matterId, ids]));
+  let publicBrief = null;
+  if (req.body.publicWorkBrief !== undefined) {
+    const value = req.body.publicWorkBrief;
+    if (req.body.publicBriefConfirmed !== true || !value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['title','description','tasks'].includes(key)) || typeof value.title !== 'string' || !value.title.trim() || value.title.length > 300 || typeof value.description !== 'string' || value.description.trim().length < 10 || value.description.length > 4000 || !Array.isArray(value.tasks || []) || (value.tasks || []).length > 25 || (value.tasks || []).some(task => typeof task !== 'string' || !task.trim() || task.length > 200)) fail(400, 'BRIEF_REVIEW_REQUIRED', 'Review the public work title, description and deliverables before preparing the draft.');
+    const clean = text => text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim();
+    publicBrief = { title: clean(value.title), description: clean(value.description), tasks: (value.tasks || []).map(clean) };
+    if (!publicBrief.title || publicBrief.description.length < 10 || publicBrief.tasks.some(task => !task)) fail(400, 'BRIEF_REVIEW_REQUIRED', 'Enter a work title and description before reviewing the posting draft.');
+  }
+  const matterId = clioId(req.body.clioMatterId), ids = selectedIds(req.body.documentIds || []), key = requestId(req.body.requestId), reviewedVersions = reviewIdentity(req.body.expectedDocuments), fingerprint = hash(JSON.stringify([matterId, ids, ...(publicBrief ? [publicBrief] : []), ...(reviewedVersions ? [reviewedVersions] : [])]));
   const connection = await pinConnection(req);
   const old = await Handoff.findOne({ ownerId: req.user.id, requestId: key }).lean();
   if (old) { if (old.fingerprint !== fingerprint) fail(409, 'REQUEST_CHANGED', 'This request was already used for different selections.'); return handoffResult(old); }
   const matter = matterShape((await api(req, `/matters/${matterId}.json`, { query: { fields: 'id,display_number,description,status' } })).data);
   const documents = await documentsInMatter(req, matterId, ids);
+  verifyDocumentReview(documents, req.body.expectedDocuments);
   let saved;
   try { saved = await withActiveAccountWrite([req.user.id], async session => {
     if (!await Connection.exists({ _id: connection._id, revision: connection.revision, disconnectedAt: null, needsReconnect: false }).session(session)) fail(409, 'CONNECTION_CHANGED', 'The connected Clio account changed. Refresh its records before continuing.');
-    const [draft] = await CaseDraft.create([{ owner: req.user.id, title: '', description: '', tasks: [], status: 'draft' }], { session });
+    const [draft] = await CaseDraft.create([{ owner: req.user.id, title: publicBrief?.title || '', description: publicBrief?.description || '', tasks: (publicBrief?.tasks || []).map(title => ({ title })), status: 'draft' }], { session });
     // Raw Clio matter descriptions can contain confidential client facts. They
     // stay encrypted in this private handoff, never prefilled into a posting.
     const [handoff] = await Handoff.create([{ ownerId: req.user.id, draftId: draft._id, clioMatterId: matterId, clioUserId: connection.clioUserId, connectionRevision: connection.revision, requestId: key, fingerprint, payload: encode({ matter, documents }) }], { session });
@@ -249,7 +277,23 @@ async function createHandoff(req) {
   }, ownerGuard(req)); } catch (error) { if (error.code !== 11000) throw error; const prior = await Handoff.findOne({ ownerId: req.user.id, requestId: key }).lean(); if (!prior || prior.fingerprint !== fingerprint) throw error; saved = prior; }
   return handoffResult(saved);
 }
-function handoffResult(handoff) { return { handoffId: String(handoff._id), draftId: String(handoff.draftId), href: `/attorney-v2.html#/matters/new?draftId=${handoff.draftId}`, documentsDeferredUntilFunding: true }; }
+function handoffResult(handoff) { return { handoffId: String(handoff._id), draftId: handoff.draftId ? String(handoff.draftId) : null, caseId: handoff.targetCaseId ? String(handoff.targetCaseId) : null, href: handoff.draftId ? `/attorney-v2.html#/matters/new?draftId=${handoff.draftId}` : null, documentsDeferredUntilFunding: !handoff.targetCaseId }; }
+async function createMatterHandoff(req) {
+  if (req.body.confirmed !== true) fail(400, 'CONFIRMATION_REQUIRED', 'Review and confirm the source matter and selected documents.');
+  const local = await matterOwner(req, { funded: true }), connection = await pinConnection(req);
+  const matterId = clioId(req.body.clioMatterId), ids = selectedIds(req.body.documentIds, { empty: false }), key = requestId(req.body.requestId), reviewedVersions = reviewIdentity(req.body.expectedDocuments), fingerprint = hash(JSON.stringify(['funded-matter', String(local._id), assignmentRevision(local), matterId, ids, ...(reviewedVersions ? [reviewedVersions] : [])]));
+  const old = await Handoff.findOne({ ownerId: req.user.id, requestId: key }).lean();
+  if (old) { if (old.fingerprint !== fingerprint || String(old.targetCaseId || '') !== String(local._id)) fail(409, 'REQUEST_CHANGED', 'This request already identifies another source selection.'); return handoffResult(old); }
+  const matter = matterShape((await api(req, `/matters/${matterId}.json`, { query: { fields: 'id,display_number,description,status' } })).data), documents = await documentsInMatter(req, matterId, ids);
+  verifyDocumentReview(documents, req.body.expectedDocuments);
+  let saved;
+  try { saved = await fileWrites.run(req, local, async session => {
+    if (!await Connection.exists({ _id: connection._id, revision: connection.revision, disconnectedAt: null, needsReconnect: false }).session(session)) fail(409, 'CONNECTION_CHANGED', 'The connected Clio account changed. Refresh its records before continuing.');
+    const [handoff] = await Handoff.create([{ ownerId: req.user.id, targetCaseId: local._id, clioMatterId: matterId, clioUserId: connection.clioUserId, connectionRevision: connection.revision, requestId: key, fingerprint, payload: encode({ matter, documents }) }], { session });
+    return handoff;
+  }); } catch (error) { if (error.code !== 11000) throw error; saved = await Handoff.findOne({ ownerId: req.user.id, requestId: key }).lean(); if (!saved || saved.fingerprint !== fingerprint) throw error; }
+  return handoffResult(saved);
+}
 async function matterOwner(req, { funded = false } = {}) {
   await actor(req); if (!validId(req.params.caseId)) fail(400, 'INVALID', 'Select an LPC matter.');
   if (funded) return fileWrites.read(req);
@@ -263,7 +307,7 @@ async function listHandoffs(req) {
   const caseId = req.query.caseId;
   let drafts;
   if (caseId) { await matterOwner({ ...req, params: { ...req.params, caseId } }); drafts = await CaseDraft.find({ owner: req.user.id, publishedCaseId: caseId }).select('_id').lean(); }
-  const rows = await Handoff.find({ ownerId: req.user.id, ...(caseId ? { draftId: { $in: drafts.map(doc => doc._id) } } : {}) }).select('+payload').sort({ createdAt: -1 }).limit(50).lean();
+  const rows = await Handoff.find({ ownerId: req.user.id, ...(caseId ? { $or: [{ targetCaseId: caseId }, { draftId: { $in: drafts.map(doc => doc._id) } }] } : {}) }).select('+payload').sort({ createdAt: -1 }).limit(50).lean();
   return { items: rows.map(row => { const payload = decode(row.payload); return { ...handoffResult(row), clioMatterId: row.clioMatterId, label: payload.matter.label, documents: payload.documents, createdAt: row.createdAt }; }) };
 }
 function transferUrl(value) {
@@ -287,13 +331,13 @@ async function importDocuments(req) {
   const doc = await matterOwner(req, { funded: true }), key = requestId(req.body.requestId), ids = selectedIds(req.body.documentIds, { empty: false });
   if (!validId(req.body.handoffId)) fail(400, 'INVALID', 'Select the original Clio handoff.');
   const handoff = await Handoff.findOne({ _id: req.body.handoffId, ownerId: req.user.id }).select('+payload').lean();
-  const draft = handoff && await CaseDraft.findOne({ _id: handoff.draftId, owner: req.user.id, publishedCaseId: doc._id }).lean();
-  if (!handoff || !draft) fail(404, 'HANDOFF_UNAVAILABLE', 'This handoff is not connected to the LPC matter.');
+  const draft = handoff?.draftId && await CaseDraft.findOne({ _id: handoff.draftId, owner: req.user.id, publishedCaseId: doc._id }).lean();
+  if (!handoff || !draft && String(handoff.targetCaseId || '') !== String(doc._id)) fail(404, 'HANDOFF_UNAVAILABLE', 'This handoff is not connected to the LPC matter.');
   const connection = await pinConnection(req); if (connection.clioUserId !== handoff.clioUserId) fail(409, 'CONNECTION_CHANGED', 'Reconnect the original Clio account before importing.');
   const payload = decode(handoff.payload), files = [];
   if (ids.some(value => !payload.documents.some(item => item.id === value))) fail(400, 'SELECTION_CHANGED', 'Only explicitly selected handoff documents may be imported.');
-  const fingerprint = hash(JSON.stringify(['import', String(doc._id), String(handoff._id), ids]));
-  const acquired = await acquireTransfer(req, { direction: 'import', key, fingerprint, caseId: doc._id }), transfer = acquired.operation, leaseToken = acquired.leaseToken;
+  const assignment = assignmentRevision(doc), fingerprint = hash(JSON.stringify(['import', String(doc._id), assignment, String(handoff._id), ids]));
+  const acquired = await acquireTransfer(req, { direction: 'import', key, fingerprint, caseId: doc._id, payload: encode({ handoffId: String(handoff._id), documentIds: ids, matterId: handoff.clioMatterId, destinationLabel: payload.matter.label, assignmentRevision: assignment }) }), transfer = acquired.operation, leaseToken = acquired.leaseToken;
   if (transfer?.status === 'recorded') {
     const result = decode(transfer.result);
     const records = await CaseFile.collection.find({ _id: { $in: result.files.map(item => oid(item.id)) }, caseId: doc._id }).toArray();
@@ -307,10 +351,10 @@ async function importDocuments(req) {
     const held = await Transfer.updateOne({ _id: transfer._id, leaseToken, status: { $ne: 'recorded' } }, { $set: { leaseUntil: new Date(Date.now() + 120000) } });
     if (held.matchedCount !== 1) fail(409, 'IMPORT_PROCESSING', 'Another worker is checking this import. Refresh Files before continuing.');
     const selected = payload.documents.find(value => value.id === item.id);
-    if (selected.versionId !== item.versionId || selected.versionUuid !== item.versionUuid || selected.name !== item.name || selected.contentType !== item.contentType) fail(409, 'SOURCE_CHANGED', 'A selected Clio document changed. Create a new handoff to review its latest version.');
+    if (selected.versionId !== item.versionId || selected.versionUuid !== item.versionUuid || selected.name !== item.name || selected.contentType !== item.contentType) fail(409, 'SOURCE_CHANGED', 'A selected Clio document changed. Choose the source documents again to review their latest versions.');
     const buffer = await downloadDocument(req, item);
     const uploadReq = { ...req, file: { buffer, size: buffer.length, mimetype: item.contentType }, body: {}, params: { caseId: String(doc._id) } };
-    const review = await fileWrites.read(uploadReq), clientUploadId = `clio-${hash(JSON.stringify([String(doc._id), handoff.clioUserId, item.id, item.versionId, item.versionUuid])).slice(0,64)}`;
+    const review = await fileWrites.read(uploadReq), clientUploadId = `clio-${hash(JSON.stringify([String(doc._id), assignment, handoff.clioUserId, item.id, item.versionId, item.versionUuid])).slice(0,64)}`;
     const pending = await fileWrites.prepareUpload(uploadReq, review, { name: item.name, clientUploadId });
     if (pending.recorded) { if (pending.recorded.changedSinceUpload) fail(409, 'IMPORT_CHANGED', 'This source was imported earlier and its LPC document later changed. Review Files before importing it again.'); files.push({ id: String(pending.recorded.file._id), name: item.name, version: Number(pending.recorded.file.version || 1), replayed: true }); continue; }
     const s3 = createS3Client(); if (!process.env.S3_BUCKET) fail(503, 'STORAGE_UNAVAILABLE', 'Document storage is not configured.');
@@ -330,7 +374,7 @@ async function importDocuments(req) {
     require('../../utils/caseEvents').publishCaseEvent(doc._id, 'documents', { at: new Date().toISOString() });
   }
   await fileWrites.read(req);
-  const result = { files, transferId: String(transfer._id), message: 'Selected documents were added to the funded matter. Security scanning still applies.' };
+  const result = { status: 'recorded', files, transferId: String(transfer._id), message: 'Selected documents were added to the funded matter. Security scanning still applies.' };
   const recorded = await Transfer.updateOne({ _id: transfer._id, leaseToken, fingerprint }, { $set: { status: 'recorded', result: encode(result) } });
   if (recorded.matchedCount !== 1) fail(409, 'IMPORT_PROCESSING', 'The import record changed. Review Files before trying again.');
   return result;
@@ -380,12 +424,13 @@ async function reconcileExport(req, operation, matterId) {
 async function exportDocument(req) {
   if (req.body.confirmed !== true) fail(400, 'CONFIRMATION_REQUIRED', 'Review and confirm the document and Clio destination.');
   const key = requestId(req.body.requestId), matterId = clioId(req.body.clioMatterId), reviewed = await approvedFile(req, req.body.fileId);
+  if (req.body.expectedFileVersion !== undefined && (!Number.isSafeInteger(req.body.expectedFileVersion) || req.body.expectedFileVersion !== Number(reviewed.file.version || 1))) fail(409, 'FILE_CHANGED', 'The approved document changed. Review its latest version before sending it to Clio.');
   const connection = await pinConnection(req);
   // Verify the destination through this attorney's own current OAuth grant.
-  await api(req, `/matters/${matterId}.json`, { query: { fields: 'id' } });
+  const destination = (await api(req, `/matters/${matterId}.json`, { query: { fields: 'id,display_number' } })).data;
   const source = await readApprovedBytes(req, req.body.fileId, reviewed.revision), byteHash = hash(source.buffer.toString('base64'));
   const fingerprint = hash(JSON.stringify(['export', connection.clioUserId, String(source.matter._id), String(source.record._id), reviewed.revision, matterId, byteHash]));
-  const acquired = await acquireTransfer(req, { direction: 'export', key, fingerprint, caseId: source.matter._id, fileId: source.record._id, payload: encode({ matterId, revision: reviewed.revision, byteHash }) });
+  const acquired = await acquireTransfer(req, { direction: 'export', key, fingerprint, caseId: source.matter._id, fileId: source.record._id, payload: encode({ matterId, revision: reviewed.revision, byteHash, destinationLabel: String(destination.display_number || `Clio matter ${matterId}`).slice(0,300), fileName: source.file.originalName, fileVersion: source.file.version }) });
   const { operation, newlyCreated, leaseToken } = acquired;
   if (operation?.status === 'recorded') return { ...decode(operation.result), replayed: true };
   const saveOperation = async (statusValue, payload, result) => {
@@ -459,6 +504,16 @@ async function actionContext(req) {
   const result = await api(req, `/matters/${match[1]}.json`, { query: { custom_action_nonce: body.custom_action_nonce, fields: 'id,display_number,description,status' } });
   return { matter: matterShape(result.data) };
 }
+async function listTransfers(req) {
+  const matter = await matterOwner({ ...req, params: { ...req.params, caseId: req.query.caseId } });
+  const currentAssignment = assignmentRevision(matter);
+  const rows = await Transfer.find({ ownerId: req.user.id, caseId: matter._id }).select('+payload +result').sort({ createdAt: -1 }).limit(20).lean();
+  return { assignmentRevision: currentAssignment, items: rows.map(row => {
+    const payload = row.payload ? decode(row.payload) : {}, result = row.result ? decode(row.result) : null;
+    const retryBody = row.direction === 'export' && row.fileId && payload.matterId ? { fileId: String(row.fileId), clioMatterId: payload.matterId, requestId: row.requestId, ...(payload.fileVersion ? { expectedFileVersion: Number(payload.fileVersion) } : {}) } : row.direction === 'import' && payload.assignmentRevision === currentAssignment && payload.handoffId && Array.isArray(payload.documentIds) ? { handoffId: payload.handoffId, documentIds: payload.documentIds, requestId: row.requestId } : null;
+    return { id: String(row._id), direction: row.direction, status: row.status, createdAt: row.createdAt, updatedAt: row.updatedAt, label: payload.destinationLabel || 'Clio matter', assignmentRevision: payload.assignmentRevision || null, handoffId: payload.handoffId || null, fileName: payload.fileName || '', fileVersion: payload.fileVersion || null, documentCount: row.direction === 'export' ? 1 : result?.files?.length || payload.documentIds?.length || 0, result, retry: row.status !== 'recorded' && retryBody ? { path: `/api/integrations/clio/matters/${matter._id}/${row.direction}`, body: retryBody } : null };
+  }) };
+}
 async function cleanupOwner(ownerId, { session } = {}) {
   if (!validId(String(ownerId || ''))) throw new Error('Clio cleanup requires an owner identity');
   // The caller owns its account-closure transaction. No provider requests or
@@ -470,4 +525,4 @@ async function cleanupDraft(ownerId, draftId, { session } = {}) {
   await Handoff.deleteMany({ ownerId, draftId }, ...(session ? [{ session }] : []));
 }
 
-module.exports = { configuration, status, connect, callback, disconnect, listMatters, listDocuments, createHandoff, listHandoffs, importDocuments, exportDocument, registerAction, actionContext, cleanupOwner, cleanupDraft, transferUrl, boundedBody, actor, rawApi, api, documentShape, matterOwner, requestId, selectedIds, hash, decode, encode, fail, clioId, approvedFile, BASE, MAX_FILE_BYTES };
+module.exports = { configuration, status, connect, callback, disconnect, listMatters, matterContext, listDocuments, createHandoff, createMatterHandoff, listHandoffs, listTransfers, importDocuments, exportDocument, registerAction, actionContext, cleanupOwner, cleanupDraft, transferUrl, boundedBody, actor, rawApi, api, documentShape, matterOwner, requestId, selectedIds, hash, decode, encode, fail, clioId, approvedFile, BASE, MAX_FILE_BYTES };

@@ -4,6 +4,7 @@ const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const { csrfProtection } = require("../utils/csrf");
 const service = require("../services/connectedWorkspace/preparation");
+const jobs = require("../services/connectedWorkspace/preparationJobs");
 router.use(verifyToken, requireApproved, requireRole("attorney", "paralegal"));
 router.use((req, res, next) => {
   const expected = req.headers["x-lpc-owner-id"];
@@ -22,4 +23,8 @@ const handle = action => async (req, res, next) => {
 router.get("/matters/:caseId", handle(service.list));
 router.post("/matters/:caseId/generate", csrfProtection, rateLimit({ windowMs: 60000, limit: 4, standardHeaders: "draft-8", legacyHeaders: false }), handle(service.generate));
 router.post("/matters/:caseId/accept", csrfProtection, handle(service.accept));
+const jobLimit = rateLimit({ windowMs: 60000, limit: 4, standardHeaders: "draft-8", legacyHeaders: false });
+router.post("/matters/:caseId/jobs", csrfProtection, jobLimit, (req, res, next) => { res.status(202); return handle(jobs.create)(req, res, next); });
+router.get("/matters/:caseId/jobs/:jobId", handle(jobs.get));
+router.post("/matters/:caseId/jobs/:jobId/retry", csrfProtection, jobLimit, (req, res, next) => { res.status(202); return handle(jobs.retry)(req, res, next); });
 module.exports = router;

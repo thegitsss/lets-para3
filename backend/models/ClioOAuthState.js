@@ -5,6 +5,7 @@ const schema = new mongoose.Schema({
   sessionHash: { type: String, required: true },
   authVersion: { type: Number, required: true },
   connectionRevision: { type: String, default: '' },
+  returnCaseId: { type: mongoose.Schema.Types.ObjectId, default: null },
   expiresAt: { type: Date, required: true },
   consumedAt: { type: Date, default: null },
   canceledAt: { type: Date, default: null },

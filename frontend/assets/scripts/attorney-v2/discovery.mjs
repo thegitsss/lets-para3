@@ -8,6 +8,7 @@ import { states, specialties } from "./directory-options.mjs";
 import { normalizePresentation } from "../authenticated-object-search.mjs";
 import { directoryQuery, candidateContext, candidateHref, safeCandidateReturn, legacyCandidateHref, experience, profilePhoto, projectCandidate, safeSignedUrl } from "./candidate-model.mjs";
 import { createInvitationActions } from "./invitation-actions.mjs";
+import { createNativeMatching } from "../connected-workspace/native-matching.mjs";
 
 const stateCodes = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 const displayState = value => String(value || "").replace(/\b[A-Z]{2}\b/g, code => states[stateCodes.indexOf(code)] || code);
@@ -22,26 +23,29 @@ function directoryIcon(pathData) {
   const path = document.createElementNS(svg.namespaceURI, "path"); path.setAttribute("d", pathData); svg.append(path);
   return svg;
 }
-export function createDirectory(route, { api, signal, ownerId }) {
+export function createDirectory(route, { api, signal, ownerId, connectedApi, privateState }) {
   const view = page("Find a Paralegal");
-  view.firstChild.append(link("Find by experience", "/paralegal-match.html"));
   view.classList.add("av2-directory");
   const saved = route.query.get('view') === 'saved';
+  const matching = !saved && route.query.get('match') === 'work';
   const prior = safeCandidateReturn(route.query.get("returnTo"));
   const matterReturn = prior?.startsWith("#/matters") ? prior : null;
   const contextQuery = () => { const query = candidateContext(route.query); if (matterReturn) query.set("returnTo", matterReturn); return query; };
   const listQuery = directoryQuery(route.query);
   for (const [key, value] of contextQuery()) listQuery.set(key, value);
   const listHref = saved => { const query = new URLSearchParams(listQuery); if (saved) query.set('view', 'saved'); return `#/paralegals?${query}`; };
+  const matchQuery = new URLSearchParams(listQuery); matchQuery.set('match', 'work');
+  const matchHref = `#/paralegals?${matchQuery}`;
   const tabs = node('nav', { className: 'av2-directory-tabs', 'aria-label': 'Paralegal lists' });
   const savedCount = node('span', { className: 'av2-saved-count', 'aria-hidden': 'true', hidden: '' });
-  for (const [label, href, active] of [['Browse paralegals', listHref(false), !saved], ['Saved paralegals', listHref(true), saved]]) {
+  for (const [label, href, active] of [['Browse paralegals', listHref(false), !saved && !matching], ['Find by work', matchHref, matching], ['Saved paralegals', listHref(true), saved]]) {
     const item = link(label, href); if (active) item.setAttribute('aria-current', 'page');
     if (label === 'Saved paralegals') item.append(savedCount);
     tabs.append(item);
   }
   view.append(tabs);
   if (matterReturn) view.firstChild.append(link("Back to Matter", matterReturn));
+  if (matching) { const matches = createNativeMatching({ api: connectedApi, signal, context: contextQuery(), returnHref: matchHref, state: privateState?.matching }); view.append(matches); view.readiness = matches.readiness; return view; }
   if (saved) { const list = createSavedParalegals({ api, signal, ownerId, context: contextQuery(), returnTo: listHref(true), onCount(total) { savedCount.hidden = total === null; savedCount.textContent = total === null ? '' : String(total); } }); view.append(list); view.readiness = list.readiness; return view; }
   const query = directoryQuery(route.query);
   const filters = node("form", { className: "av2-card", "aria-label": "Paralegal filters" });

@@ -23,9 +23,11 @@ import { createAccountView } from "./account-view.mjs";
 import { createOwnProfileView } from "./own-profile-view.mjs";
 import { createReportStatusPage } from "../utils/report-status.mjs";
 import { createAttorneyHelpView } from "./help-view.mjs";
+import { createConnectedApi } from "../connected-workspace/native-api.mjs";
 export { node } from "./dom.mjs";
 
 export function createView(route, identity, context) {
+  context = { ...context, connectedApi: createConnectedApi({ ownerId: identity.id, role: "attorney", signal: context.signal, onAccessLost: context.onSessionLost }) };
   if (route.name === "updates") return createUpdatesFeed({ api:context.api, identity, role:'attorney', signal:context.signal,
     destinationFor:item=>notificationDestination(item,location.origin), navigate:destination=>{if(destination.internal)location.hash=new URL(destination.href,location.origin).hash;else location.assign(destination.href);},
     showToast:text=>{document.querySelector('[data-av2-live]').textContent=text;} });

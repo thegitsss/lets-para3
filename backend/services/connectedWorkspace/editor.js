@@ -43,7 +43,8 @@ function sourceSecret() { return crypto.createHmac("sha256", process.env.JWT_SEC
 async function sessionById(sessionId) {
   if (!valid(sessionId)) fail(404, "NOT_FOUND");
   const session = await Session.findById(sessionId).select("+participants +encryptedSourceKey +sourceETag +sourceObjectVersion +leaseToken +lastCallbackDigest").lean();
-  if (!session || session.expiresAt <= new Date()) fail(410, "EXPIRED", "This editing session expired. Return to Files and open the document again.");
+  if (!session) fail(404, "NOT_FOUND");
+  if (session.expiresAt <= new Date()) fail(410, "EXPIRED", "This editing session expired. Return to Files and open the document again.");
   return session;
 }
 async function fileFor(req, { security = true } = {}) {
@@ -96,7 +97,7 @@ async function open(req) {
   const config = {
     documentType: "word", width: "100%", height: "100%",
     document: { fileType: "docx", key: session.documentKey, title: final.file.originalName, url: `${settings.appOrigin}/api/document-collaboration/source/${session._id}?token=${encodeURIComponent(sourceToken)}`, permissions: { edit: true, review: true, comment: true, download: true, print: true } },
-    editorConfig: { mode: "edit", lang: "en", callbackUrl: `${settings.appOrigin}/api/document-collaboration/callback/${session._id}`, user: { id: id(req.user.id), name: req.user.role === "attorney" ? "Matter attorney" : "Matter paralegal" }, coEditing: { mode: "fast", change: false }, customization: { autosave: true, forcesave: true, chat: false, review: { trackChanges: true, reviewDisplay: "markup" } } },
+    editorConfig: { mode: "edit", lang: "en", callbackUrl: `${settings.appOrigin}/api/document-collaboration/callback/${session._id}`, user: { id: id(req.user.id), name: req.user.role === "attorney" ? "Matter attorney" : "Matter paralegal" }, coEditing: { mode: "fast", change: false }, customization: { autosave: true, forcesave: false, chat: false, review: { trackChanges: true, reviewDisplay: "markup" } } },
   };
   config.token = jwt.sign(config, settings.secret, { algorithm: "HS256", expiresIn: "2h" });
   return { sessionId: id(session._id), scriptUrl: settings.scriptUrl, editorOrigin: settings.origin, config, expiresAt: session.expiresAt.toISOString(), savedVersion: session.savedVersion };
@@ -150,13 +151,62 @@ function downloadUrl(value, settings) {
   if (url.origin !== settings.origin || url.username || url.password || url.hash) fail(403, "URL");
   return url.href;
 }
+const saveMarker = value => typeof value === "string" && /^lpc-save:[a-f0-9-]{36}$/.test(value) ? value.slice(9) : "";
+async function requestSave(req) {
+  if (req.body?.expectedOwnerId !== undefined && req.body.expectedOwnerId !== id(req.user?.id)) fail(403, "ACCOUNT_CHANGED", "The signed-in account changed. Refresh Files before saving the document.");
+  const settings = readyConfiguration(), session = await sessionById(req.params.sessionId);
+  req.params.caseId = id(session.caseId); req.params.fileId = id(session.fileId);
+  const current = await fileFor(req), actorId = id(req.user.id);
+  if (session.state !== "open" || fileFingerprint(current.raw) !== session.currentFileFingerprint) fail(409, "CHANGED", "Check the saved document before requesting another save.");
+  if (!session.participants.some(actor => id(actor.userId) === actorId)) fail(403, "ACTOR");
+  const suppliedRequestId = req.body?.clientRequestId;
+  if (suppliedRequestId !== undefined && (typeof suppliedRequestId !== "string" || !/^[a-f0-9-]{36}$/.test(suppliedRequestId))) fail(400, "SAVE_REQUEST");
+  const existing = suppliedRequestId && (session.saveRequests || []).find(request => request.requestId === suppliedRequestId);
+  if (existing) {
+    if (id(existing.actorId) !== actorId) fail(403, "ACTOR");
+    return { requestId: existing.requestId, pending: existing.state !== "confirmed", confirmed: existing.state === "confirmed" };
+  }
+  const pending = (session.saveRequests || []).find(request => id(request.actorId) === actorId && ["requested", "unknown"].includes(request.state) && request.requestedAt > new Date(Date.now() - 120000));
+  if (pending) return { requestId: pending.requestId, pending: true, reused: true };
+  const requestId = suppliedRequestId || crypto.randomUUID(), now = new Date();
+  const created = await Session.updateOne({ _id: session._id, state: "open", currentFileFingerprint: session.currentFileFingerprint, "saveRequests.requestId": { $ne: requestId } }, { $push: { saveRequests: { $each: [{ requestId, actorId, state: "requested", requestedAt: now }], $slice: -24 } } });
+  if (created.matchedCount !== 1) fail(409, "CHANGED");
+  try {
+    const token = jwt.sign({ c: "forcesave", key: session.documentKey, userdata: `lpc-save:${requestId}`, operation: "command" }, settings.secret, { algorithm: "HS256", expiresIn: "2m" });
+    const response = await fetch(`${settings.origin}/command?shardkey=${encodeURIComponent(session.documentKey)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }), redirect: "manual", signal: AbortSignal.timeout(15000) });
+    if (response.status !== 200) fail(502, "SAVE_REQUEST", "The save request could not be confirmed. Keep the editor open and check the saved version.");
+    let result; try { result = JSON.parse((await boundedBuffer(response.body, 16384)).toString("utf8")); } catch { fail(502, "SAVE_REQUEST"); }
+    if (!Number.isInteger(result.error) || result.key !== session.documentKey) fail(502, "SAVE_REQUEST");
+    if (result.error === 0) return { requestId, pending: true };
+    if (result.error === 4) {
+      // No new assembly is not proof that a preceding provider callback has
+      // reached LPC. Retain uncertainty rather than clear a client's dirty
+      // state from an older saved version.
+      const fresh = await fileFor(req), active = await sessionById(id(session._id));
+      if (fileFingerprint(fresh.raw) !== active.currentFileFingerprint || active.state !== "open") fail(409, "CHANGED");
+      await Session.updateOne({ _id: session._id, currentFileFingerprint: active.currentFileFingerprint, "saveRequests.requestId": requestId }, { $set: { "saveRequests.$.state": "unknown" } });
+      return { requestId, pending: false, noChanges: true, savedVersion: active.savedVersion };
+    }
+    await Session.updateOne({ _id: session._id, "saveRequests.requestId": requestId }, { $set: { "saveRequests.$.state": "failed" } });
+    fail(502, "SAVE_REQUEST", "The editor could not save this document. Keep a copy from the editor and check Files before leaving.");
+  } catch (error) {
+    await Session.updateOne({ _id: session._id, saveRequests: { $elemMatch: { requestId, state: "requested" } } }, { $set: { "saveRequests.$.state": "unknown" } });
+    if (error.publicCode || error.statusCode) throw error;
+    fail(502, "SAVE_REQUEST", "The save request could not be confirmed. Keep the editor open and check the saved version.");
+  }
+}
 async function callback(req) {
   const settings = readyConfiguration(), payload = verifiedCallback(req, settings), session = await sessionById(req.params.sessionId);
   if (payload.key !== session.documentKey) fail(403, "DOCUMENT");
-  if ([3, 7].includes(payload.status)) { await Session.updateOne({ _id: session._id, state: { $ne: "closed" } }, { $set: { lastErrorCode: "PROVIDER_SAVE_FAILED" } }); return { error: 1 }; }
+  if ([3, 7].includes(payload.status)) {
+    await Session.updateOne({ _id: session._id, state: { $ne: "closed" } }, { $set: { lastErrorCode: "PROVIDER_SAVE_FAILED" } });
+    const marker = saveMarker(payload.userdata);
+    if (marker) await Session.updateOne({ _id: session._id, "saveRequests.requestId": marker }, { $set: { "saveRequests.$.state": "failed" } });
+    return { error: 1 };
+  }
   if (payload.status === 1) return { error: 0 };
   if (payload.status === 4) { await Session.updateOne({ _id: session._id, state: "open" }, { $set: { state: "closed" }, $unset: { activeKey: "" } }); return { error: 0 }; }
-  const url = downloadUrl(payload.url, settings), callbackDigest = digest(JSON.stringify([payload.key, payload.status, payload.url, payload.users]));
+  const url = downloadUrl(payload.url, settings), callbackDigest = digest(JSON.stringify([payload.key, payload.status, payload.url, payload.users, payload.userdata || ""]));
   if (session.lastCallbackDigest === callbackDigest && session.lastSavedAt) return { error: 0 };
   if (session.state === "closed") fail(409, "CLOSED");
   const actorId = Array.isArray(payload.users) ? payload.users.at(-1) : null;
@@ -211,7 +261,8 @@ async function callback(req) {
       await file.save({ session: transaction });
       await writes.recordUpload(operation, transaction);
       await AuditLog.logFromReq(actorReq, "document.collaboration.saved", { targetType: "document", targetId: file._id, caseId: session.caseId, meta: { fileId: id(file._id), version: file.version, editorSessionId: id(session._id) }, session: transaction });
-      const saved = await Session.collection.updateOne({ _id: session._id, leaseToken, state: "saving" }, { $set: { currentFileFingerprint: fileFingerprint(file.toObject()), savedVersion: file.version, lastSavedAt: new Date(), lastCallbackDigest: callbackDigest, state: payload.status === 2 ? "closed" : "open", lastErrorCode: "", leaseToken: "", leaseUntil: null, updatedAt: new Date() }, ...(payload.status === 2 ? { $unset: { activeKey: "" } } : {}) }, { session: transaction });
+      const requests = (currentSession.saveRequests || []).map(request => request.requestId === saveMarker(payload.userdata) ? { ...request, state: "confirmed", confirmedAt: new Date(), version: file.version } : request);
+      const saved = await Session.collection.updateOne({ _id: session._id, leaseToken, state: "saving" }, { $set: { currentFileFingerprint: fileFingerprint(file.toObject()), savedVersion: file.version, lastSavedAt: new Date(), lastCallbackDigest: callbackDigest, state: payload.status === 2 ? "closed" : "open", lastErrorCode: "", leaseToken: "", leaseUntil: null, saveRequests: requests, updatedAt: new Date() }, ...(payload.status === 2 ? { $unset: { activeKey: "" } } : {}) }, { session: transaction });
       if (saved.matchedCount !== 1) fail(409, "CHANGED");
     });
     publishCaseEvent(session.caseId, "documents", { at: new Date().toISOString(), type: "document_collaboration_saved" });
@@ -231,7 +282,11 @@ async function status(req) {
   req.params.caseId = id(session.caseId); req.params.fileId = id(session.fileId);
   await fileFor(req, { security: false });
   const messages = { open: session.lastSavedAt ? "Your latest saved version is recorded in Files." : "Changes are recorded in Files after the editor confirms a save.", saving: "Saving the document. Keep the editor open until the saved version is confirmed.", closed: "This editing session is closed. The saved document is available in Files.", needs_review: "The save could not be confirmed. Keep or download a copy from the editor and check Files before making further changes." };
-  return { sessionId: id(session._id), caseId: id(session.caseId), fileId: id(session.fileId), state: session.state, savedVersion: session.savedVersion, lastSavedAt: session.lastSavedAt?.toISOString() || null, expiresAt: session.expiresAt.toISOString(), message: session.lastErrorCode && session.state === "open" ? "The last save did not complete. Keep the editor open and try saving again." : messages[session.state] };
+  const requestId = req.query?.saveRequestId;
+  if (requestId !== undefined && (typeof requestId !== "string" || !/^[a-f0-9-]{36}$/.test(requestId))) fail(400, "SAVE_REQUEST");
+  const requests = (session.saveRequests || []).filter(request => id(request.actorId) === id(req.user.id));
+  const request = requestId ? requests.find(value => value.requestId === requestId) : requests.at(-1);
+  return { sessionId: id(session._id), ownerId: id(req.user.id), caseId: id(session.caseId), fileId: id(session.fileId), writable: ["open", "saving"].includes(session.state), state: session.state, savedVersion: session.savedVersion, lastSavedAt: session.lastSavedAt?.toISOString() || null, expiresAt: session.expiresAt.toISOString(), saveRequest: request ? { id: request.requestId, state: request.state, version: request.version || null } : null, message: session.lastErrorCode && session.state === "open" ? "The last save did not complete. Keep the editor open and try saving again." : messages[session.state] };
 }
 
-module.exports = { configuration, publicStatus, open, source, callback, status, verifiedCallback, downloadUrl, boundedBuffer, fileFingerprint, MAX_BYTES };
+module.exports = { configuration, publicStatus, open, source, callback, status, requestSave, verifiedCallback, downloadUrl, boundedBuffer, fileFingerprint, MAX_BYTES };

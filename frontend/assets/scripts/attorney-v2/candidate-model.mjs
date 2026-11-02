@@ -29,6 +29,7 @@ export function safeCandidateReturn(value, depth = 0) {
   if (path === "/paralegals") {
     const safe = directoryQuery(query);
     if (query.get("view") === "saved") safe.set("view", "saved");
+    else if (query.get("match") === "work") safe.set("match", "work");
     for (const [key, value] of candidateContext(query)) safe.set(key, value);
     const returnTo = depth === 0 ? safeCandidateReturn(query.get("returnTo"), 1) : null;
     if (returnTo?.startsWith("#/matters")) safe.set("returnTo", returnTo);

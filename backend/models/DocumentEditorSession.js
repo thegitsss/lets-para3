@@ -29,6 +29,15 @@ const schema = new Schema({
   lastCallbackDigest: { type: String, default: "", select: false },
   lastSavedAt: { type: Date, default: null },
   lastErrorCode: { type: String, default: "" },
+  saveRequests: { type: [{
+    _id: false,
+    requestId: { type: String, required: true },
+    actorId: { type: Schema.Types.ObjectId, required: true },
+    state: { type: String, enum: ["requested", "confirmed", "failed", "unknown"], required: true },
+    requestedAt: { type: Date, required: true },
+    confirmedAt: { type: Date, default: null },
+    version: { type: Number, default: null },
+  }], default: [] },
 }, { timestamps: true });
 schema.index({ activeKey: 1 }, { unique: true, partialFilterExpression: { activeKey: { $type: "string" } } });
 module.exports = mongoose.model("DocumentEditorSession", schema);
