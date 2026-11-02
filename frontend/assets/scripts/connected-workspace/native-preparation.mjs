@@ -25,7 +25,7 @@ export function preparationEntry(preparation) {
 }
 export function createNativePreparation({ caseId, ownerId, role, api, signal, mode = 'preparation', privateState, drafts = privateState?.preparationDrafts || new Map() }) {
   const root = node('section', { className: 'lpc-connected-section', 'data-native-preparation': '', 'data-mode': mode, 'aria-label': 'Document preparation' });
-  const header = node('div', { className: 'lpc-connected-heading' }, [node('div', {}, [node('span', { className: 'lpc-connected-eyebrow', text: 'Document intelligence' }), node('h3', { text: mode === 'submission' ? 'A closer look before review' : 'Turn the brief into a clear next step' })])]);
+  const header = node('div', { className: 'lpc-connected-heading' }, [node('div', {}, [node('h3', { text: mode === 'submission' ? 'Submission review' : 'Document preparation' })])]);
   const feedback = node('p', { className: 'lpc-connected-feedback', role: 'status', 'aria-live': 'polite' });
   const content = node('div'), progress = node('div', { className: 'lpc-connected-progress', hidden: '', role: 'status', 'aria-live': 'polite' }), output = node('div', { className: 'lpc-connected-output' });
   root.append(header, text(mode === 'submission' ? 'Check selected documents against the agreed work, with source notes for every suggestion.' : 'Build a working checklist from the agreed instructions and selected documents.'), feedback, content, progress, output);

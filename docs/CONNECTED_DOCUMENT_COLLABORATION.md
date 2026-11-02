@@ -44,7 +44,7 @@ Primary API references: [callback statuses](https://api.onlyoffice.com/docs/docs
 
 ## LPC appearance
 
-The host dialog uses the bundled light Sarabun UI, a Cormorant LPC identifier, ink actions and gold focus treatment. It inherits the same portal identity as Work and Files. The signed provider configuration requests the standard `theme-light` appearance on desktop and mobile, a compact header and a close action connected to the existing guarded return to Files. These are supported standard customization options.
+The host dialog inherits the current authenticated portal system fonts, controls and focus treatment. It inherits the same portal identity as Work and Files. The signed provider configuration requests the standard `theme-light` appearance on desktop and mobile, a compact header and a close action connected to the existing guarded return to Files. These are supported standard customization options.
 
 Document contents retain their existing fonts and formatting. The integration does not inject CSS into the provider frame or enable licensed white-label font/logo overrides without an actual provider entitlement. The live deployment still needs its normal paired-provider visual/fidelity rehearsal; browser fixtures verify the LPC frame, configuration, save receipts and recovery, rather than presenting a simulated toolbar as a live provider result.
 

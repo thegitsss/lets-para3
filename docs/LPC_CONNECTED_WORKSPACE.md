@@ -66,8 +66,6 @@ The checks and their results for the final branch head are recorded in the pull 
 - [Clio Manage API](https://docs.developers.clio.com/clio-manage/api-reference/)
 - [Clio custom actions](https://docs.developers.clio.com/guides/clio-manage/custom-actions/)
 
-## LPC visual identity
+## Current portal presentation
 
-The shared portal identity now restores the bundled thin Sarabun UI and Cormorant page/feature emphasis, white surfaces, ink actions, warm dividers and gold active/focus treatments. Existing navigation, geometry, accessibility controls and authority remain in the native components. Profile-photo fallback artwork uses the same neutral/gold palette. Clio's current official symbol and outlined wordmark retain their own typography inside the LPC interface; provenance is recorded with the assets. Neither provider endorsement nor partnership is claimed.
-
-The branding browser suite checks computed type/color, desktop/mobile wrapping, source-linked preparation, profile matching, Clio artwork and native dialogs using the actual portal files. The existing native journeys also verify continued saves, transfers, draft recovery and keyboard access after the style change.
+Connected features inherit the current authenticated portal system fonts and native colors. They use flat white sections, rows and neutral separators. No global theme override, historical gold/cream palette, serif UI headings or enclosing cards are added. Existing portal/header/matter layout files must be preserved when integrating into a newer local checkout. Clio retains its official symbol and outlined wordmark without a partnership claim.

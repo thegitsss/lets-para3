@@ -134,9 +134,9 @@ test("a newer preparation retains earlier local checklist text until the attorne
   expect(new URL(page.url()).hash).toBe("#/matters/" + MATTER + "/work");
   await chooseDocument(panel); await panel.getByText("Select documents · 1 selected", { exact: true }).click();
   await panel.getByText("View source", { exact: true }).click();
-  await panel.getByRole("heading", { name: "Turn the brief into a clear next step", exact: true }).click();
+  await panel.getByRole("heading", { name: "Document preparation", exact: true }).click();
   await shot(page, "native-preparation-clean-desktop");
-  await page.setViewportSize({ width: 390, height: 844 }); await entry.focus(); await page.keyboard.press("Enter"); await panel.getByRole("heading", { name: "Turn the brief into a clear next step", exact: true }).click(); await shot(page, "native-preparation-clean-mobile");
+  await page.setViewportSize({ width: 390, height: 844 }); await entry.focus(); await page.keyboard.press("Enter"); await panel.getByRole("heading", { name: "Document preparation", exact: true }).click(); await shot(page, "native-preparation-clean-mobile");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await panel.getByLabel("Working checklist item 1", { exact: true }).fill("Retained attorney checklist draft");
   await page.getByRole("navigation", { name: "Matter sections" }).getByRole("link", { name: "Files", exact: true }).click();

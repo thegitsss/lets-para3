@@ -4,8 +4,8 @@
 .lc-clio h3,.lc-clio-dialog h3{font:inherit;font-size:14px;font-weight:450;line-height:1.45}
 .lc-clio-muted{color:var(--clio-muted,#737773);font-size:13px;line-height:1.65}
 .lc-clio-heading{display:flex;align-items:center;gap:13px}
-.lc-clio-brand{height:42px;width:42px;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--clio-border);border-radius:10px;font-size:24px;font-weight:500;line-height:1;background:#fafaf8;color:#263d48}
-.lc-clio-state{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border-radius:999px;padding:4px 9px;background:#f5f4f0;color:#70736d;font-size:11px;line-height:1.5;font-weight:400;margin-left:auto}
+.lc-clio-brand{height:42px;width:42px;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--clio-border);border-radius:10px;font-size:24px;font-weight:500;line-height:1;background:var(--av2-soft,#f5f7fa);color:#263d48}
+.lc-clio-state{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border-radius:999px;padding:4px 9px;background:var(--av2-soft,#f5f7fa);color:#70736d;font-size:11px;line-height:1.5;font-weight:400;margin-left:auto}
 .lc-clio-state.is-connected{background:#f0f5ef;color:#45664b}
 .lc-clio-state.is-connected:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
 .lc-clio-connection-body{padding-top:18px;display:grid;gap:18px}
@@ -30,7 +30,7 @@
 .lc-clio-transfer-heading~.lc-clio-actions,.lc-clio-transfer-heading~.lc-clio-primary{margin-top:14px}
 .lc-clio-saved-selections{margin-top:20px;border-top:1px solid var(--clio-border);padding-top:14px}
 .lc-clio-saved-selections summary{cursor:pointer;font-size:12px;color:var(--clio-muted);padding:4px 0}
-.lc-clio-saved-selections button{display:block;width:100%;text-align:left;margin-top:8px;border:0!important;background:#fafaf8!important}
+.lc-clio-saved-selections button{display:block;width:100%;text-align:left;margin-top:8px;border:0!important;background:var(--av2-soft,#f5f7fa)!important}
 .lc-clio-receipts:not(:empty){margin-top:22px;border-top:1px solid var(--clio-border);padding-top:18px}
 .lc-clio-receipt{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:13px 0;border-bottom:1px solid var(--clio-border)}
 .lc-clio-receipt:last-child{border-bottom:0;padding-bottom:0}
@@ -52,7 +52,7 @@
 .lc-clio-search{display:flex;gap:10px;align-items:end}
 .lc-clio-field{display:grid;gap:7px;font-size:12px;line-height:1.5;color:var(--clio-ink);min-width:0}
 .lc-clio-field input,.lc-clio-field textarea{font:inherit;font-size:14px;line-height:1.6;box-sizing:border-box;width:100%;border:1px solid var(--clio-border);border-radius:7px;background:var(--surface,#fff);color:inherit;padding:9px 11px;outline:none;min-width:0;resize:vertical}
-.lc-clio-field input:focus,.lc-clio-field textarea:focus{border-color:#a89872;box-shadow:0 0 0 2px #b6a5771a}
+.lc-clio-field input:focus,.lc-clio-field textarea:focus{border-color:var(--av2-accent,#406aa8);box-shadow:0 0 0 2px #406aa81a}
 .lc-clio-field textarea{min-height:84px}
 .lc-clio-search>.lc-clio-field{flex:1}
 .lc-clio-matter-list{display:grid;gap:0;border:1px solid var(--clio-border);border-radius:9px;overflow:hidden}
@@ -89,14 +89,6 @@
 .lc-clio-review-documents small{font-size:11px;white-space:nowrap;color:var(--clio-muted)}
 @media(max-width:600px){.lc-clio{padding:18px 16px}.lc-clio-state{font-size:10px;padding:4px 7px}.lc-clio-heading{gap:10px}.lc-clio-brand{height:36px;width:36px;font-size:21px}.lc-clio-heading .lc-clio-muted{font-size:11px}.lc-clio-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 24px);border-radius:12px}.lc-clio-dialog-header,.lc-clio-dialog-body{padding:18px 17px}.lc-clio-dialog-footer{padding:14px 17px}.lc-clio-dialog>.lc-clio-feedback{padding-left:17px;padding-right:17px}.lc-clio-primary,.lc-clio-secondary{min-height:44px}.lc-clio-options[open]{flex-basis:100%}.lc-clio-receipt-status{font-size:10px}.lc-clio-receipt button{min-height:36px}.lc-clio-search{gap:8px}.lc-clio-matter-row{padding:14px 12px}}
 @media(prefers-reduced-motion:reduce){.lc-clio *,.lc-clio-dialog *{scroll-behavior:auto!important}}
-/* These document review dialogs own their scroll geometry and LPC controls. */
-.lc-clio,.lc-clio-dialog{--clio-ink:var(--av2-ink,#243039);--clio-muted:var(--av2-muted,#737773);--clio-border:var(--av2-line,#e7e6e1);font-family:var(--lpc-portal-font-sans,"Sarabun"),sans-serif;font-weight:300}
-.lc-clio .lc-clio-primary,.lc-clio-dialog .lc-clio-primary{background:var(--clio-ink);border:1px solid var(--clio-ink);color:#fff;border-radius:5px;font-weight:400}
-.lc-clio .lc-clio-secondary,.lc-clio-dialog .lc-clio-secondary{background:transparent;color:var(--clio-ink);border:1px solid var(--clio-border);border-radius:5px;font-weight:400}
-.lc-clio :focus-visible,.lc-clio-dialog :focus-visible{outline:2px solid #a78b55;outline-offset:3px}
-.lc-clio-dialog-header{flex:0 0 auto}
-.lc-clio-dialog-header .lc-clio-close{min-width:44px;flex:0 0 auto;font-size:13px;line-height:20px;margin:0}
-.lc-clio-dialog{margin:auto}
 /* Official Clio shapes and logotype, unchanged from Clio's public brand header.
    LPC owns the surrounding interface; Clio's mark keeps its own typography. */
 .lc-clio-brand-lockup{display:grid;gap:10px;min-width:0}
@@ -104,13 +96,17 @@
 .lc-clio-symbol,.lc-clio-logotype{display:block;flex:none;height:100%;background:currentColor;mask-position:center;mask-repeat:no-repeat;mask-size:contain}
 .lc-clio-symbol{width:30px;mask-image:url('../brand/clio-symbol.svg')}
 .lc-clio-logotype{width:51px;mask-image:url('../brand/clio-wordmark.svg')}
-body.lpc-v2 .lc-clio,body.lpc-v2 .lc-clio-dialog{--clio-ink:var(--lpc-ink,#29302c);--clio-muted:var(--lpc-muted,#666c63);--clio-border:var(--lpc-line,#e5e5dd);background:var(--lpc-paper,#fff);font-weight:200}
-body.lpc-v2 .lc-clio{border-radius:8px;padding:24px}
-body.lpc-v2 .lc-clio .lc-clio-primary,body.lpc-v2 .lc-clio-dialog .lc-clio-primary{font-weight:300}
-body.lpc-v2 .lc-clio-dialog-header h2{font:300 28px/1.2 var(--lpc-portal-font-serif,"Cormorant Garamond"),Georgia,serif}
-body.lpc-v2 .lc-clio-dialog :is(.lc-clio-review-block strong,.lc-clio-matter-row strong,.lc-clio-document-row strong){font-weight:300}
-body.lpc-v2 .lc-clio-field input,body.lpc-v2 .lc-clio-field textarea{border-color:var(--lpc-control-line,#b5b8ac);font-weight:200}
-body.lpc-v2 .lc-clio-source{background:var(--lpc-soft,#f7f6f2);border-color:var(--lpc-line,#e5e5dd)}
-body.lpc-v2 .lc-clio-dialog-footer{background:var(--lpc-paper,#fff)}
-:root.theme-dark .lc-clio-wordmark{color:#fff}
-@media(max-width:600px){body.lpc-v2 .lc-clio{padding:20px 16px}.lc-clio-wordmark{width:77px;height:26px;gap:7px}.lc-clio-symbol{width:26px}.lc-clio-logotype{width:44px}body.lpc-v2 .lc-clio-dialog-header h2{font-size:25px}}
+
+.lc-clio,.lc-clio-dialog{--clio-ink:var(--av2-ink,#263347);--clio-muted:var(--av2-muted,#657186);--clio-border:var(--av2-line,#e9edf3);font-family:var(--lpc-portal-font-sans),sans-serif;font-weight:400}
+.lc-clio{border:0;border-radius:0;padding:20px 0;background:transparent}
+.lc-clio-dialog{border:0;border-radius:6px;box-shadow:0 8px 30px #18203326}
+.lc-clio-dialog-header h2{font:500 18px/1.4 var(--lpc-portal-font-sans),sans-serif}
+.lc-clio-source{border:0;border-radius:0;padding:0;background:transparent}
+.lc-clio-matter-list,.lc-clio-document-list,.lc-clio-review-documents{border:0;border-radius:0}
+.lc-clio-matter-row,.lc-clio-document-row{padding:13px 0;border-radius:0}
+.lc-clio-review-documents li{padding:12px 0}
+.lc-clio-matter-row:hover,.lc-clio-matter-row:focus-visible{background:var(--av2-soft,#f5f7fa)}
+.lc-clio-field input,.lc-clio-field textarea{border-radius:4px;background:var(--av2-bg,#fff)}
+.lc-clio :focus-visible,.lc-clio-dialog :focus-visible{outline:2px solid var(--av2-accent,#406aa8);outline-offset:3px}
+.lc-clio-document-row input{accent-color:var(--av2-accent,#406aa8)}
+@media(max-width:600px){.lc-clio{padding:16px 0}.lc-clio-wordmark{width:77px;height:26px;gap:7px}.lc-clio-symbol{width:26px}.lc-clio-logotype{width:44px}}

@@ -12,23 +12,24 @@ async function capture(page, name) {
 }
 async function typography(page) {
   await page.evaluate(() => document.fonts.ready);
-  expect(await page.locator('body').evaluate(element => getComputedStyle(element).fontFamily)).toContain('Sarabun');
-  expect(await page.locator('body').evaluate(element => getComputedStyle(element).fontWeight)).toBe('200');
+  expect(await page.locator('body').evaluate(element => getComputedStyle(element).fontFamily)).toMatch(/Segoe UI|system-ui/);
+  expect(await page.locator('body').evaluate(element => getComputedStyle(element).fontWeight)).toBe('400');
 }
 test('LPC identity continues from native Work navigation into source-linked preparation', async ({ page }) => {
   await installNativeFixture(page, { resolve(call) { if (call.path === root) return prepSnapshot('attorney', { preparation: cleanPlan() }); } });
   await gotoNative(page, '/attorney-v2.html#/matters/' + MATTER + '/work');
   await typography(page);
-  await expect(page.locator('#av2-page-title')).toHaveCSS('font-family', /Cormorant Garamond/);
-  await expect(page.locator('#av2-page-title')).toHaveCSS('font-weight', '300');
+  await expect(page.locator('#av2-page-title')).toHaveCSS('font-family', /Segoe UI|system-ui/);
+  await expect(page.locator('#av2-page-title')).toHaveCSS('font-weight', '600');
   const active = page.locator('.av2-nav a[aria-current=page]').first();
-  await expect(active).toHaveCSS('background-color', 'rgb(244, 240, 230)');
+  await expect(active).toHaveCSS('background-color', 'rgb(237, 242, 250)');
   await capture(page, 'brand-work-desktop');
   await page.locator('[data-native-preparation-entry]').click();
   const panel = page.locator('[data-native-preparation]');
   await expect(panel).toBeFocused();
-  await expect(panel.locator('.lpc-connected-heading h3')).toHaveCSS('font-family', /Cormorant Garamond/);
-  await expect(panel.locator('.lpc-connected-button').first()).toHaveCSS('color', 'rgb(41, 48, 44)');
+  await expect(panel.locator('.lpc-connected-heading h3')).toHaveCSS('font-family', /Segoe UI|system-ui/);
+  await expect(panel.locator('.lpc-connected-source-picker')).toHaveCSS('border-top-width', '0px');
+  await expect(panel.locator('.lpc-connected-button').first()).toHaveCSS('color', 'rgb(38, 51, 71)');
   await panel.locator('.lpc-connected-citations summary').click();
   await capture(page, 'brand-preparation-desktop');
 });
@@ -37,8 +38,8 @@ test('light LPC typography and controls fit the paralegal matter on mobile', asy
   await installNativeFixture(page, { role: 'paralegal', resolve(call) { if (call.path === root) return prepSnapshot('paralegal', { preparation: cleanPlan() }); } });
   await gotoNative(page, '/paralegal-v2.html#/matter/' + MATTER + '?tab=work');
   await typography(page);
-  await expect(page.locator('#v2-matter-title')).toHaveCSS('font-family', /Cormorant Garamond/);
-  await expect(page.locator('#v2-matter-title')).toHaveCSS('font-weight', '300');
+  await expect(page.locator('#v2-matter-title')).toHaveCSS('font-family', /Segoe UI|system-ui/);
+  await expect(page.locator('#v2-matter-title')).toHaveCSS('font-weight', '600');
   await page.locator('[data-native-preparation-entry]').click();
   const panel = page.locator('[data-native-preparation]');
   await expect(panel).toBeFocused();
@@ -52,14 +53,14 @@ for (const mobile of [false, true]) test('LPC matching presents professional evi
   } });
   await gotoNative(page, '/attorney-v2.html#/paralegals?match=work');
   await typography(page);
-  await expect(page.locator('#av2-page-title')).toHaveCSS('font-family', /Cormorant Garamond/);
-  await expect(page.locator('#av2-page-title')).toHaveCSS('font-weight', '300');
+  await expect(page.locator('#av2-page-title')).toHaveCSS('font-family', /Segoe UI|system-ui/);
+  await expect(page.locator('#av2-page-title')).toHaveCSS('font-weight', '600');
   const panel = page.locator('[data-native-matching]');
   await panel.getByLabel('Work description', { exact: true }).fill('Organize discovery records and prepare a chronology for attorney review');
   await panel.getByRole('button', { name: 'Find relevant experience', exact: true }).click();
   await expect(panel.getByRole('heading', { name: 'Experience to consider' })).toBeVisible();
   await panel.getByText('Why this profile appeared', { exact: true }).click();
-  await expect(panel.getByRole('button', { name: 'Find relevant experience', exact: true })).toHaveCSS('background-color', 'rgb(41, 48, 44)');
+  await expect(panel.getByRole('button', { name: 'Find relevant experience', exact: true })).toHaveCSS('background-color', 'rgb(38, 51, 71)');
   expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await capture(page, mobile ? 'brand-matching-mobile' : 'brand-matching-desktop');
 });
@@ -79,6 +80,8 @@ test('Clio keeps its official logotype inside an LPC connection and review dialo
   await capture(page, 'brand-clio-connections');
   await page.getByRole('button', { name: 'Start from Clio', exact: true }).click();
   const dialog = page.locator('.lc-clio-dialog');
-  await expect(dialog.getByRole('heading', { name: 'Start from Clio', exact: true })).toHaveCSS('font-family', /Cormorant Garamond/);
+  await expect(dialog.getByRole('heading', { name: 'Start from Clio', exact: true })).toHaveCSS('font-family', /Segoe UI|system-ui/);
+  await expect(page.locator('.lc-clio')).toHaveCSS('border-top-width', '0px');
+  await expect(page.locator('.lc-clio')).toHaveCSS('border-radius', '0px');
   await capture(page, 'brand-clio-dialog');
 });
