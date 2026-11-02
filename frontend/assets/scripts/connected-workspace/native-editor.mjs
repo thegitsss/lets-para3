@@ -225,7 +225,7 @@ export function createNativeDocumentEditor({ caseId, fileId, ownerId, role, api,
     const titleId = `lpc-native-editor-title-${++sequence}`, descriptionId = `${titleId}-description`;
     const close = button("Return to Files", () => {}); close.setAttribute("aria-label", "Return to Files");
     title = node("p", { className: "lpc-native-editor__filename", text: "DOCX document" });
-    const heading = node("div", { className: "lpc-native-editor__heading" }, [node("h2", { id: titleId, text: "Document editor" }), title]);
+    const heading = node("div", { className: "lpc-native-editor__heading" }, [node("span", { className: "lpc-native-editor__brand", text: "Let’s ParaConnect" }), node("h2", { id: titleId, text: "Document editor" }), title]);
     version = node("span", { className: "lpc-native-editor__version" });
     saveButton = button("Save to LPC", () => void save(), true); checkButton = button("Check saved version", () => void check()); reopenButton = button("Reopen saved document", () => void reopen()); reopenButton.hidden = true;
     statusText = node("p", { className: "lpc-native-editor__status", role: "status", "aria-live": "polite", "aria-atomic": "true" });

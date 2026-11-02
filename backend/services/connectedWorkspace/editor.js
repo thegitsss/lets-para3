@@ -97,7 +97,7 @@ async function open(req) {
   const config = {
     documentType: "word", width: "100%", height: "100%",
     document: { fileType: "docx", key: session.documentKey, title: final.file.originalName, url: `${settings.appOrigin}/api/document-collaboration/source/${session._id}?token=${encodeURIComponent(sourceToken)}`, permissions: { edit: true, review: true, comment: true, download: true, print: true } },
-    editorConfig: { mode: "edit", lang: "en", callbackUrl: `${settings.appOrigin}/api/document-collaboration/callback/${session._id}`, user: { id: id(req.user.id), name: req.user.role === "attorney" ? "Matter attorney" : "Matter paralegal" }, coEditing: { mode: "fast", change: false }, customization: { autosave: true, forcesave: false, chat: false, review: { trackChanges: true, reviewDisplay: "markup" } } },
+    editorConfig: { mode: "edit", lang: "en", callbackUrl: `${settings.appOrigin}/api/document-collaboration/callback/${session._id}`, user: { id: id(req.user.id), name: req.user.role === "attorney" ? "Matter attorney" : "Matter paralegal" }, coEditing: { mode: "fast", change: false }, customization: { autosave: true, forcesave: false, chat: false, uiTheme: "theme-light", compactHeader: true, close: { visible: true, text: "Return to Files" }, review: { trackChanges: true, reviewDisplay: "markup" } } },
   };
   config.token = jwt.sign(config, settings.secret, { algorithm: "HS256", expiresIn: "2h" });
   return { sessionId: id(session._id), scriptUrl: settings.scriptUrl, editorOrigin: settings.origin, config, expiresAt: session.expiresAt.toISOString(), savedVersion: session.savedVersion };

@@ -54,6 +54,8 @@ test("both authorized participants receive the same co-editing key and signed tr
   expect(a.status).toBe(200); expect(b.status).toBe(200);
   expect(a.body.config.document.key).toBe(b.body.config.document.key);
   expect(a.body.config.editorConfig.customization.review.trackChanges).toBe(true);
+  expect(a.body.config.editorConfig.customization).toMatchObject({ uiTheme: "theme-light", compactHeader: true, close: { visible: true, text: "Return to Files" }, forcesave: false });
+  expect(a.body.config.editorConfig.customization).not.toHaveProperty("font");
   expect(jwt.verify(a.body.config.token, process.env.ONLYOFFICE_JWT_SECRET).document.key).toBe(a.body.config.document.key);
   expect(await Session.countDocuments()).toBe(1);
   const session = await Session.findById(a.body.sessionId).select("+participants").lean();

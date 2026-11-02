@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220" role="img" aria-labelledby="title description">
   <title id="title">Profile placeholder</title>
-  <desc id="description">A simple person outline on a soft blue background, used when no profile photo is available.</desc>
-  <circle cx="110" cy="110" r="110" fill="#edf2fa"/>
-  <g fill="none" stroke="#4d70a8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+  <desc id="description">A simple person outline on a warm cream background, used when no profile photo is available.</desc>
+  <circle cx="110" cy="110" r="110" fill="#f4f0e6"/>
+  <g fill="none" stroke="#79613b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="110" cy="83" r="26"/>
     <path d="M62 165v-9c0-23 21-39 48-39s48 16 48 39v9"/>
   </g>

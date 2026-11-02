@@ -1,9 +1,6 @@
-/* Portal UI only. Shared components retain their existing font elsewhere. */
+/* LPC portals use the bundled brand fonts; document contents retain their own typography. */
 :root:has(body.lpc-v2) {
-  --lpc-portal-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  --lpc-portal-font-sans: "Sarabun", Arial, sans-serif;
+  --lpc-portal-font-serif: "Cormorant Garamond", Georgia, serif;
 }
-
-body.lpc-v2 {
-  font-family: var(--lpc-portal-font-sans);
-}
+body.lpc-v2 { font-family: var(--lpc-portal-font-sans); font-weight: 200; }

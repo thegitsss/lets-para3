@@ -34,3 +34,13 @@
 @keyframes lpc-editor-spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.lpc-native-editor{width:calc(100vw - 12px);height:calc(100dvh - 12px);border-radius:7px}.lpc-native-editor__header{padding:13px 14px;gap:12px}.lpc-native-editor__filename{max-width:52vw}.lpc-native-editor__header .lpc-native-editor__button{font-size:12px;padding:8px 10px}.lpc-native-editor__toolbar{padding:10px 14px;align-items:flex-start;flex-wrap:wrap;gap:8px}.lpc-native-editor__actions{gap:7px}.lpc-native-editor__actions .lpc-native-editor__button{font-size:12px;min-height:36px;padding:8px 10px}.lpc-native-editor__feedback{padding:9px 14px}.lpc-native-editor__detail{font-size:11px}.lpc-native-editor__footer{padding:8px 14px;font-size:10px}}
 @media(prefers-reduced-motion:reduce){.lpc-native-editor__spinner{animation:none}}
+/* The LPC frame owns its typography. The provider owns document content fonts. */
+body.lpc-v2 .lpc-native-editor{color:var(--lpc-ink,#29302c);background:var(--lpc-paper,#fff);font-family:var(--lpc-portal-font-sans,"Sarabun"),sans-serif;font-weight:200;border-color:var(--lpc-line,#e5e5dd);box-shadow:0 16px 60px #2730251f}
+.lpc-native-editor__brand{display:block;font:300 17px/1.1 var(--lpc-portal-font-serif,"Cormorant Garamond"),Georgia,serif;margin-bottom:8px;color:var(--lpc-gold,#79613b)}
+body.lpc-v2 .lpc-native-editor__heading h2{font:300 16px/1.3 var(--lpc-portal-font-sans,"Sarabun"),sans-serif}
+body.lpc-v2 .lpc-native-editor__button{font-family:var(--lpc-portal-font-sans,"Sarabun"),sans-serif;font-weight:300;border-color:var(--lpc-control-line,#b5b8ac)}
+body.lpc-v2 .lpc-native-editor__button--primary{background:var(--lpc-ink,#29302c);border-color:var(--lpc-ink,#29302c);color:var(--lpc-paper,#fff)}
+body.lpc-v2 .lpc-native-editor__button:focus-visible{outline-color:var(--lpc-focus,#9b8051)}
+body.lpc-v2 .lpc-native-editor__toolbar{background:var(--lpc-soft,#f7f6f2);border-color:var(--lpc-line,#e5e5dd)}
+body.lpc-v2 .lpc-native-editor__status{font-family:var(--lpc-portal-font-sans,"Sarabun"),sans-serif;font-weight:300}
+@media(max-width:600px){.lpc-native-editor__brand{font-size:15px;margin-bottom:5px}}

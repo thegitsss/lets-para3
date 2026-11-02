@@ -97,3 +97,20 @@
 .lc-clio-dialog-header{flex:0 0 auto}
 .lc-clio-dialog-header .lc-clio-close{min-width:44px;flex:0 0 auto;font-size:13px;line-height:20px;margin:0}
 .lc-clio-dialog{margin:auto}
+/* Official Clio shapes and logotype, unchanged from Clio's public brand header.
+   LPC owns the surrounding interface; Clio's mark keeps its own typography. */
+.lc-clio-brand-lockup{display:grid;gap:10px;min-width:0}
+.lc-clio-wordmark{display:inline-flex;align-items:center;gap:9px;width:89px;height:30px;margin:0;color:#000;flex:none}
+.lc-clio-symbol,.lc-clio-logotype{display:block;flex:none;height:100%;background:currentColor;mask-position:center;mask-repeat:no-repeat;mask-size:contain}
+.lc-clio-symbol{width:30px;mask-image:url('../brand/clio-symbol.svg')}
+.lc-clio-logotype{width:51px;mask-image:url('../brand/clio-wordmark.svg')}
+body.lpc-v2 .lc-clio,body.lpc-v2 .lc-clio-dialog{--clio-ink:var(--lpc-ink,#29302c);--clio-muted:var(--lpc-muted,#666c63);--clio-border:var(--lpc-line,#e5e5dd);background:var(--lpc-paper,#fff);font-weight:200}
+body.lpc-v2 .lc-clio{border-radius:8px;padding:24px}
+body.lpc-v2 .lc-clio .lc-clio-primary,body.lpc-v2 .lc-clio-dialog .lc-clio-primary{font-weight:300}
+body.lpc-v2 .lc-clio-dialog-header h2{font:300 28px/1.2 var(--lpc-portal-font-serif,"Cormorant Garamond"),Georgia,serif}
+body.lpc-v2 .lc-clio-dialog :is(.lc-clio-review-block strong,.lc-clio-matter-row strong,.lc-clio-document-row strong){font-weight:300}
+body.lpc-v2 .lc-clio-field input,body.lpc-v2 .lc-clio-field textarea{border-color:var(--lpc-control-line,#b5b8ac);font-weight:200}
+body.lpc-v2 .lc-clio-source{background:var(--lpc-soft,#f7f6f2);border-color:var(--lpc-line,#e5e5dd)}
+body.lpc-v2 .lc-clio-dialog-footer{background:var(--lpc-paper,#fff)}
+:root.theme-dark .lc-clio-wordmark{color:#fff}
+@media(max-width:600px){body.lpc-v2 .lc-clio{padding:20px 16px}.lc-clio-wordmark{width:77px;height:26px;gap:7px}.lc-clio-symbol{width:26px}.lc-clio-logotype{width:44px}body.lpc-v2 .lc-clio-dialog-header h2{font-size:25px}}

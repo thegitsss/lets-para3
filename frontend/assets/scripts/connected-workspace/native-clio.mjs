@@ -70,7 +70,10 @@ function createCore({ ownerId, api, signal }) {
 
 function connectionHeading(connection) {
   const state = connection.connected ? 'Connected' : connection.needsReconnect ? 'Reconnect required' : 'Not connected';
-  return node('div', { className: 'lc-clio-heading' }, [node('div', { className: 'lc-clio-brand', 'aria-hidden': 'true', text: 'C' }), node('div', {}, [node('h2', { text: 'Clio' }), paragraph('Practice management · United States')]), node('span', { className: `lc-clio-state${connection.connected ? ' is-connected' : ''}`, text: state })]);
+  return node('div', { className: 'lc-clio-heading' }, [node('div', { className: 'lc-clio-brand-lockup' }, [clioWordmark('h2'), paragraph('Clio Manage · United States')]), node('span', { className: `lc-clio-state${connection.connected ? ' is-connected' : ''}`, text: state })]);
+}
+function clioWordmark(tag = 'span') {
+  return node(tag, { className: 'lc-clio-wordmark', 'aria-label': 'Clio' }, [node('span', { className: 'lc-clio-symbol', 'aria-hidden': 'true' }), node('span', { className: 'lc-clio-logotype', 'aria-hidden': 'true' })]);
 }
 function connectButton(core, { caseId, onBeforeNavigate } = {}) {
   return control(core.connection?.needsReconnect ? 'Reconnect Clio' : 'Connect Clio', async event => {
@@ -292,7 +295,7 @@ export function createClioMatterTransfers({ caseId, ownerId, api, signal, files,
     try {
       const [connection, history] = await Promise.all([core.status(), core.read(`${BASE}transfers?caseId=${caseId}`)]); if (!core.isGeneration(generation)) return;
       if (!Array.isArray(history.items)) throw new Error('The saved Clio transfers could not be read.'); recorded = history.items; currentAssignment = typeof history.assignmentRevision === 'string' ? history.assignmentRevision : '';
-      body.replaceChildren(node('div', { className: 'lc-clio-transfer-heading' }, [node('h3', { text: 'Clio' }), node('span', { className: `lc-clio-state${connection.connected ? ' is-connected' : ''}`, text: connection.connected ? 'Connected' : 'Not connected' })]));
+      body.replaceChildren(node('div', { className: 'lc-clio-transfer-heading' }, [clioWordmark('h3'), node('span', { className: `lc-clio-state${connection.connected ? ' is-connected' : ''}`, text: connection.connected ? 'Connected' : 'Not connected' })]));
       if (!connection.configured) { body.append(paragraph('Clio transfers are currently unavailable.')); renderReceipts(); return; }
       if (!connection.connected) { body.append(paragraph('Connect Clio to bring selected documents into this matter and return approved work.'), connectButton(core, { caseId })); renderReceipts(); return; }
       const [sources, available] = await Promise.all([core.read(`${BASE}handoffs?caseId=${caseId}`), isReadOnly() ? Promise.resolve([]) : loadFiles()]);
