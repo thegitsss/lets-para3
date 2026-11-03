@@ -125,7 +125,7 @@ body.admin-live #pendingUserModal.admin-flow-inline .admin-tabs{gap:19px;margin-
 body.admin-live #pendingUserModal.admin-flow-inline .admin-tabs button{font-size:12px;padding:7px 0 10px;min-height:36px;flex:0 0 auto;min-width:0}
 body.admin-live #pendingUserModal.admin-flow-inline .admin-review-card{margin:0 0 12px;padding:0 0 12px}
 body.admin-live #pendingUserModal.admin-flow-inline .admin-review-card h3{font-size:14px;margin:0 0 8px}
-body.admin-live #pendingUserModal.admin-flow-inline .admin-document-link{font-size:13px;min-height:38px}
+body.admin-live #pendingUserModal.admin-flow-inline .admin-document-link{font-size:13px;min-height:38px;margin-inline-end:12px}
 body.admin-live .admin-admission-brief{font-size:12px;color:#875722;line-height:1.6;margin:0 0 15px;padding:10px 12px;background:#fff8ed;border:1px solid #f2e6d1;border-radius:6px}
 body.admin-live #pendingUserModal.admin-flow-inline .admin-draft-state{font-size:11px;line-height:1.5;color:var(--muted);margin-bottom:16px}
 body.admin-live .admin-review-summary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 18px;padding:0 0 16px;border-bottom:1px solid var(--line)}
@@ -252,6 +252,7 @@ body.admin-live #adminFlow .admin-flow-heading:has(#adminFlowOptions:not([hidden
 @media(max-width:760px){
  body.admin-live .admin-live-queue.show-review .admin-live-review{min-height:max(430px,32rem)}
  body.admin-live .admin-review-summary{grid-template-columns:minmax(0,1fr)}
+ body.admin-live #pendingUserModal.admin-flow-inline .admin-document-link{min-height:44px}
 }
 
 @media (max-width: 1024px) {
