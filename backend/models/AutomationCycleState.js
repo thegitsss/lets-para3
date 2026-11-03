@@ -6,5 +6,7 @@ const schema = new mongoose.Schema({
   startedAt: { type: Date, required: true },
   finishedAt: { type: Date, default: null },
   failedTasks: { type: [String], default: [] },
+  leaseUntil: { type: Date, default: null },
+  preparationCursors: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { timestamps: true, versionKey: false });
 module.exports = mongoose.models.AutomationCycleState || mongoose.model('AutomationCycleState', schema);

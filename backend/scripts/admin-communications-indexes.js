@@ -43,7 +43,7 @@ async function ensureReviewNoticeIndexes() {
 async function ensureCommunicationIndexes() {
   // Create required indexes; only the named legacy review key is replaced below.
   // Duplicate existing records fail this release step instead of silently losing deduplication.
-  for (const name of ['AdmissionDecisionNotification', 'SignupReviewNotification', 'AutonomyPreference', 'SupportTicket', 'KnowledgeItem', 'KnowledgeRevision', 'KnowledgeCollection', 'OpsMonitorState', 'Message', 'MatterMessageNotification', 'AdminCommunicationAlert', 'AdminMailboxState', 'AdminInboundMail', 'AdminDraft', 'SupportMessage', 'MatterFileNotification', 'MatterWorkNotification', 'MatterPaymentNotification', 'MatterWithdrawalNotification', 'MatterApplicationNotification', 'MatterInvitationNotification', 'MatterPreEngagementNotification', 'MatterPostingNotification']) {
+  for (const name of ['AdminWorkPreparation', 'AdmissionDecisionNotification', 'SignupReviewNotification', 'AutonomyPreference', 'SupportTicket', 'KnowledgeItem', 'KnowledgeRevision', 'KnowledgeCollection', 'OpsMonitorState', 'Message', 'MatterMessageNotification', 'AdminCommunicationAlert', 'AdminMailboxState', 'AdminInboundMail', 'AdminDraft', 'SupportMessage', 'MatterFileNotification', 'MatterWorkNotification', 'MatterPaymentNotification', 'MatterWithdrawalNotification', 'MatterApplicationNotification', 'MatterInvitationNotification', 'MatterPreEngagementNotification', 'MatterPostingNotification']) {
     await ensureModelIndexes(require(`../models/${name}`));
   }
   await ensureReviewNoticeIndexes();

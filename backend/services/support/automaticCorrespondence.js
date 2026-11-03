@@ -24,7 +24,16 @@ const value = (row,key) => Object.hasOwn(row,key)?row[key]:{$exists:false};
 function snapshot(ticket) {
  return Object.fromEntries(['subject','message','latestUserMessage','requesterUserId','userId','requesterEmail','requesterRole','requestKind','status','assignedTo','lastInboundMailAt','lastAdminReplyAt','caseId','jobId','applicationId','conversationId','escalationReason','linkedIncidentIds','riskFlags','automaticReminders','emailReplies'].map(key=>[key,ticket[key]]));
 }
-function sourceFilter(ticket) {return Object.fromEntries(Object.keys(snapshot(ticket)).map(key=>[key,value(ticket,key)]));}
+function sourceFilter(ticket) {
+ const filter=Object.fromEntries(Object.keys(snapshot(ticket)).filter(key=>key!=='emailReplies').map(key=>[key,value(ticket,key)]));
+ // Receipts are appended after the reply subdocument was created. Match the
+ // retained BSON array literally: schema recasting can reorder its fields and
+ // make an unchanged reply fail an embedded-document equality comparison.
+ // $ifNull prevents Mongoose inferring and recasting the comparison RHS.
+ if(Object.hasOwn(ticket,'emailReplies'))filter.$expr={$eq:[{$ifNull:['$emailReplies',[]]},{$literal:ticket.emailReplies}]};
+ else filter.emailReplies={$exists:false};
+ return filter;
+}
 function rules(policy) {
  const incoming=policy?.outboundRules||{};
  const result={startHour:incoming.startHour??9,endHour:incoming.endHour??17,timeZone:incoming.timeZone??'America/New_York',reminderLimit:incoming.reminderLimit??2,reminderIntervalHours:incoming.reminderIntervalHours??72,spendingLimitCents:incoming.spendingLimitCents??0};
@@ -88,7 +97,8 @@ async function stageAdmission(user,policy,now) {
  const prepared=admission(user);if(!prepared.missing.length)return false;
  // One canonical initial request per account. Subsequent reminders reuse it.
  const key=`admission:auto:${user._id}`;
- const ticket=await Ticket.findOneAndUpdate({administrativeRequestKey:key},{$setOnInsert:{subject:'Application information requested',message:'LPC needs application details before the owner can review admission.',requesterUserId:user._id,userId:user._id,requesterEmail:user.email,requesterRole:user.role,sourceSurface:'admin',sourceLabel:'Application review',requestKind:'support',nextAction:'Review the applicant response.'}},{upsert:true,returnDocument:'after'}).select('+automaticCorrespondence').lean();
+ if(await Ticket.exists({requesterUserId:user._id,administrativeRequestKey:{$exists:true,$ne:key},status:{$in:['open','in_review','waiting_on_user','waiting_on_info']}}))return false;
+ const ticket=await Ticket.findOneAndUpdate({administrativeRequestKey:key},{$setOnInsert:{subject:'Application information requested',message:'LPC needs application details before the owner can review admission.',requesterUserId:user._id,userId:user._id,requesterEmail:user.email,requesterRole:user.role,sourceSurface:'admin',sourceLabel:'Application review',requestKind:'support',admissionSourceRevision:require('../admissionReview').admissionRevision(user),nextAction:'Review the applicant response.'}},{upsert:true,returnDocument:'after'}).select('+automaticCorrespondence').lean();
  if(!unowned(ticket)||ticket.automaticCorrespondence||ticket.emailReplies?.length||ticket.status!=='open')return false;
  return stage(ticket,{kind:'admission_information',policyAction:policy.actionType,text:`${disclosure}\n\n${prepared.text}`,admissionFingerprint:prepared.fingerprint},{now});
 }
@@ -143,7 +153,7 @@ async function deliver(claimed,now) {
  const changes={'automaticCorrespondence.status':status,'automaticCorrespondence.failure':failure,'automaticCorrespondence.nextAttemptAt':new Date(now.getTime()+2**(intent.attempts+1)*60000),'emailReplies.$[reply].delivery':status};
  if(status==='accepted')changes['automaticCorrespondence.nextReminderAt']=new Date(now.getTime()+config.reminderIntervalHours*3600000);
  const match={_id:ticket._id,'automaticCorrespondence.claim':claimId,'automaticCorrespondence.status':'sending'};
- await Ticket.updateOne(match,{$set:changes},{arrayFilters:[{'reply.requestId':intent.requestId}]});
+ await Ticket.updateOne(match,{$set:changes,$push:{'emailReplies.$[reply].attemptOutcomes':{claimId,status,attempted,recordedAt:now}}},{arrayFilters:[{'reply.requestId':intent.requestId}]});
  if(status==='accepted'){
   await Ticket.updateOne({...match,'automaticCorrespondence.status':'accepted',assignedTo:null,status:ticket.status,message:value(ticket,'message'),latestUserMessage:value(ticket,'latestUserMessage'),lastInboundMailAt:value(ticket,'lastInboundMailAt'),lastAdminReplyAt:value(ticket,'lastAdminReplyAt')},{$set:{status:'waiting_on_user',lastAdminReplyAt:now},...(intent.kind==='reminder'?{$inc:{automaticReminders:1}}:{})});
  }
@@ -175,7 +185,7 @@ async function handOffExhaustedReminder(id, now) {
 }
 async function processAutomaticCorrespondence({limit=20,now=new Date(),shouldStop=()=>false,onProgress=async()=>{}}={}) {
  // A paused policy must still expose any abandoned in-flight attempt as unknown.
- await Ticket.updateMany({'automaticCorrespondence.status':'sending','automaticCorrespondence.claimedAt':{$lt:new Date(now.getTime()-10*60000)}},[{$set:{'automaticCorrespondence.status':'unknown','automaticCorrespondence.failure':'The worker stopped before delivery was confirmed. Check the provider.',emailReplies:{$map:{input:{$ifNull:['$emailReplies',[]]},as:'reply',in:{$cond:[{$eq:['$$reply.requestId','$automaticCorrespondence.requestId']},{$mergeObjects:['$$reply',{delivery:'unknown'}]},'$$reply']}}}}}],{updatePipeline:true});
+ await Ticket.updateMany({'automaticCorrespondence.status':'sending','automaticCorrespondence.claimedAt':{$lt:new Date(now.getTime()-10*60000)}},[{$set:{'automaticCorrespondence.status':'unknown','automaticCorrespondence.failure':'The worker stopped before delivery was confirmed. Check the provider.',emailReplies:{$map:{input:{$ifNull:['$emailReplies',[]]},as:'reply',in:{$cond:[{$eq:['$$reply.requestId','$automaticCorrespondence.requestId']},{$mergeObjects:['$$reply',{delivery:'unknown',attemptOutcomes:{$concatArrays:[{$ifNull:['$$reply.attemptOutcomes',[]]},[{claimId:'$automaticCorrespondence.claim',status:'unknown',attempted:null,recordedAt:now}]]}}]},'$$reply']}}}}}],{updatePipeline:true});
  const active=await Preference.find({agentRole:'CCO',mode:'auto',actionType:{$in:Object.values(POLICIES)}}).lean();
  if(!active.length)return {processed:0,staged:0};
  let staged=0,processed=0;

@@ -143,7 +143,11 @@
     "test:playwright:technical-source-hygiene": "playwright test -c playwright.technical-source-hygiene.config.cjs --fail-on-flaky-tests",
     "test:journey-intelligence": "npm test -- tests/matterJourney.test.js tests/journeyContinuity.test.js tests/matterExperience.test.js tests/attorneyHomeInventory.test.js tests/paralegalHomeModel.test.js tests/paralegalHomeWorkspaceModel.test.js",
     "test:playwright:journey-intelligence": "playwright test -c playwright.journey-intelligence.config.cjs --fail-on-flaky-tests",
-    "test:playwright:stripe-behavior": "playwright test -c playwright.stripe-behavior.config.cjs --fail-on-flaky-tests"
+    "test:playwright:stripe-behavior": "playwright test -c playwright.stripe-behavior.config.cjs --fail-on-flaky-tests",
+    "test:admin-operating-system": "jest --runInBand --runTestsByPath tests/adminOperatingSystem.test.js tests/adminOperatingPreparation.test.js tests/adminExecutiveMetrics.test.js tests/adminFlow.test.js tests/adminFinancialAgreement.test.js tests/adminWorkflows.test.js tests/automaticCorrespondence.test.js tests/automationCycle.test.js tests/automationCycleStatus.test.js tests/adminAdmissionsJourney.test.js tests/adminCommunicationsWorker.test.js tests/adminCommunicationsDeployment.test.js tests/adminRelatedWork.test.js tests/adminOperations.test.js tests/supportPhase2.test.js tests/predeployIndexCompatibility.test.js",
+    "test:admin-overview": "node scripts/verify-admin-overview.cjs",
+    "test:admin-operating-journey": "node scripts/verify-admin-operating-journey.cjs",
+    "test:admin-operating-scale": "node scripts/verify-admin-operating-scale.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.645.0",

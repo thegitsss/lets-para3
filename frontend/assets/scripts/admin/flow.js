@@ -2,7 +2,9 @@ import { replaceEventHandler } from '../utils/event-bindings.mjs';
 import { privateApi as api, onAdminPrivateInvalidation, escapeHTML as esc, routeParam, visible } from './shared.js';
 import { icon } from './presentation.js';
 import { initAdminToday } from './today.js';
-import { getStoredSession } from '../auth.js';
+import { getStoredSession, fetchCSRF } from '../auth.js';
+import { readFinancial } from './financial-read.js';
+import { readExecutive } from './executive.js';
 
 const el = id => document.getElementById(id);
 const placements = [];
@@ -13,6 +15,7 @@ let queueData = null;
 let storageKey = '', mounted = '', pendingCompletion = null;
 let refreshActivity = () => {};
 let reading = false, working = false, navigating = false, pendingSection = '';
+let integrated = false, backgroundChecked = false, backgroundHealthy = false;
 
 function saveSession() {
   if (!storageKey) {
@@ -77,6 +80,7 @@ function restore({ clearRoute = true } = {}) {
     el('pendingUserModal').setAttribute('aria-modal', 'true');
   }
   for (const { node, marker, hidden } of placements.splice(0).reverse()) {
+    if (node.id === 'adminReplySend') node.removeAttribute('form');
     marker.replaceWith(node);
     node.hidden = hidden;
   }
@@ -89,6 +93,9 @@ async function flushDraft() {
   if (mounted === 'inquiry') await window.flushAdminInquiryDraft?.();
 }
 async function readQueue(key = '', selected = '') {
+  if (!queueData && !key && !selected && queuePage === 1 && new URL(location.href).searchParams.get('view') !== 'queue') {
+    try { const data = await readExecutive(); if (data.decisions && Number.isSafeInteger(data.decisions.remaining) && Array.isArray(data.decisions.items)) return data.decisions; } catch (_) { /* The established queue remains usable if summary metrics are unavailable. */ }
+  }
   return api(`/api/admin/workspace/flow?${new URLSearchParams({ current: key, selected, page: String(queuePage) })}`);
 }
 function progress(data) {
@@ -100,6 +107,7 @@ function progress(data) {
   el('adminFlowQueueCount').textContent = `${data.remaining} to review`;
   el('adminFlowProgress').textContent = [completed ? `${completed} reviewed this visit` : '', `${data.remaining} to review`, data.deferred ? `${data.deferred} set for later` : ''].filter(Boolean).join(' · ');
   el('adminFlowScope').textContent = `Checked: ${data.scope}.`;
+  document.dispatchEvent(new CustomEvent('admin:queue-state', { detail: data }));
   followUps = data.followUps || [];
   const saved = el('adminFlowSaved');
   saved.hidden = !followUps.length;
@@ -128,7 +136,18 @@ function compact() {
     note.before(fold); fold.append(note);
     fold.open = Boolean(el('adminDecisionNote').value);
   }
-  if (mounted === 'inquiry' && el('adminReplySend') && !el('adminReplyText').readOnly) {
+  if (integrated && mounted === 'inquiry') {
+    const send = body.querySelector('#adminReplySend');
+    if (send) {
+      // Keep the original guarded form submit reachable beside Later. Refreshing
+      // a record replaces its form, so retire its previous detached submit.
+      el('adminFlowActions').querySelector('#adminReplySend')?.remove();
+      send.setAttribute('form', 'adminReplyForm');
+      mount(send, el('adminFlowActions'));
+      send.hidden = el('adminReplyForm').classList.contains('admin-reply-unavailable');
+    }
+  }
+  if (mounted === 'inquiry' && el('adminReplySend') && el('adminReplyText') && !el('adminReplyText').readOnly) {
     el('adminReplyTitle')?.setAttribute('aria-level', '2');
     const text = (el('adminReplyForm').querySelector('h3').textContent.includes('email') ? 'Send email' : 'Send') + (el('adminReplyStatus').value === 'in_review' ? '' : ' & next');
     if (el('adminReplySend').textContent !== text && !busy) el('adminReplySend').textContent = text;
@@ -147,7 +166,47 @@ function compact() {
     });
   }
 }
-async function openTask(task, request) {
+async function showPreparation(task, request) {
+  if (!['application','inquiry','matter'].includes(task.kind)) return;
+  const currentView = () => request === sequence && active && current?.key === task.key;
+  try {
+    const data = await readFinancial(`/api/admin/workspace/preparation/${task.kind}/${encodeURIComponent(task.id)}`, { suppressToast: true });
+    if (!currentView()) return;
+    const prepared = data.preparation;
+    if (prepared?.current === true && prepared.status === 'prepared' && prepared.result) {
+      if (prepared.recordUpdatedAt && prepared.recordUpdatedAt !== task.revision) return;
+      const result = prepared.result;
+      const explanation = task.kind === 'inquiry' ? [result.summary] : [result.summary, result.recommendedAction];
+      el('adminFlowReason').textContent = explanation.filter(value => typeof value === 'string' && value.trim()).join(' ');
+      // Never replace a saved draft, an uncertain send, or facts from a different
+      // source revision. Existing input handlers retain the private save contract.
+      if (prepared.recordUpdatedAt === task.revision) {
+        const field = task.kind === 'inquiry' ? el('adminReplyText') : task.kind === 'application' ? el('adminInformationText') : null;
+        const text = task.kind === 'inquiry' ? result.text : result.requestText;
+        if (field && !field.value.trim() && !field.readOnly && typeof text === 'string' && text.trim()) {
+          field.value = text; field.dispatchEvent(new Event('input', { bubbles: true }));
+          if (task.kind === 'application') field.closest('details').open = true;
+        }
+      }
+    } else if (prepared?.status === 'failed' && /^[a-f0-9]{64}$/.test(prepared.sourceRevision || '')) {
+      const note = document.createElement('span'); note.textContent = 'Preparation could not finish. You can review the original record.';
+      const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn secondary'; retry.textContent = 'Retry preparation';
+      el('adminFlowReason').replaceChildren(note, document.createTextNode(' '), retry);
+      retry.addEventListener('click', async () => {
+        if (!currentView() || retry.disabled) return;
+        retry.disabled = true;
+        try {
+          await fetchCSRF(); if (!currentView()) return;
+          await api(`/api/admin/workspace/preparation/${task.kind}/${encodeURIComponent(task.id)}/retry?expectedOwnerId=${encodeURIComponent(data.ownerId)}`, { method: 'POST', body: { expectedOwnerId: data.ownerId, reviewedRevision: prepared.sourceRevision } });
+          if (currentView()) el('adminFlowReason').textContent = 'Preparation is queued. The original record remains available for review.';
+        } catch (error) {
+          if (currentView()) el('adminFlowReason').textContent = error.status >= 400 && error.status < 500 ? error.message : 'Preparation request is unconfirmed. Refresh to check its current status.';
+        }
+      });
+    }
+  } catch (_) { /* Cached preparation is optional; current source records remain authoritative. */ }
+}
+async function openTask(task, request, { focus = false } = {}) {
   restore();
   el('adminFlowQueueLayout').classList.remove('is-empty');
   const body = el('adminFlowBody');
@@ -218,8 +277,10 @@ async function openTask(task, request) {
     // Record deep links belong to standalone reviews, not the embedded queue.
     for (const key of ['account', 'ticket', 'matter', 'dispute']) routeParam(key, '');
     compact();
-    el('main').scrollTo({ top: 0, behavior: 'instant' });
-    el('adminFlowTitle').focus({ preventScroll: true });
+    void showPreparation(task, request);
+    if (!integrated) el('main').scrollTo({ top: 0, behavior: 'instant' });
+    else if (matchMedia('(max-width:760px)').matches && el('adminFlowQueueLayout').classList.contains('show-review')) el('adminFlow').scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (!integrated || focus) el('adminFlowTitle').focus({ preventScroll: true });
   } catch (error) {
     if (request !== sequence || !active) return;
     status(error.message);
@@ -230,8 +291,8 @@ function renderEmpty(data) {
   restore(); current = null; savedSelection = ''; saveSession();
   el('adminFlowQueueLayout').classList.add('is-empty');
   el('adminFlowActions').hidden = true;
-  el('adminFlowTitle').textContent = 'You’re up to date here.';
-  el('adminFlowContext').textContent = data.deferred ? `${data.deferred} ${data.deferred === 1 ? 'item is' : 'items are'} set for later.` : data.waiting ? `Waiting for ${data.waiting} ${data.waiting === 1 ? 'applicant to reply' : 'applicants to reply'}.` : 'No items need review in your checked queues right now.';
+  el('adminFlowTitle').textContent = backgroundHealthy ? 'Nothing needs your decision.' : 'Your decision queues are clear.';
+  el('adminFlowContext').textContent = !backgroundHealthy ? (backgroundChecked ? 'Background checks need attention before relying on this overview.' : 'Background operations are being checked.') : data.deferred ? `${data.deferred} ${data.deferred === 1 ? 'item is' : 'items are'} set for later.` : data.waiting ? `Waiting for ${data.waiting} ${data.waiting === 1 ? 'applicant to reply' : 'applicants to reply'}.` : 'No items need review in your checked queues right now.';
   el('adminFlowReason').textContent = '';
   el('adminFlowFollowUpForm').hidden = true;
   el('adminFlowBody').replaceChildren();
@@ -267,7 +328,7 @@ async function refresh({ completion = '', check = false, followUpAt, bringBack, 
     }
     progress(data);
     void refreshActivity();
-    if (data.task) await openTask(data.task, request);else renderEmpty(data);
+    if (data.task) await openTask(data.task, request, { focus: Boolean(completion || selected || document.activeElement?.closest?.('#adminFlow')) });else renderEmpty(data);
     if (completion) status(completion);
     else if (followUpAt) status('Follow-up saved. Next item ready.');
     else if (bringBack) {
@@ -318,8 +379,9 @@ function completedWork(detail) {
   void refresh({ completion: detail.message || 'Saved.' });
 }
 function init() {
-  if (new URL(location.href).searchParams.get('view') !== 'queue') return;
   if (!el('section-overview')) return;
+  const legacy = new URL(location.href).searchParams.get('view') === 'queue';
+  integrated = !legacy;
   loadSession();
   const overview = el('section-overview');
   const more = document.createElement('details');
@@ -329,9 +391,17 @@ function init() {
   overview.append(more);
   const flow = document.createElement('div');
   flow.id = 'adminFlow';
-  flow.innerHTML = `<header class="admin-live-page-heading"><h1>Today</h1><button type="button" class="btn secondary" id="adminFlowRefresh" aria-label="Refresh queue">${icon('refresh')}</button></header><div class="admin-tabs admin-today-tabs" role="group" aria-label="Today views"><button type="button" data-today-view="review" aria-pressed="true">Needs you <span id="adminTodayNeedsCount"></span></button><button type="button" data-today-view="waiting" aria-pressed="false">Waiting</button><button type="button" data-today-view="activity" aria-pressed="false">Activity</button></div><div id="adminFlowQueueLayout" class="admin-live-queue"><aside class="admin-live-queue-list" aria-label="Decision queue"><div class="admin-queue-heading" id="adminFlowQueueCount">Loading queue…</div><div id="adminFlowQueue"></div></aside><section id="adminReviewPane" class="admin-live-review" aria-label="Selected decision"><header class="admin-flow-heading"><button class="btn secondary admin-queue-back" type="button" id="adminFlowBack">${icon('back')}Back</button><div><h2 id="adminFlowTitle" tabindex="-1">Loading…</h2><p id="adminFlowContext"></p><p id="adminFlowReason"></p></div><details id="adminFlowOptions" class="admin-record-options" hidden><summary aria-label="Account options">•••</summary><div id="adminFlowOptionsContent"></div></details></header><p id="adminFlowStatus" role="status" aria-live="polite"></p><div id="adminFlowBody" class="admin-flow-body"></div><form id="adminFlowFollowUpForm" class="admin-flow-follow-up" hidden><label for="adminFlowFollowUpAt">Remind me</label><input id="adminFlowFollowUpAt" type="datetime-local" required><p>No message will be sent.</p><div class="admin-inline-actions"><button class="btn primary" type="submit" id="adminFlowSaveFollowUp">Save follow-up</button><button class="btn secondary" type="button" id="adminFlowCancelFollowUp">Cancel</button></div></form><div id="adminFlowActions" class="admin-flow-actions" hidden><button type="button" class="btn secondary" id="adminFlowLater" aria-label="Choose follow-up">Later</button><button type="button" class="btn primary" id="adminFlowCheck" hidden>Check &amp; next ${icon('arrow')}</button></div></section></div><details class="admin-queue-evidence"><summary>Queue details</summary><p id="adminFlowScope" class="small"></p><p id="adminFlowProgress"></p></details><details id="adminFlowSaved" class="admin-flow-saved" hidden></details>`;
+  flow.innerHTML = `<header class="admin-live-page-heading">${legacy ? '<h1>Today</h1>' : ''}<button type="button" class="btn secondary" id="adminFlowRefresh" aria-label="Refresh queue">${icon('refresh')}</button></header><div class="admin-tabs admin-today-tabs" role="tablist" aria-label="Daily work"><button type="button" data-today-view="review" role="tab" aria-selected="true" aria-controls="adminFlowQueueLayout">Needs you <span id="adminTodayNeedsCount"></span></button><button type="button" data-today-view="waiting" role="tab" aria-selected="false" aria-controls="adminTodayWaitingPanel" tabindex="-1">Waiting</button><button type="button" data-today-view="activity" role="tab" aria-selected="false" aria-controls="adminTodayActivityPanel" tabindex="-1">Handled</button></div><div id="adminFlowQueueLayout" class="admin-live-queue"><aside class="admin-live-queue-list" aria-label="Decision queue"><div class="admin-queue-heading" id="adminFlowQueueCount">Loading queue…</div><div id="adminFlowQueue"></div></aside><section id="adminReviewPane" class="admin-live-review" aria-label="Selected decision"><header class="admin-flow-heading"><button class="btn secondary admin-queue-back" type="button" id="adminFlowBack">${icon('back')}Back</button><div><h2 id="adminFlowTitle" tabindex="-1">Loading…</h2><p id="adminFlowContext"></p><p id="adminFlowReason"></p></div><details id="adminFlowOptions" class="admin-record-options" hidden><summary aria-label="Account options">•••</summary><div id="adminFlowOptionsContent"></div></details></header><p id="adminFlowStatus" role="status" aria-live="polite"></p><div id="adminFlowBody" class="admin-flow-body"></div><form id="adminFlowFollowUpForm" class="admin-flow-follow-up" hidden><label for="adminFlowFollowUpAt">Remind me</label><input id="adminFlowFollowUpAt" type="datetime-local" required><p>No message will be sent.</p><div class="admin-inline-actions"><button class="btn primary" type="submit" id="adminFlowSaveFollowUp">Save follow-up</button><button class="btn secondary" type="button" id="adminFlowCancelFollowUp">Cancel</button></div></form><div id="adminFlowActions" class="admin-flow-actions" hidden><button type="button" class="btn secondary" id="adminFlowLater" aria-label="Choose follow-up">Later</button><button type="button" class="btn primary" id="adminFlowCheck" hidden>Check &amp; next ${icon('arrow')}</button></div></section></div><details class="admin-queue-evidence"><summary>Queue details</summary><p id="adminFlowScope" class="small"></p><p id="adminFlowProgress"></p></details><details id="adminFlowSaved" class="admin-flow-saved" hidden></details>`;
   overview.prepend(flow);
-  refreshActivity = initAdminToday(overview);
+  if (integrated) { flow.querySelector(':scope > header').prepend(flow.querySelector('.admin-today-tabs')); flow.querySelector(':scope > header').classList.add('admin-executive-queue-header'); el('adminFlowQueueCount').hidden = true; }
+  refreshActivity = initAdminToday(overview, { configureWorkspaces: legacy });
+  document.addEventListener('admin:background-state', event => {
+    backgroundChecked = event.detail?.checked !== false; backgroundHealthy = event.detail?.healthy === true;
+    if (active && !current && queueData?.remaining === 0) {
+      el('adminFlowTitle').textContent = backgroundHealthy ? 'Nothing needs your decision.' : 'Your decision queues are clear.';
+      el('adminFlowContext').textContent = backgroundHealthy ? 'Required queues and background checks are current.' : backgroundChecked ? 'Background checks need attention before relying on this overview.' : 'Background operations are being checked.';
+    }
+  });
   onAdminPrivateInvalidation(reason => {
     pause();current = null;pendingCompletion = null;queueData = null;followUps = [];savedSelection = '';queuePage = 1;completed = 0;
     if (storageKey && reason !== 'document-leaving') { try { sessionStorage.removeItem(storageKey); } catch {} }storageKey = '';
@@ -351,7 +421,7 @@ function init() {
   for (const node of more.querySelectorAll('.admin-home-grid, .overview-action-panel')) node.hidden = true;
   document.body.classList.add('admin-guided');
   const home = document.querySelector('#sidebarNav [data-section="overview"]');
-  [...home.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.textContent = 'Today');
+  if (legacy) [...home.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.textContent = 'Today');
   replaceEventHandler(el('adminFlowRefresh'), 'click', () => { if (!active) resume();else void refresh(); });
   replaceEventHandler(el('adminFlowLater'), 'click', () => {
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(9, 0, 0, 0);
@@ -392,7 +462,7 @@ function init() {
     if (working) pendingSection = '';
     updateBusy();
   });
-  addEventListener('admin:admissions-changed', event => completedWork({ ...event.detail, message: 'Decision saved.' }));
+  addEventListener('admin:admissions-changed', event => completedWork({ ...event.detail, message: event.detail?.message || 'Decision saved.' }));
   addEventListener('admin:work-saved', event => completedWork(event.detail));
   // Existing home polling can bring new work into an empty flow without replacing an open draft.
   for (const event of ['admin:home-data', 'admin:inbox-counts']) document.addEventListener(event, () => {

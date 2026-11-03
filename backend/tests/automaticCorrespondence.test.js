@@ -73,11 +73,12 @@ test('pending applicant requests use known missing fields, wait a day, and never
  await User.collection.updateOne({_id:user._id},{$set:{createdAt:new Date('2026-10-07T14:00:00Z')}});await Preference.updateMany({},{$set:{outboundScanCursor:null}});
  await service.processAutomaticCorrespondence({now});expect(email).toHaveBeenCalledTimes(1);expect(email.mock.calls[0][3].text).toContain('Please reply');expect((await User.findById(user._id)).status).toBe('pending');
  expect(await Ticket.countDocuments({administrativeRequestKey:`admission:auto:${user._id}`})).toBe(1);
+ expect((await Ticket.findOne({administrativeRequestKey:`admission:auto:${user._id}`})).admissionSourceRevision).toBe(require('../services/admissionReview').admissionRevision(await User.findById(user._id)));
 });
 test('at most two reminders follow accepted requests and newer replies stop them',async()=>{
  await enable();await enable('reminder');await service.processAutomaticCorrespondence({now});
  const monday=new Date('2026-10-12T14:00:00Z'),thursday=new Date('2026-10-15T14:00:00Z'),next=new Date('2026-10-19T14:00:00Z');
- await service.processAutomaticCorrespondence({now:monday});await service.processAutomaticCorrespondence({now:thursday});await service.processAutomaticCorrespondence({now:next});
+ await service.processAutomaticCorrespondence({now:monday});expect((await retained()).automaticCorrespondence).toMatchObject({kind:'reminder',status:'accepted'});await service.processAutomaticCorrespondence({now:thursday});await service.processAutomaticCorrespondence({now:next});
  expect(email).toHaveBeenCalledTimes(3);expect((await retained()).automaticReminders).toBe(2);
 });
 
@@ -105,4 +106,29 @@ test('policy changes require an active admin, current review, confirmed activati
   await expect(policyService.savePolicy(req)).rejects.toMatchObject({statusCode:409});
   expect(await Audit.countDocuments({action:'support.correspondence.policy_changed'})).toBe(1);
  }finally{for(const [key,value]of Object.entries(env))if(value===undefined)delete process.env[key];else process.env[key]=value;}
+});
+
+
+test('delivery outcome receipts are recorded once per claim and distinguish real attempts', async () => {
+ await enable();const prepared=await service.routine(await retained(),now);await service.stage(await retained(),prepared,{now});
+ const work=await service.claim(ticket._id,now);await service.deliver(work,now);await service.deliver(work,now);
+ const receipts=(await retained()).emailReplies[0].attemptOutcomes;
+ expect(receipts).toHaveLength(1);expect(receipts[0]).toMatchObject({claimId:work.claimId,status:'accepted',attempted:true,recordedAt:now});
+});
+test('abandoned delivery receipts stay unknown without asserting that SMTP ran', async () => {
+ await enable();const prepared=await service.routine(await retained(),now);await service.stage(await retained(),prepared,{now});const work=await service.claim(ticket._id,now);
+ await service.processAutomaticCorrespondence({now:new Date(now.getTime()+11*60000)});
+ const receipts=(await retained()).emailReplies[0].attemptOutcomes;
+ expect(receipts).toHaveLength(1);expect(receipts[0]).toMatchObject({claimId:work.claimId,status:'unknown',attempted:null});expect(email).not.toHaveBeenCalled();
+});
+
+
+test('an existing active manual admission request prevents a duplicate automatic request',async()=>{
+ await enable('admission_information');
+ await User.updateOne({_id:user._id},{$set:{status:'pending'}});
+ await User.collection.updateOne({_id:user._id},{$set:{createdAt:new Date('2026-10-07T14:00:00Z')}});
+ await Ticket.create({subject:'Owner requested admission details',message:'Please send the missing document.',requesterUserId:user._id,userId:user._id,requesterEmail:user.email,requesterRole:user.role,administrativeRequestKey:`admission:${user._id}:manual`,assignedTo:admin._id,status:'waiting_on_user'});
+ await service.processAutomaticCorrespondence({now});
+ expect(email).not.toHaveBeenCalled();expect(await Ticket.countDocuments({administrativeRequestKey:`admission:auto:${user._id}`})).toBe(0);
+ expect((await User.findById(user._id)).status).toBe('pending');
 });

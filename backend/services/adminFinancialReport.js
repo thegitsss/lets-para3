@@ -115,12 +115,13 @@ function project(value, { from = null } = {}) {
   return { matters, historyRows, funding: flow(funding), payouts: flow(payouts), income: flow(income), pending, allFunding: funding, allPayouts: payouts, allIncome: income,
     held: aggregate(heldRows, { unknownAffectsTotal: true }), payoutTotals: aggregate(inPeriod(payouts)), incomeTotals: aggregate(inPeriod(income), { unknownAffectsTotal: true }), fundingTotals: aggregate(inPeriod(funding), { unknownAffectsTotal: true }), pendingTotals: aggregate(pending, { unknownAffectsTotal: true }) };
 }
-async function begin(req, { caseId = null, from = null } = {}) {
+async function begin(req, { caseId = null, caseIds = null, from = null } = {}) {
   if (caseId && !/^[a-f0-9]{24}$/i.test(caseId) || from !== null && (!(from instanceof Date) || !Number.isFinite(from.getTime()))) fail(400, 'INVALID');
-  const owner = await account.read(req, 'admin', req.query?.expectedOwnerId), first = await source(caseId);
+  if (caseIds !== null && (caseId || !Array.isArray(caseIds) || caseIds.length > cap || caseIds.some(value => !/^[a-f0-9]{24}$/i.test(String(value))))) fail(400, 'INVALID');
+  const owner = await account.read(req, 'admin', req.query?.expectedOwnerId), first = await source(caseId, { caseIds });
   const revision = fingerprint([owner, first, from?.toISOString() || null]), value = { ...project(first, { from }), ownerId: id(owner._id), revision, from: from?.toISOString() || null };
   return { value, source: first, async verify() {
-    const current = await source(caseId), fresh = await account.read(req, 'admin', req.query?.expectedOwnerId);
+    const current = await source(caseId, { caseIds }), fresh = await account.read(req, 'admin', req.query?.expectedOwnerId);
     if (fingerprint(owner) !== fingerprint(fresh) || fingerprint(first) !== fingerprint(current)) fail(409, 'CHANGED');
   } };
 }

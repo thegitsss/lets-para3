@@ -7,6 +7,8 @@ const mongoose = require('mongoose');
 const ApprovalTask = require('../models/ApprovalTask');
 const IncidentApproval = require('../models/IncidentApproval');
 const { relatedTechnicalReports, verifyRelatedReports } = require('./adminRelatedWorkService');
+const { admissionRevision, reviewedFields } = require('./admissionReview');
+const { relatedFinancialMatters, verifyRelatedFinancialMatters } = require('./adminRelatedFinancialWork');
 const KEY = /^(application|inquiry|payment|matter|approval|incident|photo):[a-f0-9]{24}$/;
 const fail = (message, statusCode = 400) => { throw Object.assign(new Error(message), { statusCode }); };
 
@@ -50,9 +52,17 @@ async function nextAdminTask({ deferred: raw, current = '', selected = '', page 
     { $sort: { createdAt: -1, _id: -1 } },
     { $group: { _id: '$requesterUserId', request: { $first: '$$ROOT' } } },
     { $match: { 'request.status': 'waiting_on_user', $expr: { $eq: [{ $arrayElemAt: ['$request.emailReplies.delivery', -1] }, 'accepted'] } } },
-    { $project: { _id: 1 } }
+    { $lookup: { from: User.collection.name, localField: '_id', foreignField: '_id', as: 'applicant', pipeline: [{ $project: Object.fromEntries([...reviewedFields, 'updatedAt'].map(field => [field, 1])) }] } },
+    { $project: { _id: 1, revision: '$request.admissionSourceRevision', sentAt: '$request.lastAdminReplyAt', applicant: { $arrayElemAt: ['$applicant', 0] } } }
   ]);
-  const waitingIds = waitingRequests.map(request => request._id);
+  const waitingIds = waitingRequests.filter(request => {
+    if (!request.applicant) return false;
+    if (request.revision) return /^[a-f0-9]{64}$/.test(request.revision) && request.revision === admissionRevision(request.applicant);
+    // Historical manual requests predate the revision field. Without a valid
+    // send/applicant timestamp, keep the application visible for review.
+    const sent = new Date(request.sentAt || NaN).getTime(), changed = new Date(request.applicant.updatedAt || NaN).getTime();
+    return Number.isFinite(sent) && Number.isFinite(changed) && changed <= sent;
+  }).map(request => request._id);
   const applications = { role: { $in: ['attorney', 'paralegal'] }, status: 'pending', deleted: { $ne: true }, disabled: { $ne: true } };
   const inquiries = { $nor: [{ sourceLabel: 'Control Room e2e harness' }, { 'supportFactsSnapshot.harnessRunKey': /^cr-e2e-/i }], $or: [
     { status: { $in: ['open', 'in_review'] } },
@@ -83,11 +93,16 @@ async function nextAdminTask({ deferred: raw, current = '', selected = '', page 
     if (!reportsByDecision.has(key)) reportsByDecision.set(key, []);
     reportsByDecision.get(key).push({ id: String(row._id), subject: row.subject });
   }
+  const financialProtectedIds = [...new Set([...reminders.map(row => row.key), ...deferred.map(row => row.key), current, selected])]
+    .filter(key => key.startsWith('matter:')).map(key => new mongoose.Types.ObjectId(key.split(':')[1]));
+  const relatedFinancial = await relatedFinancialMatters({ query: matters, now, protectedIds: financialProtectedIds });
+  const ownerMatters = relatedFinancial.length ? { $and: [matters, { _id: { $nin: relatedFinancial.map(row => row._id) } }] } : matters;
+  const financialByOperation = new Map(relatedFinancial.map(row => [String(row.operationId), row]));
   const sources = [
     ['application', User, { ...applications, _id: { $nin: waitingIds } }, 'firstName lastName email role createdAt updatedAt'],
     ['inquiry', SupportTicket, ownerInquiries, 'subject requesterEmail requestKind caseId status followUpAt urgency routingSuggestion.priority emailReplies.delivery createdAt updatedAt'],
     ['payment', PaymentOperation, payments, 'kind caseId status administrativeStatus createdAt updatedAt'],
-    ['matter', Case, matters, 'title status disputes.status deadlineDate fundingIntegrityStatus postingSyncStatus hiringClaimStatus completionClaimStatus moderationStatus createdAt updatedAt'],
+    ['matter', Case, ownerMatters, 'title status disputes.status deadlineDate fundingIntegrityStatus postingSyncStatus hiringClaimStatus completionClaimStatus moderationStatus createdAt updatedAt'],
     ['approval', ApprovalTask, { approvalState: 'pending' }, 'title summary taskType targetType targetId metadata.automationFailure createdAt updatedAt'],
     ['incident', IncidentApproval, { status: 'pending', $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] }, 'incidentId approvalType createdAt updatedAt'],
     ['photo', User, { role: { $in: ['attorney', 'paralegal'] }, deleted: { $ne: true }, disabled: { $ne: true }, status: { $nin: ['denied', 'pending'] }, pendingProfileImage: { $nin: ['', null] } }, 'firstName lastName email createdAt updatedAt']
@@ -117,13 +132,13 @@ async function nextAdminTask({ deferred: raw, current = '', selected = '', page 
     return { kind, total, remaining, candidates, retained };
   }));
   const waiting = await User.countDocuments({ ...applications, _id: { $in: waitingIds } });
-  await verifyRelatedReports(relatedReports, now);
+  await Promise.all([verifyRelatedReports(relatedReports, now), verifyRelatedFinancialMatters(relatedFinancial)]);
   let currentRecord = null;
   if (current) {
     const [kind, id] = current.split(':');
     const [, Model, query] = sources.find(source => source[0] === kind);
     // Grouping attention does not mean the original report was completed.
-    currentRecord = await Model.findOne({ $and: [kind === 'inquiry' ? inquiries : query, { _id: id }] }).select('updatedAt').lean();
+    currentRecord = await Model.findOne({ $and: [kind === 'inquiry' ? inquiries : kind === 'matter' ? matters : query, { _id: id }] }).select('updatedAt').lean();
   }
   function toTask(kind, row) {
     const id = String(row._id);
@@ -131,6 +146,10 @@ async function nextAdminTask({ deferred: raw, current = '', selected = '', page 
     if (kind === 'application') Object.assign(task, { title: 'Review application', name: [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email, detail: row.role });
     if (kind === 'inquiry') Object.assign(task, { title: 'Reply to an inquiry', name: row.subject, detail: row.requestKind === 'human' ? 'Human request' : 'Message', caseId: row.caseId ? String(row.caseId) : null });
     if (kind === 'payment') Object.assign(task, { view: row.kind === 'chargeback' ? 'chargeback' : 'payment', title: row.kind === 'chargeback' ? 'Review a chargeback' : 'Check a payment', name: row.caseId?.title || row.kind.replace(/_/g, ' '), detail: row.kind === 'chargeback' ? 'Financial review needed' : 'Payment needs reconciliation', caseId: row.caseId ? String(row.caseId._id) : null });
+    if (kind === 'payment' && financialByOperation.has(id)) {
+      const related = financialByOperation.get(id);
+      task.relatedMatter = { id: String(related._id), title: related.title, revision: related.updatedAt.toISOString() };
+    }
     if (kind === 'approval') Object.assign(task, { title: 'Review prepared content', name: row.title, detail: row.summary, workKey: `${row.targetType}:${row.targetId}`, section: 'approvals-workspace' });
     if (kind === 'incident') Object.assign(task, { title: 'Review a technical decision', name: row.approvalType.replace(/_/g, ' '), detail: 'A technical change is waiting for your decision.', incidentId: String(row.incidentId), section: 'engineering' });
     if (kind === 'incident' && reportsByDecision.has(id)) {
@@ -186,7 +205,7 @@ async function nextAdminTask({ deferred: raw, current = '', selected = '', page 
     deferred: queues.reduce((sum, queue) => sum + queue.total - queue.remaining, 0),
     deferredItems, followUps, followUpRevision: selectedPreference?.revision || 0,
     counts: Object.fromEntries(queues.map(row => [row.kind, { total: row.total, ready: row.remaining }])),
-    grouped: { inquiry: relatedReports.length },
+    grouped: { inquiry: relatedReports.length, financial: relatedFinancial.length },
     scope: 'Applications, inquiries, payment and matter exceptions, posting edits, profile photos, content approvals, and technical approvals',
     waiting, currentPending: Boolean(currentRecord), currentRevision: currentRecord?.updatedAt?.toISOString() || null,
     checkedAt: now.toISOString()

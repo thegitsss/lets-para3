@@ -110,7 +110,7 @@ async function select(id) {
     replaceEventHandler(el('inboxDetailRetry'), 'click', () => select(id));
   }
   document.querySelectorAll('[data-inbox-ticket]').forEach(b => {b.classList.toggle('selected', b.dataset.inboxTicket === id);b.setAttribute('aria-pressed',String(b.dataset.inboxTicket===id));});
-  if(calmMode() || matchMedia('(max-width:760px)').matches) { el('adminInboxDetail').scrollIntoView({block:'start'}); el('adminInboxBack')?.focus({preventScroll:true}); }
+  if(!document.body.classList.contains('admin-flow-active') && (calmMode() || matchMedia('(max-width:760px)').matches)) { el('adminInboxDetail').scrollIntoView({block:'start'}); el('adminInboxBack')?.focus({preventScroll:true}); }
 }
 function renderDetail(t, d) {
   window.flushAdminInquiryDraft = () => draftStore.flush(d);

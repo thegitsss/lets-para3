@@ -3,7 +3,7 @@ const { createHash } = require('node:crypto');
 const qualifications = new Set(['certificate', 'degree', 'law_firm_experience']);
 const methods = new Set(['issuing_institution', 'employer_contact', 'official_communication', 'reliable_documentation']);
 const reviewedFields = ['role', 'status', 'email', 'emailVerified', 'disabled', 'deleted',
-  'firstName', 'lastName', 'paralegalQualification', 'yearsExperience', 'resumeURL',
+  'firstName', 'lastName', 'state', 'location', 'paralegalQualification', 'yearsExperience', 'resumeURL',
   'certificateURL', 'writingSampleURL', 'experience', 'education', 'bio', 'about', 'barNumber', 'barState'];
 
 function snapshot(user) {
@@ -58,4 +58,4 @@ function decisionFilter(user) {
   ) };
 }
 
-module.exports = { admissionRevision, prepareQualificationReview, decisionFilter, conflict };
+module.exports = { reviewedFields, admissionRevision, prepareQualificationReview, decisionFilter, conflict };
