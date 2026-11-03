@@ -23,14 +23,13 @@ for (const width of [1440, 390]) test(`new paralegal can create and retain the f
     await page.goto(`${server.origin}/paralegal-v2.html#/home`);
     await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
     const welcome = page.locator('[data-v2-onboarding-dialog="welcome-v1"]');
-    await expect(welcome).toBeVisible();
-    await welcome.getByRole('button', { name: 'Set up my account', exact: true }).click();
+    await expect(welcome).toHaveCount(0);
     const panel = page.locator('#v2-settings-profile');
     const intro = page.locator('dialog.ri-dialog[open]');
     await expect(intro).toBeVisible();
     await intro.getByRole('button', { name: 'Enter manually', exact: true }).click();
     await expect(panel).toBeVisible();
-    await expect.poll(async () => (await read()).onboarding.paralegalTours['welcome-v1']).toBe('completed');
+    await expect.poll(async () => (await read()).onboarding.paralegalTours['welcome-v1']).toBe('dismissed');
     const entries = [
       { key: 'experience', button: 'Add work experience', fields: [['Role / title', 'Litigation paralegal'], ['Dates / years', '2020–2026'], ['Organization & description', 'Synthetic firm: filing and trial support.']], expected: { title: 'Litigation paralegal', years: '2020–2026', description: 'Synthetic firm: filing and trial support.' } },
       { key: 'education', button: 'Add education', fields: [['Institution', 'Synthetic City College'], ['Degree', 'B.A.'], ['Subject', 'Legal studies']], expected: { school: 'Synthetic City College', degree: 'B.A.', fieldOfStudy: 'Legal studies' } },

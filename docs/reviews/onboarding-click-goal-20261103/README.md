@@ -29,7 +29,7 @@ Live LinkedIn photo authorization/configuration was not verified or changed in t
 
 ## Validation
 
-- 57 focused onboarding browser cases passed across Chromium, Firefox and WebKit against source and against generated production assets. Six additional return-window cases passed for success/failure, real assets and popup closure; the final welcome styling and route-guard adjustment passed 18 affected reruns.
+- 57 focused onboarding browser cases passed across Chromium, Firefox and WebKit against source and against generated production assets. Six additional return-window cases passed against source and compiled assets for success/failure, real assets and popup closure; the final welcome styling and route-guard adjustment passed 18 affected reruns.
 - 12 photo-import service/route security checks and five saved-profile model checks passed.
 - Both exact-action journey replays passed. The original two-step signup is covered for both roles in all three browser engines.
 - Production frontend build, frontend API-route contract and candidate secret scan passed locally. Required hosted CI status is reported separately on the pull request.

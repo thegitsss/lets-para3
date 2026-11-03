@@ -145,17 +145,8 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await admissionHistory.screenshot({ path: info.outputPath('admin-qualification-history-phone.png') });
     await adminPage.close();
     expect(await User.findById(id).lean()).toMatchObject({ status: 'approved', preferences: { hideProfile: true } });
-    await login(page, email, password); await expect(page.locator('body')).toHaveAttribute('data-v2-session', 'ready');
-    const welcome = page.locator('[data-v2-onboarding-dialog="welcome-v1"]');
-    await expect(welcome).toBeVisible();
-    await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
-    await expect(welcome.getByRole('button', { name: 'Explore first', exact: true })).toBeVisible();
-    await expect(welcome.getByRole('button', { name: 'Set up my account', exact: true })).toBeVisible();
-    await page.screenshot({ animations: 'disabled', path: info.outputPath('welcome-desktop.png') });
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expect(welcome.getByRole('button', { name: 'Set up my account', exact: true })).toBeInViewport();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-    await page.screenshot({ animations: 'disabled', path: info.outputPath('welcome-mobile.png') });
+    // The shortened route records the skipped welcome when setup opens, so
+    // install the same first-write failure before signing in.
     let failedWrites = 0;
     await page.route('**/api/users/me/onboarding', route => {
       if (route.request().method() === 'PATCH') {
@@ -164,8 +155,20 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
       }
       return route.continue();
     });
-    await welcome.getByRole('button', { name: 'Explore first', exact: true }).click();
+    await login(page, email, password); await expect(page.locator('body')).toHaveAttribute('data-v2-session', 'ready');
+    const welcome = page.locator('[data-v2-onboarding-dialog="welcome-v1"]');
+    const resumeIntro = page.locator('dialog.ri-dialog[open]');
     await expect(welcome).toHaveCount(0);
+    await expect(resumeIntro).toBeVisible();
+    await expect(page.locator('.lpc-boot-screen[open]')).toHaveCount(0);
+    const autofill = resumeIntro.getByRole('button', { name: 'Autofill from my résumé', exact: true });
+    await expect(autofill).toBeVisible();
+    await expect(resumeIntro.getByRole('button', { name: 'I’ll enter it myself', exact: true })).toBeVisible();
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('setup-entry-desktop.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await autofill.scrollIntoViewIfNeeded();await expect(autofill).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ animations: 'disabled', path: info.outputPath('setup-entry-mobile.png') });
     await expect(page.locator('[data-v2-toast-region]')).toContainText('Progress couldn’t sync');
     expect((await User.findById(id).lean()).onboarding.paralegalTourCompleted).toBe(false);
     const outboxKey = `lpc_portal_tour_pending_v1:${id}`;
@@ -183,11 +186,9 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
       await expect(page.locator('[data-v2-route-outlet]')).toBeVisible();
     }
     await page.getByRole('button', { name: 'Replay tour', exact: true }).click();
-    await expect(welcome).toBeVisible();
-    await welcome.getByRole('button', { name: 'Set up my account', exact: true }).click();
-    const resumeIntro = page.locator('dialog.ri-dialog[open]');
+    await expect(welcome).toHaveCount(0);
     await expect(resumeIntro).toBeVisible();
-    await expect(resumeIntro).toContainText('Your résumé has a head start.');
+    await expect(resumeIntro.getByRole('button', { name: 'Autofill from my résumé', exact: true })).toBeVisible();
     await page.screenshot({ animations: 'disabled', path: info.outputPath('setup-resume-mobile.png') });
     await resumeIntro.getByRole('button', { name: 'I’ll enter it myself', exact: true }).click();
     await expect(resumeIntro).toHaveCount(0);
