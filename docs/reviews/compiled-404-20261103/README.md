@@ -8,4 +8,6 @@ The production probe now follows the existing static-cache policy for legal page
 
 Validation: 20 focused not-found/cache/production-probe checks passed. The final directory-normalization adjustment passed the four not-found checks again. The existing page rendered through the compiled-directory handler at [1440](404-1440.png), [390](404-390.png) and [320](404-320.png); keyboard focus and the homepage recovery link worked at each width. No frontend file changed. Hosted checks and live verification are reported on the pull request.
 
+The protected browser run exposed a Firefox test race when the photo popup closed before the click promise returned. The test now waits for the close event and accepts only the matching target-closed error while the opener remains open. All content, asset, responsive and actual-closure assertions remain. Thirty repeated Chromium/Firefox/WebKit popup checks passed; no product behavior changed.
+
 LPC UX review — Baseline: the existing approved 404 document and page assets. Evidence: actual rendered recovery states and widths above, exact approved response bytes, real GET/HEAD status and usable homepage recovery. Exceptions: none; this change restores delivery of the existing page and makes no visual edits.

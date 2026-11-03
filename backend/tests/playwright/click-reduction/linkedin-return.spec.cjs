@@ -12,7 +12,13 @@ for(const status of ['ready','failed'])test(`LinkedIn photo ${status} return loa
  else{
   await expect(popup.getByRole('heading',{name:'Photo not imported',exact:true})).toBeVisible();await expect(popup.locator('#result-copy')).toHaveText('Return to LPC to try again or upload a photo.');
   for(const width of [1440,390,320]){await popup.setViewportSize({width,height:1000});await popup.screenshot({path:info.outputPath(`photo-return-${width}.png`),fullPage:true});expect(await popup.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect((await popup.getByRole('button',{name:'Close window'}).boundingBox()).height).toBeGreaterThanOrEqual(44);}
-  await popup.getByRole('button',{name:'Close window'}).click();await expect.poll(()=>popup.isClosed()).toBe(true);
+  await Promise.all([
+   popup.waitForEvent('close'),
+   popup.getByRole('button',{name:'Close window'}).click().catch(error=>{
+    if(!popup.isClosed()||page.isClosed()||!error.message.includes('Target page, context or browser has been closed'))throw error;
+   }),
+  ]);
+  expect(popup.isClosed()).toBe(true);expect(page.isClosed()).toBe(false);
  }
  expect(responses).toHaveLength(2);expect(responses.every(r=>r.status===200)).toBe(true);
 });
