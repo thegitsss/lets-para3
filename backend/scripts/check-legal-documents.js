@@ -14,6 +14,7 @@ const read = (name) => fs.readFileSync(path.join(frontendDir, name), "utf8");
 const terms = read("terms.html");
 const privacy = read("privacy.html");
 const signup = read("signup.html");
+const signupController = read("assets/scripts/signup-controller.js");
 const supportDrawer = read("assets/scripts/utils/support-drawer.js");
 
 const failures = [];
@@ -60,7 +61,8 @@ expectEffectiveDate(privacy, CURRENT_PRIVACY_VERSION, "Privacy");
 expectText(terms, /id="section-24"[\s\S]*24\. Definitions/, "Terms are missing the consolidated general provisions and definitions.");
 expectText(privacy, /AI-assisted support[\s\S]*OpenAI[\s\S]*optional storage of AI responses[\s\S]*monitor abuse/i, "Privacy policy is missing the factual AI-support disclosure.");
 expectText(supportDrawer, /AI can make mistakes\. Check important information\.[\s\S]*href=["']\/privacy\.html["']/, "The support composer is missing its AI fallibility notice or Privacy link.");
-expectText(signup, /privacyAcknowledged[\s\S]*true/, "Signup does not submit a separate privacy acknowledgement.");
+expectText(signup, /<script\b[^>]*\ssrc=["']\/?assets\/scripts\/signup-controller\.js(?:\?[^"']*)?["']/, "Signup must load the checked submission controller.");
+expectText(signupController, /formData\.append\((["'])privacyAcknowledged\1,\s*(["'])true\2\)/, "Signup does not submit a separate privacy acknowledgement.");
 rejectText(privacy, /Indemnification|Waiver of Jury Trial|Choice of Law and Venue|LIMITATIONS OF LIABILITY/i, "Contract terms remain in the Privacy Policy.");
 
 

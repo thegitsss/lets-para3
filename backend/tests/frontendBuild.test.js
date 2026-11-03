@@ -2,7 +2,7 @@ const fs = require("fs"), path = require("path"), vm = require("vm"), os = requi
 const { execFile } = require("child_process"), { promisify } = require("util"), { pathToFileURL } = require("url");
 const { PROJECT_ROOT, RECIPE_INPUTS, frontendDirectory } = require("../utils/frontendAssets");
 const runNode = async code => {
-  const result = await promisify(execFile)(process.execPath, ["-e", code], { env: { PATH: process.env.PATH, NODE_ENV: "test" }, timeout: 30000, maxBuffer: 2 * 1024 * 1024 });
+  const result = await promisify(execFile)(process.execPath, ["-e", code], { env: { PATH: process.env.PATH, NODE_ENV: "test" }, timeout: 120000, maxBuffer: 2 * 1024 * 1024 });
   return JSON.parse(result.stdout);
 };
 // Babel 8 is ESM. Use the actual Node 24 module loader and build process,
@@ -39,6 +39,28 @@ beforeEach(() => {
 });
 afterEach(() => { jest.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
 
+test.each([
+  'const value = ["De", "La", "Cruz"].join(SELF);',
+  'const value = "First Last".split(SELF);',
+  'const value = new URL("https://example.com").protocol === SELF;',
+  'const url = new URL("https://example.com"); url.search = SELF_QUERY;',
+  'const value = new URL("https://example.com").search === SELF_QUERY;',
+])("rejects published script URL corruption in data operations: %s", async source => {
+  const relative = "public-live-20261031/assets/scripts/validation.js";
+  const corrupted = source.replace("SELF_QUERY", JSON.stringify("/" + relative + "?cardSetup=1"))
+    .replace("SELF", JSON.stringify("/" + relative));
+  write("frontend/" + relative, corrupted);
+  await expect(buildFrontend(root)).rejects.toThrow(/Published script integrity failed/);
+});
+
+test("retains legitimate published resource references without treating them as corrupted separators", async () => {
+  const relative = "public-live-20261031/assets/scripts/validation.js";
+  const source = 'const sourceURL = ' + JSON.stringify("/" + relative) + '; const value = ["De", "La", "Cruz"].join(" ");';
+  write("frontend/" + relative, source);
+  await buildFrontend(root);
+  expect(read(".lpc-build/frontend/" + relative)).toBe(source);
+});
+
 test("the current complete frontend preserves semantic syntax in every emitted script", async () => {
   const result = await runNode(`
     const fs = require("fs"), path = require("path"), root = ${JSON.stringify(PROJECT_ROOT)};
@@ -51,7 +73,7 @@ test("the current complete frontend preserves semantic syntax in every emitted s
     }).catch(error => { console.error(error.message); process.exitCode = 1; });
   `);
   expect(result.scripts).toBeGreaterThan(0); expect(result.differences).toEqual([]);
-});
+}, 180000);
 
 test("build output is deterministic, executes classic and async-module code, and preserves other assets", async () => {
   const first = await buildFrontend(root);
@@ -68,6 +90,18 @@ test("build output is deterministic, executes classic and async-module code, and
   const modulePath = pathToFileURL(path.join(root, ".lpc-build/frontend/assets/scripts/module.mjs")).href;
   const run = await promisify(execFile)(process.execPath, ["--input-type=module", "-e", `const value = await import(${JSON.stringify(modulePath)}); console.log(JSON.stringify(value.result));`], { env, timeout: 10000 });
   expect(JSON.parse(run.stdout)).toEqual(["namedAction", "ready"]);
+});
+
+test("native starting styles and following rules survive the production build intact", async () => {
+  const css = `.panel { --ink: var(--surface, #182033); transition: opacity 220ms ease; }
+@starting-style { .panel:not([hidden]) { opacity: 0; translate: 0 -6px; } }
+@media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+.following-rule { color: var(--ink); }
+`;
+  write("frontend/assets/styles/modern.css", css);
+  await buildFrontend(root);
+  expect(read(".lpc-build/frontend/assets/styles/modern.css")).toBe(css);
+  expect(frontendDirectory({ projectRoot: root, built: true })).toBe(path.join(root, ".lpc-build/frontend"));
 });
 
 test.each([

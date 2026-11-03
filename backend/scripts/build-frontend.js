@@ -5,6 +5,35 @@ const { parse } = require("@babel/parser");
 const { PROJECT_ROOT, BUILD_OWNER, digest, filesIn, recipeFor, verifyFrontendBuild } = require("../utils/frontendAssets");
 const MINIFY_OPTIONS = Object.freeze({ compress: false, mangle: false, keep_fnames: true, keep_classnames: true, format: { comments: "some", semicolons: true } });
 
+function checkPublishedStringOperations(relative, text) {
+  if (!/^public-live-\d{8}\/assets\/scripts\/.*\.(?:mjs|js)$/.test(relative)) return;
+  const self = "/" + relative;
+  const ownUrl = node => node?.type === "StringLiteral" && node.value === self;
+  const ownQueryUrl = node => node?.type === "StringLiteral" && node.value.startsWith(self + "?");
+  const search = node => ["MemberExpression", "OptionalMemberExpression"].includes(node?.type)
+    && (node.computed ? node.property.value : node.property.name) === "search";
+  const protocol = node => ["MemberExpression", "OptionalMemberExpression"].includes(node?.type)
+    && (node.computed ? node.property.value : node.property.name) === "protocol";
+  function visit(node) {
+    if (!node || typeof node !== "object") return;
+    const callee = node.callee;
+    const method = callee && ["MemberExpression", "OptionalMemberExpression"].includes(callee.type)
+      ? (callee.computed ? callee.property.value : callee.property.name) : "";
+    const separator = ["CallExpression", "OptionalCallExpression"].includes(node.type)
+      && ["join", "split"].includes(method) && node.arguments.some(ownUrl);
+    const scheme = node.type === "BinaryExpression"
+      && ((ownUrl(node.left) && protocol(node.right)) || (ownUrl(node.right) && protocol(node.left)));
+    const query = (node.type === "AssignmentExpression" && search(node.left) && ownQueryUrl(node.right))
+      || (node.type === "BinaryExpression" && ((ownQueryUrl(node.left) && search(node.right)) || (ownQueryUrl(node.right) && search(node.left))));
+    if (separator || scheme || query) throw new Error(`Published script integrity failed for ${relative}: its own URL cannot be a string separator, URL protocol, or search query.`);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === "object") visit(value);
+    }
+  }
+  visit(parse(text, { sourceType: "unambiguous" }));
+}
+
 async function buildFrontend(projectRoot = PROJECT_ROOT) {
   const sourceRoot = path.join(projectRoot, "frontend"), outputRoot = path.join(projectRoot, ".lpc-build");
   if (fs.existsSync(outputRoot)) {
@@ -28,6 +57,7 @@ async function buildFrontend(projectRoot = PROJECT_ROOT) {
     for (const relative of filesIn(sourceRoot, { source: true })) {
       const source = fs.readFileSync(path.join(sourceRoot, relative));
       let output = source;
+      if (/^public-live-/.test(relative) && /\.(mjs|js)$/.test(relative)) checkPublishedStringOperations(relative, source.toString("utf8"));
       if (relative.startsWith("assets/scripts/") && /\.(mjs|js)$/.test(relative)) {
         const text = source.toString("utf8");
         const module = parse(text, { sourceType: "unambiguous" }).program.sourceType === "module";
@@ -35,9 +65,15 @@ async function buildFrontend(projectRoot = PROJECT_ROOT) {
         output = Buffer.from(result.code + "\n");
       }
       if (relative.endsWith(".css")) {
-        const result = new CleanCSS({ level: 0, inline: false, rebase: false }).minify(source.toString("utf8"));
-        if (result.errors.length) throw new Error(`CSS build failed for ${relative}: ${result.errors.join("; ")}`);
-        output = Buffer.from(result.styles + "\n");
+        const text = source.toString("utf8");
+        // clean-css 5 treats @starting-style as a declaration block: even a
+        // successful serialization can drop its closing brace. Preserve native
+        // CSS containing this rule verbatim, including the rules that follow it.
+        if (!/@starting-style\b/i.test(text)) {
+          const result = new CleanCSS({ level: 0, inline: false, rebase: false }).minify(text);
+          if (result.errors.length) throw new Error(`CSS build failed for ${relative}: ${result.errors.join("; ")}`);
+          output = Buffer.from(result.styles + "\n");
+        }
       }
       const target = path.join(temporary, "frontend", relative);
       fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, output);

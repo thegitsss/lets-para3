@@ -1,3 +1,5 @@
+const linkedInAuth = require('../services/linkedInAuthProvider');
+const microsoftAuth = require('../services/microsoftAuthProvider');
 const { protectedUploadKey } = require("../utils/uploadQuarantine");
 const { letterEmail, escape: escapeEmailValue } = require("../email/layout");
 const accountEmails = require("../email/accountTemplates");
@@ -113,6 +115,10 @@ function buildGoogleCookieOptions(req, { maxAge, path: cookiePath = "/api/auth" 
 }
 
 const EMAIL_NOT_VERIFIED_MSG = "Please verify your email before logging in.";
+// Admission grants marketplace users sign-in access without marking their email verified.
+function requiresVerifiedLoginEmail(user) {
+  return user.emailVerified !== true && !(["attorney", "paralegal"].includes(user.role) && isApprovedUser(user));
+}
 const INVALID_CREDENTIALS_MSG = "Invalid email or password.";
 const DUMMY_PASSWORD_HASH = argon2.hash(crypto.randomBytes(32).toString("base64url"));
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
@@ -322,10 +328,10 @@ function verifyGoogleContext(token, purpose) {
   }
 }
 
-function googleErrorRedirect(code, intent = "login", requestedTarget = "") {
+function googleErrorRedirect(code, intent = "login", requestedTarget = "", provider = "google") {
   const page = intent === "signup" ? "/signup.html" : "/login.html";
   const next = intent === "login" ? resolveLoginReturnTarget(requestedTarget, "paralegal") || resolveLoginReturnTarget(requestedTarget, "attorney") : "";
-  return `${page}?google_error=${encodeURIComponent(code)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+  return `${page}?${provider}_error=${encodeURIComponent(code)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
 }
 
 async function roleDashboard(user) {
@@ -340,7 +346,7 @@ async function roleDashboard(user) {
   return "/attorney-v2.html#/home";
 }
 
-async function startGoogleTwoFactor(req, res, user) {
+async function startGoogleTwoFactor(req, res, user, provider = "google") {
   const { challengeToken, code } = createTwoFactorChallenge(user);
   user.twoFactorExpiresAt = new Date(Date.now() + FIFTEEN_MIN);
   if (user.twoFactorMethod === "authenticator") {
@@ -359,7 +365,7 @@ async function startGoogleTwoFactor(req, res, user) {
     } catch (err) {
       clearTwoFactorChallenge(user);
       await user.save();
-      authLogger.error("[auth.google] two-factor delivery failed");
+      authLogger.error(`[auth.${provider}] two-factor delivery failed`);
       return false;
     }
   }
@@ -367,6 +373,7 @@ async function startGoogleTwoFactor(req, res, user) {
   const context = signGoogleContext(
     {
       purpose: "google_2fa",
+      provider,
       userId: String(user._id),
       challengeToken,
     },
@@ -384,6 +391,8 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
   const token = req.cookies?.[GOOGLE_LINK_CANDIDATE_COOKIE];
   const candidate = verifyGoogleContext(token, "google_link");
   if (!candidate) return false;
+  const provider = candidate.provider || "google";
+  if (!["google", "linkedin", "microsoft"].includes(provider)) return false;
 
   if (clearCookie) res.clearCookie(GOOGLE_LINK_CANDIDATE_COOKIE, buildGoogleCookieOptions(req));
   if (
@@ -391,7 +400,7 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
     !candidate.providerAccountId ||
     !safeEqual(String(candidate.userId), String(user?._id || ""))
   ) {
-    await AuditLog.logFromReq(req, "auth.google.link.fail", {
+    await AuditLog.logFromReq(req, `auth.${provider}.link.fail`, {
       targetType: "user",
       targetId: user?._id,
       meta: { reason: "authenticated_user_mismatch" },
@@ -404,13 +413,13 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
   const providerOwner = await User.findOne({
     authProviders: {
       $elemMatch: {
-        provider: "google",
+        provider,
         providerAccountId,
       },
     },
   }).select("_id").session(session);
   if (providerOwner && String(providerOwner._id) !== String(user._id)) {
-    await AuditLog.logFromReq(req, "auth.google.link.fail", {
+    await AuditLog.logFromReq(req, `auth.${provider}.link.fail`, {
       targetType: "user",
       targetId: user._id,
       meta: { reason: "provider_already_linked" },
@@ -423,13 +432,13 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
   if (!target) return false;
   const alreadyLinked = (target.authProviders || []).some(
     (identity) =>
-      identity.provider === "google" &&
+      identity.provider === provider &&
       safeEqual(identity.providerAccountId, providerAccountId)
   );
   if (alreadyLinked) return true;
 
   target.authProviders.push({
-    provider: "google",
+    provider,
     providerAccountId,
     linkedAt: new Date(),
   });
@@ -437,7 +446,7 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
     await target.save(session ? { session, pathsToSave: ["authProviders", "updatedAt"] } : {});
   } catch (err) {
     if (err?.code === 11000) {
-      await AuditLog.logFromReq(req, "auth.google.link.fail", {
+      await AuditLog.logFromReq(req, `auth.${provider}.link.fail`, {
         targetType: "user",
         targetId: user._id,
         meta: { reason: "provider_unique_conflict" },
@@ -448,10 +457,10 @@ async function linkPendingGoogleIdentity(req, res, user, { session = null, clear
     throw err;
   }
 
-  await AuditLog.logFromReq(req, "auth.google.link.success", {
+  await AuditLog.logFromReq(req, `auth.${provider}.link.success`, {
     targetType: "user",
     targetId: user._id,
-    meta: { provider: "google" },
+    meta: { provider },
     ...(session ? { session } : {}),
   });
   return true;
@@ -505,28 +514,34 @@ async function verifyTurnstile(token, remoteIp) {
   });
 }
 
+for (const provider of ['google', 'linkedin', 'microsoft']) {
+  const providerName = {google:'Google',linkedin:'LinkedIn',microsoft:'Microsoft'}[provider];
+  const getConfig = provider === 'google' ? getGoogleConfig : provider === 'linkedin' ? linkedInAuth.configuration : microsoftAuth.configuration;
+  const oauthCookie = provider === 'google' ? GOOGLE_OAUTH_CONTEXT_COOKIE : `lpc_${provider}_oauth`;
 // ----------------------------------------
-// GOOGLE OAUTH (server-side authorization-code flow)
+// Member OAuth providers share approval, linking and session policy.
 // GET /api/auth/google
 // GET /api/auth/google/callback
 // ----------------------------------------
 router.get(
-  "/google",
+  `/${provider}`,
   asyncHandler(async (req, res) => {
-    const config = getGoogleConfig();
+    const config = getConfig();
     if (!config) {
-      return res.status(503).json({ msg: "Google authentication is temporarily unavailable." });
+      return provider === "google" ? res.status(503).json({ msg: "Google authentication is temporarily unavailable." }) : res.redirect(googleErrorRedirect("unavailable", req.query?.intent === "signup" ? "signup" : "login", req.query?.next, provider));
     }
 
     const intent = req.query?.intent === "signup" ? "signup" : "login";
     const role = req.query?.role === "paralegal" ? "paralegal" : "attorney";
     const state = crypto.randomBytes(32).toString("base64url");
     const nonce = crypto.randomBytes(32).toString("base64url");
+    const codeVerifier = provider === "microsoft" ? crypto.randomBytes(32).toString("base64url") : undefined;
     const context = signGoogleContext(
       {
-        purpose: "google_oauth",
+        purpose: `${provider}_oauth`,
         state,
         nonce,
+        ...(codeVerifier ? { codeVerifier } : {}),
         intent,
         role,
         next: resolveLoginReturnTarget(req.query?.next, "paralegal", process.env.APP_BASE_URL || "https://lpc.invalid") || resolveLoginReturnTarget(req.query?.next, "attorney", process.env.APP_BASE_URL || "https://lpc.invalid"),
@@ -535,11 +550,11 @@ router.get(
     );
 
     res.cookie(
-      GOOGLE_OAUTH_CONTEXT_COOKIE,
+      oauthCookie,
       context,
       buildGoogleCookieOptions(req, {
         maxAge: GOOGLE_OAUTH_TTL_MS,
-        path: "/api/auth/google",
+        path: `/api/auth/${provider}`,
       })
     );
 
@@ -549,24 +564,24 @@ router.get(
       response_type: "code",
       scope: "openid email profile",
       state,
-      nonce,
-      prompt: "select_account",
+      ...(provider !== "linkedin" ? { nonce, prompt: "select_account" } : {}),
+      ...(codeVerifier ? { code_challenge: crypto.createHash("sha256").update(codeVerifier).digest("base64url"), code_challenge_method: "S256" } : {}),
     });
-    return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+    return res.redirect(`${provider === "google" ? "https://accounts.google.com/o/oauth2/v2/auth" : provider === "linkedin" ? "https://www.linkedin.com/oauth/v2/authorization" : microsoftAuth.AUTHORIZE_URL}?${params.toString()}`);
   })
 );
 
 router.get(
-  "/google/callback",
+  `/${provider}/callback`,
   asyncHandler(async (req, res) => {
-    const config = getGoogleConfig();
-    const rawContext = req.cookies?.[GOOGLE_OAUTH_CONTEXT_COOKIE];
-    const context = verifyGoogleContext(rawContext, "google_oauth");
+    const config = getConfig();
+    const rawContext = req.cookies?.[oauthCookie];
+    const context = verifyGoogleContext(rawContext, `${provider}_oauth`);
     const intent = context?.intent === "signup" ? "signup" : "login";
-    const errorRedirect = (code, errorIntent = intent) => googleErrorRedirect(code, errorIntent, context?.next);
+    const errorRedirect = (code, errorIntent = intent) => googleErrorRedirect(code, errorIntent, context?.next, provider);
     res.clearCookie(
-      GOOGLE_OAUTH_CONTEXT_COOKIE,
-      buildGoogleCookieOptions(req, { path: "/api/auth/google" })
+      oauthCookie,
+      buildGoogleCookieOptions(req, { path: `/api/auth/${provider}` })
     );
 
     if (!config) {
@@ -577,14 +592,14 @@ router.get(
       !req.query?.state ||
       !safeEqual(req.query.state, context.state)
     ) {
-      await AuditLog.logFromReq(req, "auth.google.fail", {
+      await AuditLog.logFromReq(req, `auth.${provider}.fail`, {
         targetType: "user",
         meta: { reason: "invalid_state" },
       });
       return res.redirect(errorRedirect("invalid_state", intent));
     }
     if (req.query?.error || !req.query?.code) {
-      await AuditLog.logFromReq(req, "auth.google.fail", {
+      await AuditLog.logFromReq(req, `auth.${provider}.fail`, {
         targetType: "user",
         meta: { reason: req.query?.error ? "provider_denied" : "missing_code" },
       });
@@ -593,6 +608,9 @@ router.get(
 
     let profile;
     try {
+      if (provider === "microsoft") profile = await microsoftAuth.exchange(String(req.query.code), config, context);
+      else if (provider === "linkedin") profile = await linkedInAuth.exchange(String(req.query.code), config);
+      else {
       const client = getGoogleClient(config);
       const { tokens } = await client.getToken({
         code: String(req.query.code),
@@ -604,8 +622,9 @@ router.get(
         audience: config.clientId,
       });
       profile = ticket.getPayload();
+      }
     } catch {
-      await AuditLog.logFromReq(req, "auth.google.fail", {
+      await AuditLog.logFromReq(req, `auth.${provider}.fail`, {
         targetType: "user",
         meta: { reason: "code_exchange_or_identity_verification" },
       });
@@ -617,12 +636,10 @@ router.get(
     if (
       !providerAccountId ||
       providerAccountId.length > 255 ||
-      !isEmail(verifiedEmail) ||
-      profile?.email_verified !== true ||
-      !profile?.nonce ||
-      !safeEqual(profile.nonce, context.nonce)
+      (provider !== "microsoft" && (!isEmail(verifiedEmail) || profile?.email_verified !== true)) ||
+      (provider !== "linkedin" && (!profile?.nonce || !safeEqual(profile.nonce, context.nonce)))
     ) {
-      await AuditLog.logFromReq(req, "auth.google.fail", {
+      await AuditLog.logFromReq(req, `auth.${provider}.fail`, {
         targetType: "user",
         meta: { reason: "invalid_verified_identity" },
       });
@@ -632,7 +649,7 @@ router.get(
     const linkedUser = await User.findOne({
       authProviders: {
         $elemMatch: {
-          provider: "google",
+          provider,
           providerAccountId,
         },
       },
@@ -652,7 +669,7 @@ router.get(
       }
 
       if (!isApprovedUser(linkedUser)) {
-        await AuditLog.logFromReq(req, "auth.google.login.blocked", {
+        await AuditLog.logFromReq(req, `auth.${provider}.login.blocked`, {
           targetType: "user",
           targetId: linkedUser._id,
           meta: { reason: String(linkedUser.status || "pending") },
@@ -668,7 +685,7 @@ router.get(
       }
 
       let userChanged = ensureApprovedUserAuthReady(linkedUser);
-      if (linkedUser.emailVerified !== true) {
+      if (requiresVerifiedLoginEmail(linkedUser)) {
         if (userChanged) await linkedUser.save();
         return res.redirect(errorRedirect("email_unverified", "login"));
       }
@@ -678,10 +695,10 @@ router.get(
       if (userChanged) await linkedUser.save();
 
       if (linkedUser.twoFactorEnabled && TWO_FACTOR_ENABLED) {
-        const sent = await startGoogleTwoFactor(req, res, linkedUser);
+        const sent = await startGoogleTwoFactor(req, res, linkedUser, provider);
         if (!sent) return res.redirect(errorRedirect("two_factor_unavailable", "login"));
         const next = resolveLoginReturnTarget(context.next, linkedUser.role);
-        return res.redirect(`/login.html?google_2fa=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+        return res.redirect(`/login.html?${provider}_2fa=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
       }
 
       const lastLoginAt = linkedUser.lastLoginAt ? new Date(linkedUser.lastLoginAt) : null;
@@ -690,7 +707,7 @@ router.get(
       linkedUser.recordLoginSuccess();
       await linkedUser.save();
       await establishSession(req, res, linkedUser);
-      await AuditLog.logFromReq(req, "auth.google.login.success", {
+      await AuditLog.logFromReq(req, `auth.${provider}.login.success`, {
         targetType: "user",
         targetId: linkedUser._id,
       });
@@ -698,22 +715,22 @@ router.get(
         try {
           await ensureParalegalWelcomeNotification(linkedUser);
         } catch (err) {
-          authLogger.warn("[auth.google] welcome notification failed");
+          authLogger.warn(`[auth.${provider}] welcome notification failed`);
         }
       }
       return res.redirect(resolveLoginReturnTarget(context.next, linkedUser.role) || await roleDashboard(linkedUser));
     }
 
-    const emailOwner = await User.findOne({
+    const emailOwner = isEmail(verifiedEmail) ? await User.findOne({
       email: verifiedEmail,
       deleted: { $ne: true },
-    }).select("_id");
+    }).select("_id") : null;
     if (emailOwner) {
       const linkCandidate = signGoogleContext(
         {
           purpose: "google_link",
           userId: String(emailOwner._id),
-          provider: "google",
+          provider,
           providerAccountId,
         },
         20
@@ -723,7 +740,7 @@ router.get(
         linkCandidate,
         buildGoogleCookieOptions(req, { maxAge: GOOGLE_SIGNUP_TTL_MS })
       );
-      await AuditLog.logFromReq(req, "auth.google.login.blocked", {
+      await AuditLog.logFromReq(req, `auth.${provider}.login.blocked`, {
         targetType: "user",
         targetId: emailOwner._id,
         meta: { reason: "matching_email_unlinked" },
@@ -741,9 +758,10 @@ router.get(
     const handoff = signGoogleContext(
       {
         purpose: "google_signup",
-        provider: "google",
+        signInAccountNotFound: intent === "login",
+        provider,
         providerAccountId,
-        email: verifiedEmail,
+        email: isEmail(verifiedEmail) ? verifiedEmail : "",
         firstName,
         lastName,
       },
@@ -754,47 +772,48 @@ router.get(
       handoff,
       buildGoogleCookieOptions(req, { maxAge: GOOGLE_SIGNUP_TTL_MS })
     );
-    await AuditLog.logFromReq(req, "auth.google.signup.handoff", {
+    await AuditLog.logFromReq(req, `auth.${provider}.signup.handoff`, {
       targetType: "user",
-      meta: { provider: "google" },
+      meta: { provider },
     });
     const role = context.role === "paralegal" ? "paralegal" : "attorney";
-    return res.redirect(`/signup.html?google=1&role=${role}`);
+    return res.redirect(`/signup.html?${provider}=1&role=${role}`);
   })
 );
 
-router.get("/google/signup-profile", (req, res) => {
+router.get(`/${provider}/signup-profile`, (req, res) => {
   const handoff = verifyGoogleContext(
     req.cookies?.[GOOGLE_SIGNUP_HANDOFF_COOKIE],
     "google_signup"
   );
-  if (!handoff) {
-    return res.status(401).json({ msg: "Google signup session expired. Please try again." });
+  if (!handoff || handoff.provider !== provider) {
+    return res.status(401).json({ msg: `${providerName} signup session expired. Please try again.` });
   }
   return res.json({
     profile: {
       firstName: String(handoff.firstName || ""),
       lastName: String(handoff.lastName || ""),
       email: String(handoff.email || ""),
-      emailVerified: true,
+      emailVerified: provider !== "microsoft",
+      signInAccountNotFound: handoff.signInAccountNotFound === true,
     },
   });
 });
 
-router.get("/google/2fa-context", asyncHandler(async (req, res) => {
+router.get(`/${provider}/2fa-context`, asyncHandler(async (req, res) => {
   const context = verifyGoogleContext(
     req.cookies?.[GOOGLE_TWO_FACTOR_COOKIE],
     "google_2fa"
   );
   res.clearCookie(GOOGLE_TWO_FACTOR_COOKIE, buildGoogleCookieOptions(req));
-  if (!context?.userId || !isObjId(context.userId)) {
-    return res.status(401).json({ msg: "Google sign-in session expired. Please try again." });
+  if (!context?.userId || (context.provider || "google") !== provider || !isObjId(context.userId)) {
+    return res.status(401).json({ msg: `${providerName} sign-in session expired. Please try again.` });
   }
   const user = await User.findById(context.userId)
     .select("email twoFactorEnabled twoFactorMethod")
     .lean();
   if (!user?.twoFactorEnabled) {
-    return res.status(401).json({ msg: "Google sign-in session expired. Please try again." });
+    return res.status(401).json({ msg: `${providerName} sign-in session expired. Please try again.` });
   }
   return res.json({
     challengeToken: context.challengeToken,
@@ -803,6 +822,8 @@ router.get("/google/2fa-context", asyncHandler(async (req, res) => {
     passkeyAvailable: (await PasskeyCredential.exists({ userId: context.userId })) !== null,
   });
 }));
+
+}
 
 // ----------------------------------------
 // REGISTER
@@ -840,6 +861,7 @@ router.post(
       yearsExperience,
       paralegalQualification,
       googleSignupIntent,
+      oauthSignupProvider,
     } = req.body || {};
 
     const settings = await getAppSettings();
@@ -855,21 +877,23 @@ router.post(
       req.cookies?.[GOOGLE_SIGNUP_HANDOFF_COOKIE],
       "google_signup"
     );
-    const expectsGoogleSignup =
-      String(googleSignupIntent || "").toLowerCase() === "true";
+    const requestedOAuthProvider = typeof oauthSignupProvider === 'string' ? oauthSignupProvider : '';
+    const expectsGoogleSignup = Boolean(requestedOAuthProvider) || String(googleSignupIntent || "").toLowerCase() === "true";
+    const signupProviderName = {google:'Google',linkedin:'LinkedIn',microsoft:'Microsoft'}[googleSignupHandoff?.provider || requestedOAuthProvider] || 'Google';
     if (expectsGoogleSignup && !googleSignupHandoff) {
       return res.status(401).json({
-        msg: "Google signup session expired. Please continue with Google again.",
+        msg: `${signupProviderName} signup session expired. Please continue with ${signupProviderName} again.`,
       });
     }
     if (
       googleSignupHandoff &&
-      (!safeEqual(normalizedEmail, normalizeEmail(googleSignupHandoff.email || "")) ||
-        googleSignupHandoff.provider !== "google" ||
+      ((googleSignupHandoff.provider !== "microsoft" && !safeEqual(normalizedEmail, normalizeEmail(googleSignupHandoff.email || ""))) ||
+        !["google", "linkedin", "microsoft"].includes(googleSignupHandoff.provider) ||
+        (requestedOAuthProvider && requestedOAuthProvider !== googleSignupHandoff.provider) ||
         !googleSignupHandoff.providerAccountId)
     ) {
       return res.status(400).json({
-        msg: "Google signup details changed or expired. Please continue with Google again.",
+        msg: `${signupProviderName} signup details changed or expired. Please continue with ${signupProviderName} again.`,
       });
     }
     const resolvedTurnstileToken =
@@ -988,14 +1012,14 @@ router.post(
       const existingProvider = await User.findOne({
         authProviders: {
           $elemMatch: {
-            provider: "google",
+            provider: googleSignupHandoff.provider,
             providerAccountId: String(googleSignupHandoff.providerAccountId),
           },
         },
       }).select("_id");
       if (existingProvider) {
         return res.status(409).json({
-          msg: "This Google account is already linked. Sign in with Google instead.",
+          msg: `This ${signupProviderName} account is already linked. Sign in with ${signupProviderName} instead.`,
         });
       }
     }
@@ -1075,11 +1099,11 @@ router.post(
       timezone: safeTimezone || undefined,
       yearsExperience: roleLc === "paralegal" ? safeYearsExperience : undefined,
       paralegalQualification: roleLc === "paralegal" ? qualification : "",
-      emailVerified: Boolean(googleSignupHandoff),
+      emailVerified: Boolean(googleSignupHandoff && googleSignupHandoff.provider !== "microsoft"),
       authProviders: googleSignupHandoff
         ? [
             {
-              provider: "google",
+              provider: googleSignupHandoff.provider,
               providerAccountId: String(googleSignupHandoff.providerAccountId),
               linkedAt: new Date(),
             },
@@ -1164,7 +1188,7 @@ router.post(
         // Existing reconciliation checks both live User and retained resume refs.
         const duplicateProvider = err?.code === 11000 &&
           (err?.keyPattern?.["authProviders.providerAccountId"] || String(err?.message || "").includes("user_auth_provider_unique"));
-        if (duplicateProvider) return res.status(409).json({ msg: "This Google account is already linked. Sign in with Google instead." });
+        if (duplicateProvider) return res.status(409).json({ msg: `This ${signupProviderName} account is already linked. Sign in with ${signupProviderName} instead.` });
         if (err?.code === 11000 && (err?.keyPattern?.email || err?.keyValue?.email)) {
           return res.status(409).json({ msg: "An account already uses this email. Please sign in or use another email.", field: "email" });
         }
@@ -1193,7 +1217,7 @@ router.post(
     }
 
     let verificationEmailStatus = user.emailVerified ? "not_required" : "not_sent";
-    if (!googleSignupHandoff) {
+    if (!user.emailVerified) {
       try {
         const delivery = await sendVerificationEmail({ user, email: user.email });
         verificationEmailStatus = delivery?.disabled ? "not_sent"
@@ -1211,7 +1235,7 @@ router.post(
       targetId: user._id,
       meta: {
         role: user.role,
-        provider: googleSignupHandoff ? "google" : "password",
+        provider: googleSignupHandoff ? googleSignupHandoff.provider : "password",
       },
     });
 
@@ -1299,7 +1323,7 @@ async function rehashCurrentLoginPassword(user, password) {
     if (!current || current.isLocked || !(await current.comparePassword(String(password)))) {
       throw Object.assign(new Error(INVALID_CREDENTIALS_MSG), { status: 401, publicCode: "LOGIN_CREDENTIALS_CHANGED" });
     }
-    if (current.emailVerified !== true) {
+    if (requiresVerifiedLoginEmail(current)) {
       throw Object.assign(new Error(EMAIL_NOT_VERIFIED_MSG), { status: 403, publicCode: "LOGIN_EMAIL_NOT_VERIFIED" });
     }
     const approvedAtChanged = ensureApprovedUserAuthReady(current);
@@ -1387,7 +1411,7 @@ router.post(
     }
 
     let userChanged = ensureApprovedUserAuthReady(user);
-    if (user.emailVerified !== true) {
+    if (requiresVerifiedLoginEmail(user)) {
       if (userChanged) await user.save();
       return res.status(403).json({ msg: EMAIL_NOT_VERIFIED_MSG, error: EMAIL_NOT_VERIFIED_MSG, emailVerificationRequired: true });
     }
@@ -1516,7 +1540,7 @@ async function finishFactorSignIn(req, res, { backup = false } = {}) {
         return;
       }
       ensureApprovedUserAuthReady(user);
-      if (user.emailVerified !== true) {
+      if (requiresVerifiedLoginEmail(user)) {
         clearTwoFactorChallenge(user);
         await saveChallenge();
         outcome = { status: 403, body: { error: EMAIL_NOT_VERIFIED_MSG } };
@@ -1690,7 +1714,7 @@ router.post(
       return res.status(503).json({ error: "The platform is in maintenance mode. Please try again soon." });
     }
     ensureApprovedUserAuthReady(user);
-    if (user.emailVerified !== true) {
+    if (requiresVerifiedLoginEmail(user)) {
       return res.status(403).json({ error: EMAIL_NOT_VERIFIED_MSG, emailVerificationRequired: true, email: user.email });
     }
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;

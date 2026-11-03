@@ -14,8 +14,8 @@
 }
 .signup-page.auth-entry.signup-received .signup-form-scroll { height: auto; }
 
-/* Phones scroll the card above the agreement; the agreement cannot cover controls. */
-@media (max-width: 768px), (max-width: 1024px) and (max-height: 500px) {
+/* Compact screens scroll the card above the agreement; controls stay reachable. */
+@media (max-width: 768px), (max-height: 700px) and (orientation: landscape) {
  body.signup-page.auth-entry { padding: 0; }
  .signup-page .signup-stage {
   display: grid;
@@ -70,13 +70,13 @@
 .signup-page.auth-entry #signupState option { font-size: 16px; }
 .signup-page.auth-entry #signupState:open { font-size: 16px; }
 
-/* Landscape validation needs real scroll space below the fixed brand. */
-@media (max-width: 1024px) and (max-height: 500px) and (orientation: landscape) {
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .overlay { height: auto; min-height: var(--signup-common-height); }
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .left-panel { height: auto; padding-bottom: var(--signup-panel-padding-bottom); }
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .form-container { height: auto; margin-top: 0; }
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .signup-form-scroll { height: auto; }
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) .signup-submit-actions { position: static; width: 100%; margin-top: 16px; }
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) #attorneyPricingText { position: static; margin: 0 0 12px; }
- .signup-page.auth-entry.signup-application-step.signup-landscape-recovery:not(.signup-sizing-measure):not(.signup-received) #editSignupBasics { position: static; transform: none; margin-top: 8px; }
+/* Short landscape screens keep both signup steps below the brand and scrollable. */
+@media (max-height: 700px) and (orientation: landscape) {
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) .overlay { height: auto; min-height: var(--signup-common-height); }
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) .left-panel { height: auto; align-items: flex-start; padding-top: 72px; padding-bottom: var(--signup-panel-padding-bottom); }
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) .form-container { height: auto; margin-top: 0; }
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) .signup-form-scroll { height: auto; }
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) .signup-submit-actions { position: static; width: 100%; margin-top: 16px; }
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) #attorneyPricingText { position: static; margin: 0 0 12px; }
+ .signup-page.auth-entry:not(.signup-sizing-measure):not(.signup-received) #editSignupBasics { position: static; transform: none; margin-top: 8px; }
 }
