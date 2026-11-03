@@ -125,6 +125,7 @@ jobs:
           --fail-on-flaky-tests
       - name: Verify signup-to-engagement shortcuts
         env:
+          LPC_HELP_SOURCE_ROOT: ${{ github.workspace }}/.lpc-build
           PW_TEST_SCREENSHOT_NO_FONTS_READY: "1"
         run: npx playwright test -c tests/playwright/click-reduction/playwright.config.cjs --output=test-results/onboarding --fail-on-flaky-tests
   dependency-review:
