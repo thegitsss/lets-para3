@@ -268,7 +268,7 @@ test('only exhausted or uncertain admission mail needs owner attention and delib
 });
 
 
-test.each(['attorney', 'paralegal'])('%s approval before verification emails a usable verification action, then allows first sign-in', async role => {
+test.each(['attorney', 'paralegal'])('%s approval allows first sign-in while email verification remains available', async role => {
   const applicant = new User({ firstName: 'Synthetic', lastName: 'Applicant', email: `unverified-${role}@example.test`,
     password: 'Synthetic applicant passphrase', role, status: 'pending', emailVerified: false, yearsExperience: 3,
     paralegalQualification: 'law_firm_experience', barNumber: 'CA-12345', barState: 'CA', attorneyGoodStanding: true });
@@ -285,7 +285,8 @@ test.each(['attorney', 'paralegal'])('%s approval before verification emails a u
   expect(jwt.decode(token)).not.toHaveProperty('exp');
   expect(email[2]).toContain('Privacy Policy');
   const login = () => request(app).post('/api/auth/login').send({ email: applicant.email, password: 'Synthetic applicant passphrase' });
-  expect((await login()).status).toBe(403);
+  expect((await login()).status).toBe(200);
+  expect((await User.findById(applicant._id)).emailVerified).toBe(false);
   expect((await request(app).post('/api/auth/verify-email').send({ token })).body).toMatchObject({ ok: true, accountStatus: 'approved' });
   expect((await login()).status).toBe(200);
 });

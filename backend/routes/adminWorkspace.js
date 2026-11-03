@@ -52,6 +52,54 @@ const guardedInformationWrite = (req, reviewed, work) => adminAccountAuthority.w
 });
 
 router.use(verifyToken, requireApproved, requireRole('admin'));
+router.get('/executive', asyncHandler(async (req, res) => {
+  const now = new Date();
+  const owner = await financialAccount.read(req, 'admin', req.query.expectedOwnerId);
+  const ownerId = String(owner._id);
+  const run = operation => Promise.resolve().then(operation);
+  const sections = await Promise.allSettled([
+    run(() => require('../services/adminExecutiveMetrics').readExecutiveMetrics({ now, ownerId })),
+    run(() => require('../services/adminFlowService').nextAdminTask({ now, owner: ownerId })),
+    run(async () => {
+      const earnings = await require('../services/adminPlatformEarnings').readPlatformEarnings(req, { now });
+      return { available: true, earnings };
+    }),
+    run(() => require('../services/adminOperatingPreparation').readAdminOperatingStatus({ now })),
+    run(() => require('../services/adminHandledService').readHandled({ now, owner: ownerId })),
+  ]);
+  // A late cookie/session/role change must not deliver any section of the old
+  // owner's operating view, even if one independent source succeeded.
+  const current = await financialAccount.read(req, 'admin', req.query.expectedOwnerId);
+  if (fingerprint(owner) !== fingerprint(current)) throw Object.assign(new Error('Current Admin access changed. Refresh before continuing.'), { statusCode: 403 });
+  const names = ['metrics', 'decisions', 'financial', 'operations', 'handled'];
+  const result = { ownerId, checkedAt: now.toISOString(), sources: {} };
+  for (const [index, section] of sections.entries()) {
+    const key = names[index], available = section.status === 'fulfilled';
+    result.sources[key] = { available };
+    result[key] = available ? section.value : { available: false, checkedAt: now.toISOString(), message: `${key === 'decisions' ? 'Your decision queue' : key[0].toUpperCase() + key.slice(1)} could not be checked. Refresh to try again.` };
+  }
+  if (sections[1].status === 'fulfilled') {
+    const seconds = { application: 90, inquiry: 180, photo: 30, payment: 300, matter: 300, approval: 90, incident: 600 };
+    result.ownerTime = { available: true, estimate: true, estimatedMinutes: Math.ceil(Object.entries(result.decisions.counts).reduce((total, [kind, count]) => total + count.ready * (seconds[kind] || 180), 0) / 60),
+      definition: 'Planning estimate from the current queue, not measured owner time. Credential checks, investigation and incidents can take longer.' };
+  } else result.ownerTime = { available: false, estimatedMinutes: null };
+  result.revision = fingerprint(result);
+  res.set('Cache-Control', 'private, no-store').json(result);
+}));
+router.get('/preparation/:kind/:id', asyncHandler(async (req, res) => {
+  const owner = await financialAccount.read(req, 'admin', req.query.expectedOwnerId);
+  if (!['application', 'inquiry', 'matter'].includes(req.params.kind) || !mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid work item.' });
+  const value = await require('../services/adminOperatingPreparation').readCurrentPreparation(req.params.kind, req.params.id);
+  const current = await financialAccount.read(req, 'admin', req.query.expectedOwnerId);
+  if (fingerprint(owner) !== fingerprint(current)) throw Object.assign(new Error('Current Admin access changed.'), { statusCode: 403 });
+  const result = { ownerId: String(owner._id), preparation: value }; result.revision = fingerprint(result);
+  res.set('Cache-Control', 'private, no-store').json(result);
+}));
+router.post('/preparation/:kind/:id/retry', csrfProtection, asyncHandler(async (req, res) => {
+  if (!['application', 'inquiry', 'matter'].includes(req.params.kind) || !mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid work item.' });
+  const value = await adminAccountAuthority.write(req, session => require('../services/adminOperatingPreparation').retryPreparation(req.params.kind, req.params.id, { reviewedRevision: req.body?.reviewedRevision, session }));
+  res.set('Cache-Control', 'private, no-store').json(value);
+}));
 router.get('/correspondence/policies', asyncHandler(async (_req,res)=>res.set('Cache-Control','no-store').json(await require('../services/support/correspondencePolicy').readPolicies())));
 router.put('/correspondence/policies/:kind', csrfProtection, asyncHandler(async (req,res)=>res.json(await require('../services/support/correspondencePolicy').savePolicy(req))));
 router.get('/activity', asyncHandler(async (_req, res) => {
@@ -154,6 +202,10 @@ const paymentAttentionOperation = action => asyncHandler(async (req, res) => {
 router.get('/finance/payment-alerts', paymentAttentionOperation('list'));
 router.get('/finance/payment-alerts/:receiptId/review', paymentAttentionOperation('review'));
 router.post('/finance/payment-alerts/:receiptId/resolve', csrfProtection, paymentAttentionOperation('resolve'));
+router.get('/finance/earnings', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'private, no-store').json(await require('../services/adminPlatformEarnings').readPlatformEarnings(req));
+}));
+
 router.get('/finance/records', asyncHandler(async (req, res) => res.set('Cache-Control', 'private, no-store').json(await listFinance(req.query, req))));
 router.get('/finance/export', asyncHandler(async (req, res) => exportFinance(req.query, res, req)));
 router.get('/finance/dispute-preview/:id', asyncHandler(async (req, res) => {
@@ -261,7 +313,7 @@ router.get('/attention', asyncHandler(async (_req, res) => {
     checkedAt: new Date()
   });
 }));
-const fields = 'title details briefSummary practiceArea locationState state status moderationStatus archived attorney attorneyId paralegal paralegalId paralegalNameSnapshot createdAt updatedAt deadline deadlineDate totalAmount lockedTotalAmount currency paymentStatus escrowStatus paymentReleased payoutFinalizedAt payoutTransferId relistRequestedAt terminationStatus tasks jobId flags hiredAt pausedAt pausedReason completedAt disputeDeadlineAt disputes.createdAt preEngagement.status preEngagement.requestedAt preEngagement.submittedAt preEngagement.reviewedAt withdrawalHistory terminatedAt terminationRequestedAt remainingAmount fundingIntegrityStatus payoutStatus postingSyncStatus hiringClaimStatus completionClaimStatus applicants.paralegalId applicants.status applicants.appliedAt';
+const fields = 'title details briefSummary practiceArea locationState state status moderationStatus archived attorney attorneyId paralegal paralegalId paralegalNameSnapshot createdAt updatedAt deadline deadlineDate totalAmount lockedTotalAmount feeAttorneyPct feeParalegalPct feeAttorneyAmount feeParalegalAmount currency paymentStatus escrowStatus paymentReleased payoutFinalizedAt payoutTransferId relistRequestedAt terminationStatus tasks jobId flags hiredAt pausedAt pausedReason completedAt disputeDeadlineAt disputes.createdAt preEngagement.status preEngagement.requestedAt preEngagement.submittedAt preEngagement.reviewedAt withdrawalHistory terminatedAt terminationRequestedAt remainingAmount fundingIntegrityStatus payoutStatus postingSyncStatus hiringClaimStatus completionClaimStatus applicants.paralegalId applicants.status applicants.appliedAt';
 const populate = query => query.populate('attorney', 'firstName lastName email').populate('attorneyId', 'firstName lastName email').populate('paralegal', 'firstName lastName email').populate('paralegalId', 'firstName lastName email');
 function safeMatter(doc) {
   const {
@@ -312,6 +364,7 @@ function safeMatter(doc) {
     deadline: deadlineDate || deadline,
     totalAmount,
     lockedTotalAmount,
+    platformFee: require('../services/matterFeeSummary').summarize(doc),
     currency,
     paymentStatus,
     escrowStatus,
@@ -438,6 +491,20 @@ router.get('/matters', asyncHandler(async (req, res) => {
     query.$and = [...(query.$and || []), {
       $or: clauses
     }];
+  }
+  const view = String(req.query.view || 'all');
+  if (!['all', 'posted', 'engagements'].includes(view)) return res.status(400).json({ error: 'Invalid matter view.' });
+  if (view !== 'all') {
+    // A relisted open posting is a listing again, even when its history contains a hire.
+    const engagement = { $and: [
+      { $nor: [{ status: 'open', paralegal: null, paralegalId: null }] },
+      { $or: [
+        { paralegal: { $ne: null } }, { paralegalId: { $ne: null } },
+        { hiredAt: { $ne: null } }, { 'withdrawalHistory.0': { $exists: true } },
+        { status: { $in: ['in progress', 'in_progress', 'in-progress', 'active', 'assigned', 'awaiting_documents', 'reviewing', 'paused', 'completed', 'disputed'] } }
+      ] }
+    ] };
+    query.$and = [...(query.$and || []), view === 'engagements' ? engagement : { $nor: [engagement] }];
   }
   const [docs, total] = await Promise.all([populate(Case.find(query).select(fields).sort({
     createdAt: -1,

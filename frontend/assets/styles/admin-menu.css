@@ -1,12 +1,14 @@
 /* Separate task cards within the existing admin shell. */
 body.admin-menu-mode #section-overview>:not(#adminSimpleMenu){display:none!important}
 body.admin-menu-mode #adminSimpleMenu{max-width:1100px;margin:32px auto 64px}
+body.admin-menu-mode #adminSignupPanel #adminHomeRefresh{min-width:44px;min-height:44px}
 body.admin-menu-mode #adminSimpleMenu h1{font-size:30px;line-height:1.25;letter-spacing:-.6px;margin:0 0 28px;font-weight:600}
-body.admin-menu-mode #adminSimpleMenu>nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-body.admin-menu-mode #adminSimpleMenu>nav>a{display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-height:190px;padding:24px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);text-decoration:none}
-body.admin-menu-mode #adminSimpleMenu>nav>a:hover{background:var(--sidebar-bg);border-color:var(--muted)}
+body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav>a,body.admin-menu-mode #adminSimpleMenu .admin-earnings-card{display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-height:190px;padding:24px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);text-decoration:none}
+body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav>a:hover{background:var(--sidebar-bg);border-color:var(--muted)}
 body.admin-menu-mode .admin-card-label{font-size:16px;font-weight:500}
 body.admin-menu-mode .admin-card-count{font-size:44px;line-height:1.15;font-weight:600;letter-spacing:-1px}
+body.admin-menu-mode .admin-earnings-card .admin-card-count{max-width:100%;overflow-wrap:anywhere;font-size:clamp(24px,2.5vw,36px)}
 body.admin-menu-mode .admin-card-caption{font-size:12px;color:var(--muted)}
 body.admin-menu-mode #adminSimpleMenu a:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 body.admin-menu-mode #adminMenuBack{font-size:14px;color:var(--ink);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;white-space:nowrap}
@@ -14,8 +16,8 @@ body.admin-menu-mode .admin-single-area>.admin-tabs,body.admin-menu-mode .admin-
 body.admin-menu-mode .main #section-user-management>header{order:-2}
 body.admin-menu-mode .main #section-user-management>.admin-tabs{order:-1}
 body.admin-menu-mode .main #section-user-management>.admin-context-nav{order:-1}
-@media(max-width:1100px){body.admin-menu-mode #adminSimpleMenu>nav{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:560px){body.admin-menu-mode #adminSimpleMenu>nav{grid-template-columns:1fr}body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:165px}body.admin-menu-mode #adminSimpleMenu{margin:24px auto 40px}}
+@media(max-width:1100px){body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav{grid-template-columns:1fr}body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav>a,body.admin-menu-mode #adminSimpleMenu .admin-earnings-card{min-height:165px}body.admin-menu-mode #adminSimpleMenu{margin:24px auto 40px}}
 
 /* One request at a time; secondary tools remain available on demand. */
 body.admin-menu-mode .admin-calm-inbox .admin-inbox-layout{display:block;max-width:920px}
@@ -80,3 +82,51 @@ body.admin-menu-mode .admin-calm-inbox .admin-empty>svg,body.admin-menu-mode .ad
 body.admin-menu-mode .admin-test-request-toggle{display:flex;align-items:center;gap:8px}
 body.admin-menu-mode .admin-test-request-toggle input{width:auto}
 body.admin-menu-mode .admin-support-tools [hidden]{display:none!important}
+
+/* Overview combines the existing earnings card and operating queue in one place. */
+body.admin-menu-mode #adminSimpleMenu .admin-executive-summary{display:grid;grid-template-columns:minmax(240px,.8fr) minmax(0,1.7fr);gap:24px;align-items:stretch;margin:0 0 16px}
+body.admin-menu-mode #adminSimpleMenu .admin-executive-summary>.admin-earnings-card{min-height:0;padding:18px;gap:8px;justify-content:center}
+body.admin-menu-mode .admin-business-signals{min-width:0;padding:8px 0}
+body.admin-menu-mode .admin-business-signals h2{font-size:14px;line-height:1.5;font-weight:600;margin:0 0 12px;color:var(--ink)}
+body.admin-menu-mode .admin-business-signals dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0}
+body.admin-menu-mode .admin-business-signals dt{font-size:12px;line-height:1.5;color:var(--muted)}
+body.admin-menu-mode .admin-business-signals dd{margin:5px 0 0;font-size:24px;line-height:1.3;font-weight:600;font-variant-numeric:tabular-nums}
+body.admin-menu-mode #adminMarketplaceState,body.admin-menu-mode #adminExecutiveStatus{font-size:12px;line-height:1.5;color:var(--muted);margin:12px 0 0}
+body.admin-menu-mode #adminExecutiveStatus:empty{display:none}
+body.admin-menu-mode #adminSimpleMenu .admin-background-status{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;margin:0 0 20px;font-size:12px;line-height:1.5}
+body.admin-menu-mode #adminSimpleMenu .admin-background-status p{margin:0;color:var(--muted)}
+body.admin-menu-mode #adminSimpleMenu .admin-background-status p:empty{display:none}
+body.admin-menu-mode #adminSimpleMenu :is(#adminTodayOpenSystem,#adminTodayOpenFinance){min-height:44px;padding:4px 8px;font-size:12px}
+body.admin-menu-mode #adminFlow>.admin-executive-queue-header{gap:12px;margin-bottom:12px}
+body.admin-menu-mode #adminFlow>.admin-executive-queue-header>.admin-tabs{margin:0;gap:8px 20px}
+body.admin-menu-mode #adminFlowQueueLayout{grid-template-columns:minmax(230px,.7fr) minmax(0,1.7fr);height:min(560px,calc(100dvh - 440px));min-height:430px;max-height:640px}
+body.admin-menu-mode #adminFlowQueueLayout.is-empty{grid-template-columns:1fr;height:auto;min-height:0}
+body.admin-menu-mode #adminFlowQueueLayout.is-empty .admin-queue-back{display:none}
+body.admin-menu-mode #adminSimpleMenu .admin-today-details{margin:0 0 20px;max-width:none}
+body.admin-menu-mode #adminTodayOwnerHandled .admin-activity-row>div{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}
+body.admin-menu-mode #adminTodayActivityPanel h2{font-size:15px;line-height:1.5;margin:0 0 12px}
+body.admin-menu-mode #adminTodayHandled+h2,body.admin-menu-mode #adminTodayOwnerHandled+h2{margin-top:24px}
+body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts,body.admin-menu-mode #adminSimpleMenu .admin-executive-details{border-top:1px solid var(--line);padding:10px 0;margin:12px 0 0}
+body.admin-menu-mode .admin-overview-shortcuts>summary,body.admin-menu-mode .admin-executive-details>summary{font-size:13px;color:var(--muted);min-height:44px;padding:10px 0;cursor:pointer;box-sizing:border-box}
+body.admin-menu-mode #adminExecutiveMeasurements{margin:8px 0 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}
+body.admin-menu-mode #adminExecutiveMeasurements>div{min-width:0}
+body.admin-menu-mode #adminExecutiveMeasurements dt{font-size:13px;font-weight:500}
+body.admin-menu-mode #adminExecutiveMeasurements dd{margin:4px 0 0;font-size:14px;line-height:1.5}
+body.admin-menu-mode #adminExecutiveMeasurements small{display:block;margin-top:4px;font-size:12px;color:var(--muted)}
+body.admin-menu-mode #adminExecutiveLimitations{margin:0;padding-left:18px;font-size:12px;color:var(--muted);line-height:1.6}
+body.admin-menu-mode #adminOverviewShortcuts>nav{padding:8px 0 0}
+@media(max-width:1024px){body.admin-menu-mode #adminSimpleMenu .admin-executive-summary{grid-template-columns:minmax(220px,.8fr) minmax(0,1.3fr)}body.admin-menu-mode .admin-business-signals dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){
+ body.admin-menu-mode #adminSimpleMenu .admin-executive-summary{grid-template-columns:1fr;gap:16px}
+ body.admin-menu-mode #adminSimpleMenu .admin-executive-summary>.admin-earnings-card{padding:16px}
+ body.admin-menu-mode .admin-business-signals{padding:0}
+ body.admin-menu-mode .admin-business-signals dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body.admin-menu-mode #adminSimpleMenu .admin-background-status{margin-bottom:16px}
+ body.admin-menu-mode #adminFlow>.admin-executive-queue-header{align-items:flex-start}
+ body.admin-menu-mode #adminFlow>.admin-executive-queue-header>.admin-tabs{gap:0 12px}
+ body.admin-menu-mode #adminFlowQueueLayout{height:auto;min-height:0;max-height:none}
+ body.admin-menu-mode #adminFlowQueueLayout.show-review>.admin-live-review{height:calc(100dvh - 180px);min-height:430px}
+ body.admin-menu-mode #adminExecutiveMeasurements{grid-template-columns:1fr}
+}
+
+body.admin-menu-mode #adminReviewTimeEstimate{font-size:12px;line-height:1.5;color:var(--muted);margin:0 0 12px}

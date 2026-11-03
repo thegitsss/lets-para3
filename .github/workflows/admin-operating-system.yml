@@ -1,0 +1,51 @@
+name: Admin operating system
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/admin-operating-system.yml'
+      - 'backend/**'
+      - 'frontend/admin-dashboard.html'
+      - 'frontend/assets/scripts/admin/**'
+      - 'frontend/assets/styles/admin*.css'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: admin-os-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  admin-operating-system:
+    name: Admin decisions, automation, and scale
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      CI: 'true'
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      MONGOMS_DISABLE_POSTINSTALL: 'true'
+      EMAIL_DISABLE: 'true'
+      JWT_SECRET: ci-only-jwt-secret-at-least-32-bytes
+      DATA_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      AWS_EC2_METADATA_DISABLED: 'true'
+      LPC_TEST_MONGO_NAMESPACE: admin-operating-system
+      LPC_USE_BUILT_FRONTEND: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: node scripts/verify-runtime.js
+      - run: npm ci --include=dev
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:frontend
+      - run: npm run test:admin-operating-system
+      - run: npm run test:admin-overview
+      - run: npm run test:admin-operating-journey
+      - run: npm run test:admin-operating-scale

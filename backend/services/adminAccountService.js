@@ -137,7 +137,8 @@ async function sendAdmissionInformation({
           createdAt: new Date(), updatedAt: new Date(), subject: 'Application information requested', message: text.trim(),
           requesterUserId: user._id, userId: user._id, requesterEmail: user.email, requesterRole: user.role,
           sourceSurface: 'admin', sourceLabel: 'Application review', assignedTo: adminUser._id || adminUser.id,
-          nextAction: 'Review the applicant’s response.', requestKind: 'support'
+          nextAction: 'Review the applicant’s response.', requestKind: 'support',
+          admissionSourceRevision: require('./admissionReview').admissionRevision(user)
         }
       }, { upsert: true, timestamps: false, returnDocument: 'after', runValidators: true, ...(session ? { session } : {}) });
     } catch (error) {

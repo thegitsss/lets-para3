@@ -63,8 +63,8 @@ body.admin-live #adminIdentity{font-size:13px;font-weight:500;min-height:34px;di
 body.admin-live #adminSearchOpen kbd{display:none}
 body.admin-menu-mode #adminSimpleMenu{margin:20px auto 32px}
 body.admin-menu-mode #adminSimpleMenu h1{margin-bottom:20px}
-body.admin-menu-mode #adminSimpleMenu>nav{gap:12px}
-body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:145px;padding:18px;gap:8px}
+body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav{gap:12px}
+body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav>a,body.admin-menu-mode #adminSimpleMenu .admin-earnings-card{min-height:145px;padding:18px;gap:8px}
 body.admin-menu-mode .admin-card-count{font-size:36px}
 body.admin-menu-mode .admin-calm-inbox .admin-inbox-layout{max-width:920px}
 body.admin-menu-mode .admin-calm-inbox #adminInboxDetail{padding:0}
@@ -76,7 +76,7 @@ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{padding:14px 0;gap:4px 
 body.admin-menu-mode .admin-calm-inbox #adminReplyText{margin:8px 0;min-height:90px}
 body.admin-menu-mode .admin-calm-inbox .admin-inquiry-options{margin-top:12px}
 body.admin-menu-mode .admin-dispute-table .admin-dispute-summary>td{padding-top:12px;padding-bottom:12px}
-@media(max-width:760px){body.admin-live .section .panel{padding:0}body.admin-live .section :is(button,input:not([type="checkbox"]):not([type="radio"]),select,summary){min-height:44px}body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:135px}}
+@media(max-width:760px){body.admin-live .section .panel{padding:0}body.admin-live .section :is(button,input:not([type="checkbox"]):not([type="radio"]),select,summary){min-height:44px}body.admin-menu-mode #adminSimpleMenu .admin-overview-shortcuts>nav>a,body.admin-menu-mode #adminSimpleMenu .admin-earnings-card{min-height:135px}}
 body.admin-live .section :is(.card,.ai-room-card,.ai-room-card-queue,.ai-room-summary-tile,.ai-room-list-item,.engineering-detail-meta-item,.engineering-ticket-card,.knowledge-detail-meta-item){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 0}
 body.admin-live .section :is(.ai-room-list-item,.engineering-ticket-card){border-bottom:1px solid var(--line)!important}
 body.admin-live .admin-account-scroll :is(.admin-review-card,.admin-facts){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 0;margin-bottom:12px}

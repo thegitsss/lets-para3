@@ -75,7 +75,7 @@ test('a changed deferred record returns automatically', async () => {
 });
 test('accepted information requests wait for the applicant and a response restores review', async () => {
   const applicant = await user();
-  const info = await ticket({ requesterUserId: applicant._id, administrativeRequestKey: `admission:${applicant._id}:first`, status: 'waiting_on_user', emailReplies: [{ requestId: 'first', text: 'More information please', delivery: 'accepted' }] });
+  const info = await ticket({ requesterUserId: applicant._id, administrativeRequestKey: `admission:${applicant._id}:first`, status: 'waiting_on_user', lastAdminReplyAt: new Date(), emailReplies: [{ requestId: 'first', text: 'More information please', delivery: 'accepted' }] });
   const waiting = await nextAdminTask();
   expect(waiting.task).toBeNull(); expect(waiting.waiting).toBe(1);
   await Ticket.updateOne({ _id: info._id }, { $set: { status: 'open' } });

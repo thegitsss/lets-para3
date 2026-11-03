@@ -394,7 +394,9 @@ describe("Admin workflows", () => {
     expect(approvalEmailHtml).toContain("create a Matter outlining the scope");
     expect(approvalEmailHtml).toContain(">Sign in</a>");
     expect(sendEmail.mock.calls[0][3].text).toContain("/login.html");
-    expect(approvalEmailHtml).not.toMatch(/linkedin|facebook|instagram/i);
+    // The approved shared letter footer contains the company LinkedIn link;
+    // the admission message itself must keep the single sign-in action.
+    expect(approvalEmailHtml.split("— The LPC team")[0]).not.toMatch(/linkedin|facebook|instagram/i);
 
     const updated = await User.findById(attorney._id);
     expect(updated.status).toBe("approved");

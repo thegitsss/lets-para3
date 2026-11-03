@@ -25,6 +25,7 @@ const { releaseCommit } = require("../utils/releaseIdentity");
 const { readMaintenanceMode } = require("../utils/appSettings");
 const { processAutoModeActions } = require("../services/ai/autonomyPreferenceService");
 const { recordAutomationCycle } = require('../services/automationCycleStatus');
+const { runAdminPreparationCycle } = require('../services/adminOperatingPreparation');
 const { assertAutomationConfiguration } = require("../utils/workerProductionConfig");
 const {
   MONGO_OPERATION_OPTIONS,
@@ -62,6 +63,7 @@ async function runTask(name, operation, results, failures) {
 async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) {
   const deps = {
     readMaintenanceMode,
+    runAdminPreparationCycle,
     processAutoModeActions,
     generateMonitoringReport,
     runTimedTriggers,
@@ -122,6 +124,12 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
       failures,
     };
   }
+
+  const adminPreparation = await runTask('adminPreparation', async () => {
+    const result = await deps.runAdminPreparationCycle({ now });
+    if (!result.ok) throw new Error('Review preparation needs attention. Original records remain available.');
+    return result;
+  }, results, failures);
 
   const expiredWithdrawals = await runTask(
     "expiredWithdrawals",
@@ -185,6 +193,7 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
       fullCycle,
       now: now.toISOString(),
       casePurge,
+      adminPreparation,
       personalStorageDeletion,
     matterStorageRetirement,
       expiredWithdrawals,
@@ -262,6 +271,7 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
     fullCycle,
     now: now.toISOString(),
     casePurge,
+    adminPreparation,
     personalStorageDeletion,
     matterStorageRetirement,
     expiredWithdrawals,

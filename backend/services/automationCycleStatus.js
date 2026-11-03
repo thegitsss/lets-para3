@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const State = require('../models/AutomationCycleState');
 const TASK_LABELS = {
+  adminPreparation: 'Review preparation',
   automationControl: 'Automation settings', governedApprovals: 'Automatic approvals', monitoringReport: 'Service monitoring',
   timedTriggers: 'Scheduled reminders', marketingResearch: 'Marketing research', marketingCleanup: 'Marketing record cleanup',
   marketingPublishing: 'Marketing preparation', directorFollowUps: 'Director follow-ups', directorMailImport: 'Director mailbox sync',

@@ -107,8 +107,8 @@ test('verified completion income retains the exact attorney and paralegal fees',
     const response = await get(path, owner()); expect(response.status).toBe(200); expect(value(response.body)).toBe(16000);
   }
 });
-test.each(['/api/admin/workspace/finance/records', '/api/admin/workspace/finance/export'])('revocation during the income read prevents delivery from %s', async path => {
-  await Income.create({ caseId: matter._id, attorneyId: attorney._id, paralegalId: para._id, operationKey: `case_payout:${matter._id}`, feeAmount: 16000, stripeMode: 'test' });
+test.each(['/api/admin/workspace/finance/records', '/api/admin/workspace/finance/export', '/api/admin/workspace/finance/earnings', '/api/admin/workspace/executive'])('revocation during the income read prevents delivery from %s', async path => {
+  await Income.create({ caseId: matter._id, attorneyId: attorney._id, paralegalId: para._id, operationKey: `case_payout:${matter._id}`, feeAmount: 16000, stripeMode: ['/api/admin/workspace/finance/earnings', '/api/admin/workspace/executive'].includes(path) ? 'live' : 'test' });
   const find = Income.collection.find.bind(Income.collection); let changed = false;
   jest.spyOn(Income.collection, 'find').mockImplementation((...args) => {
     const cursor = find(...args);
@@ -300,4 +300,97 @@ test.each(['pi_admin_first', 'a'])('admin search binds financial matches and emp
   expect(result.body.ownerId).toBe(String(admin._id)); expect(result.body.revision).toMatch(/^[a-f0-9]{64}$/);
   expect(result.body.payments).toHaveLength(q.length > 1 ? 1 : 0);
   const denied = await get('/api/admin/workspace/search', { expectedOwnerId: String(para._id), q }); expect(denied.status).toBe(403);
+});
+
+test('overview earnings shows only live retained platform fees, not case funding', async () => {
+  await retainCompletion();
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { stripeMode: 'live' } });
+  await Operation.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live', livemode: true } });
+  await Payout.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live' } });
+  await Income.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live' } });
+  const response = await get('/api/admin/workspace/finance/earnings', owner());
+  expect(response.status).toBe(200);
+  expect(response.body).toMatchObject({ available: true, amount: 16000, currency: 'USD', stripeMode: 'live', period: 'month', ownerId: String(admin._id) });
+  expect(response.body.amount).not.toBe(48800);
+});
+test('overview earnings excludes test transactions and preserves owner access checks', async () => {
+  await retainCompletion();
+  const response = await get('/api/admin/workspace/finance/earnings', owner());
+  expect(response.status).toBe(200); expect(response.body).toMatchObject({ available: true, amount: 0 });
+  expect((await get('/api/admin/workspace/finance/earnings', owner(), attorney)).status).toBe(403);
+  expect((await get('/api/admin/workspace/finance/earnings', { expectedOwnerId: String(attorney._id) })).status).toBe(403);
+});
+test('overview earnings does not turn unverified live fees into zero', async () => {
+  await Income.create({ caseId: matter._id, attorneyId: attorney._id, paralegalId: para._id, operationKey: 'unverified-live-income', feeAmount: 16000, stripeMode: 'live' });
+  const response = await get('/api/admin/workspace/finance/earnings', owner());
+  expect(response.status).toBe(200); expect(response.body).toMatchObject({ available: false, amount: null });
+});
+
+test('matter list fee columns use case amount and combine both fee snapshots', async () => {
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { totalAmount: 50000, lockedTotalAmount: 40000, feeAttorneyAmount: 8800, feeParalegalAmount: 7200 } });
+  const response = await get('/api/admin/workspace/matters');
+  expect(response.status).toBe(200);
+  expect(response.body.items.find(row => row.id === String(matter._id))).toMatchObject({ totalAmount: 50000, lockedTotalAmount: 40000, platformFee: { amount: 16000, basis: 'recorded' } });
+});
+test('matter list fee columns distinguish expected fees and preserve historical rates', async () => {
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { feeAttorneyPct: 10, feeParalegalPct: 5, feeAttorneyAmount: 0, feeParalegalAmount: 0 } });
+  const response = await get('/api/admin/workspace/matters');
+  expect(response.status).toBe(200);
+  expect(response.body.items.find(row => row.id === String(matter._id)).platformFee).toEqual({ amount: 6000, basis: 'expected' });
+});
+
+test('matter stage tabs separate postings, relisted work and actual engagements', async () => {
+  const ids = Array.from({ length: 5 }, () => new (require('mongoose').Types.ObjectId)());
+  await Case.collection.insertMany([
+    { _id: ids[0], title: 'Open posting', status: 'open', attorney: attorney._id },
+    { _id: ids[1], title: 'Relisted posting', status: 'open', attorney: attorney._id, hiredAt: new Date(), withdrawalHistory: [{ paralegalId: para._id }] },
+    { _id: ids[2], title: 'Closed posting', status: 'closed', attorney: attorney._id },
+    { _id: ids[3], title: 'Completed engagement', status: 'completed', attorney: attorney._id, paralegal: para._id },
+    { _id: ids[4], title: 'Historical engagement', status: 'terminated', attorney: attorney._id, hiredAt: new Date(), paralegalNameSnapshot: 'Historical Paralegal' },
+  ]);
+  const posted = await get('/api/admin/workspace/matters', { view: 'posted' });
+  const engagements = await get('/api/admin/workspace/matters', { view: 'engagements' });
+  expect(posted.status).toBe(200); expect(engagements.status).toBe(200);
+  expect(posted.body.items.map(row => row.id).sort()).toEqual(ids.slice(0, 3).map(String).sort());
+  expect(engagements.body.items.map(row => row.id).sort()).toEqual([String(matter._id), ...ids.slice(3).map(String)].sort());
+  expect(posted.body.total + engagements.body.total).toBe(await Case.countDocuments({}));
+  expect((await get('/api/admin/workspace/matters', { view: 'engagements', filter: 'completed' })).body.total).toBe(1);
+  expect((await get('/api/admin/workspace/matters', { view: 'posted', q: 'Relisted' })).body.total).toBe(1);
+});
+test('matter stage tabs filter before pagination and preserve person filtering', async () => {
+  await Case.collection.insertMany(Array.from({ length: 24 }, (_, i) => ({ title: `Posted pagination ${i}`, status: 'open', attorney: i === 23 ? new (require('mongoose').Types.ObjectId)() : attorney._id, createdAt: new Date() })));
+  const first = await get('/api/admin/workspace/matters', { view: 'posted', page: 1 });
+  const second = await get('/api/admin/workspace/matters', { view: 'posted', page: 2 });
+  expect(first.body).toMatchObject({ total: 24, page: 1, pages: 2 }); expect(first.body.items).toHaveLength(20); expect(second.body.items).toHaveLength(4);
+  expect(new Set([...first.body.items, ...second.body.items].map(row => row.id)).size).toBe(24);
+  expect((await get('/api/admin/workspace/matters', { view: 'posted', user: String(attorney._id) })).body.total).toBe(23);
+  expect((await get('/api/admin/workspace/matters', { view: 'engagements' })).body.total).toBe(1);
+  expect((await get('/api/admin/workspace/matters', { view: 'invalid' })).status).toBe(400);
+});
+
+test('executive monthly platform fees stay verified beyond unrelated historical operation limits', async () => {
+  await retainCompletion();
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { stripeMode: 'live' } });
+  await Operation.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live', livemode: true } });
+  await Payout.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live' } });
+  await Income.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live' } });
+  const unrelated = new (require('mongoose').Types.ObjectId)();
+  await Operation.collection.insertMany(Array.from({ length: 10020 }, (_, i) => ({ caseId: unrelated, kind: 'funding', operationKey: `synthetic-history:${i}`, status: 'canceled', stripeMode: 'test', amount: 48800, createdAt: new Date('2020-01-01') })));
+  const response = await get('/api/admin/workspace/finance/earnings', owner());
+  expect(response.status).toBe(200); expect(response.body).toMatchObject({ amount: 16000, available: true, evidenceCases: 1, stripeMode: 'live' });
+});
+
+test('scoped monthly fee proof still rejects an income key duplicated outside its case and month', async () => {
+  await retainCompletion();
+  await Case.collection.updateOne({ _id: matter._id }, { $set: { stripeMode: 'live' } });
+  await Operation.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live', livemode: true } });
+  await Payout.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live' } });
+  await Income.collection.updateMany({ caseId: matter._id }, { $set: { stripeMode: 'live' } });
+  const original = await Income.findOne({ caseId: matter._id }).lean(), duplicateId = new (require('mongoose').Types.ObjectId)();
+  await Income.collection.dropIndex('operationKey_1');
+  try {
+    await Income.collection.insertOne({ ...original, _id: duplicateId, caseId: new (require('mongoose').Types.ObjectId)(), stripeMode: 'test', createdAt: new Date('2020-01-01') });
+    const response = await get('/api/admin/workspace/finance/earnings', owner());
+    expect(response.status).toBe(200); expect(response.body).toMatchObject({ available: false, amount: null });
+  } finally { await Income.collection.deleteOne({ _id: duplicateId }); await Income.createIndexes(); }
 });

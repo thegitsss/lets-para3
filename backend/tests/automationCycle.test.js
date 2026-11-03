@@ -3,6 +3,7 @@ const { isFullCycle, runAutomationCycle } = require("../scripts/run-automation-c
 function dependencies(overrides = {}) {
   return {
     readMaintenanceMode: jest.fn().mockResolvedValue(false),
+    runAdminPreparationCycle: jest.fn().mockResolvedValue({ ok: true, prepared: 0 }),
     processAutoModeActions: jest.fn().mockResolvedValue({ executedCount: 0, attemptedCount: 0, failedCount: 0 }),
     autoImportDirectorMail: jest.fn().mockResolvedValue({ failed: 0, scannedDirectors: 0 }),
     purgeExpiredCases: jest.fn().mockResolvedValue(undefined),
