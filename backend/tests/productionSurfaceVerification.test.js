@@ -90,6 +90,7 @@ function successfulFetch(candidate, overrides = {}) {
         "Content-Type": contentType,
         "Cache-Control": isHtml ? "no-store" : "public, max-age=0, must-revalidate",
         ...(surface.canonical ? { Link: `<${surface.canonical}>; rel="canonical"` } : {}),
+        ...(surface.indexable === false ? { "X-Robots-Tag": "noindex, nofollow" } : {}),
         ...(route === "/" ? {
           "Content-Security-Policy": CSP,
           "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
@@ -177,11 +178,25 @@ describe("production surface verification", () => {
           "X-LPC-Release-Commit": COMMIT,
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
-          Link: '<https://www.lets-paraconnect.com/terms.html>; rel="canonical"',
+          "X-Robots-Tag": "noindex, nofollow",
         },
       }),
     });
     await expect(verifyProductionSurface({ candidate, fetchFn })).rejects.toThrow(/terms\.html SHA-256/);
+  });
+
+  test("requires the existing noindex policy on legal pages", async () => {
+    const candidate = candidateForCurrentFiles();
+    const fetchFn = successfulFetch(candidate, {
+      "/terms.html": response(fs.readFileSync(path.join(repositoryRoot, "frontend/terms.html")), {
+        headers: {
+          "X-LPC-Release-Commit": COMMIT,
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      }),
+    });
+    await expect(verifyProductionSurface({ candidate, fetchFn })).rejects.toThrow(/x-robots-tag must be noindex, nofollow/);
   });
 
   test("rejects a weakened production script policy", async () => {
