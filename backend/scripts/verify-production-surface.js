@@ -32,14 +32,14 @@ const SURFACES = Object.freeze([
   {
     route: "/terms.html",
     candidateFile: "frontend/terms.html",
-    canonical: "https://www.lets-paraconnect.com/terms.html",
+    indexable: false,
     contentType: /^text\/html\b/i,
     cacheControl: "no-store",
   },
   {
     route: "/privacy.html",
     candidateFile: "frontend/privacy.html",
-    canonical: "https://www.lets-paraconnect.com/privacy.html",
+    indexable: false,
     contentType: /^text\/html\b/i,
     cacheControl: "no-store",
   },
@@ -304,7 +304,9 @@ async function verifyProductionSurface({
     assertReleaseHeader(result.response, commit, surface.route);
     const contentType = requireHeader(result.response, "content-type", surface.contentType);
     const cacheControl = requireHeader(result.response, "cache-control", surface.cacheControl);
-    if (/\bnoindex\b/i.test(String(result.response.headers.get("x-robots-tag") || ""))) {
+    if (surface.indexable === false) {
+      requireHeader(result.response, "x-robots-tag", "noindex, nofollow");
+    } else if (/\bnoindex\b/i.test(String(result.response.headers.get("x-robots-tag") || ""))) {
       fail(`${surface.route} is an approved public surface but production marks it noindex.`);
     }
     if (surface.canonical) {
