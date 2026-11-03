@@ -41,19 +41,19 @@ export function createApplicantReview(item,caseId,selected,context) {
     if (profile?.bio) recordedProfile.push(node('p',{text:profile.bio}));
     if (profile) recordedProfile.push(node('dl',{className:'av2-matter-facts'},[['Location',profile.location],['Availability',profile.availability],['Experience',profile.yearsExperience === null ? '' : `${profile.yearsExperience} years`],['Practice areas',profile.specialties.join(', ')],['Languages',profile.languages.join(', ')]].filter(([,value])=>value).map(([label,value])=>node('div',{},[node('dt',{text:label}),node('dd',{text:value})]))));
     body.append(disclosure('Profile recorded with the application',recordedProfile.length ? recordedProfile : [node('p',{text:'No profile snapshot recorded.'})],'profile'));
-    const decisions = createApplicationDecisions(caseId,item,{...context,compact:true,autoReview:true}); body.append(decisions);
-    const process = node('details',{className:'av2-secondary-disclosure av2-applicant-process','data-applicant-section':'hiring'},[node('summary',{text:'Requirements and hiring'})]);
+    const decisions = createApplicationDecisions(caseId,item,{...context,compact:true,autoReview:true});
+    const process = node('details',{className:'av2-secondary-disclosure av2-applicant-process','data-applicant-section':'hiring'},[node('summary',{text:'Hiring review'})]);
     let processMounted = false;
     function mountProcess() {
       if (processMounted || signal.aborted) return; processMounted = true;
       const host = node('div'), requirements = node('div'); requirements.hidden = true;
       const showRequirements = () => {requirements.hidden=false;if(!requirements.children.length)requirements.append(createPreEngagement(caseId,item,{...context,autoReview:true,onContinue:()=>{requirements.hidden=true;host.hidden=false;void hiring.refresh();}}));host.hidden=true;requirements.querySelector('h3')?.setAttribute('tabindex','-1');requirements.querySelector('h3')?.focus({preventScroll:true});};
-      const hiring = createHiring(caseId,item,{...context,autoReview:true,onRequirements:showRequirements});
+      const hiring = createHiring(caseId,item,{...context,compact:true,autoReview:true,onRequirements:showRequirements});
       host.append(hiring,createHiringReturn({api:context.api,signal,ownerId:context.ownerId,privateState:context.privateState,caseId,paralegalId:item.applicantId,name:item.name})); process.append(host,requirements);
     }
-    process.open=viewState.sections.get(item.applicantId)?.has('hiring') || false;
+    process.open=viewState.sections.get(item.applicantId)?.has('hiring') || (!item.assigned && !item.blocked && !archived && ['open','posted'].includes(matterStatus) && ['submitted','viewed','shortlisted'].includes(item.status));
     process.addEventListener('toggle',()=>{const values=viewState.sections.get(item.applicantId) || new Set();if(process.open){values.add('hiring');mountProcess();}else values.delete('hiring');viewState.sections.set(item.applicantId,values);});
-    body.append(process); if(process.open)mountProcess();
+    body.prepend(process); body.append(decisions); if(process.open)mountProcess();
     const history = [node('ol',{},item.history.map(entry=>node('li',{text:`${entry.from === 'unknown' ? '' : `${applicationStatus(entry.from)} → `}${applicationStatus(entry.to)} · ${timeLabel(entry.at)}`})))];
     if (!item.history.length) history.push(node('p',{text:'No status changes are recorded.'}));
     if (item.withdrawnAt) history.push(node('p',{text:`Withdrawn ${timeLabel(item.withdrawnAt)}`}));

@@ -1,5 +1,5 @@
 import { node, button, link } from "./attorney-v2/dom.mjs";
-import { validDraftId, validRequestId } from "./matter-draft-contract.mjs";
+import { validDraftId, validRequestId, draftValues } from "./matter-draft-contract.mjs";
 
 export function readPublication(result) {
   const value = result?.publication;
@@ -12,7 +12,7 @@ export function createPublication({ state, session, api, ownerId, signal, onChan
   const publication = state.publication ||= { phase: state.id ? "checking" : "initializing", requestId: crypto.randomUUID(), result: null, request: null, error: "", cleanupFailed: false };
   const root = node("section", { className: "av2-card draft-save-recovery", role: "region", "aria-label": "Publication status", tabindex: -1 });
   const footer = integratedReview ? node("div", {className:"av2-confirmation-footer"}) : null;
-  let practices = [], confirmation = false, operationGeneration = 0, publishing = false, backgroundCheck = false, cleanupBusy = false, publishedNotified = false;
+  let practices = [], confirmation = false, operationGeneration = 0, publishing = false, backgroundCheck = false, cleanupBusy = false, publishedNotified = false, editorCommit = false;
   const currentOperation = ticket => !signal.aborted && ticket === operationGeneration;
   const visible = () => Boolean(publication.result || !["ready", "initializing"].includes(publication.phase) || confirmation || publication.error);
   const options = { ownerId, signal };
@@ -49,7 +49,7 @@ export function createPublication({ state, session, api, ownerId, signal, onChan
       if (["checking", "busy"].includes(publication.phase)) root.append(node("p", { role: "status", text: publication.phase === "busy" ? "Confirming publication…" : "Checking publication…" }));
       if (publication.phase === "uncertain") root.append(button("Check publication result", check, buttonClass));
       if (publication.phase === "ready") {
-        if (confirmation) {
+        if (confirmation && !editorCommit) {
           root.append(node("p", { text: "Paralegals can apply after publication. Compensation locks after the first application." }));
           const control = node("select", { id: "matter-publishing-practice", "aria-label": "Publishing practice area" }, [node("option", { value: "", text: "Choose a supported practice area" }), ...practices.map((value) => node("option", { value, text: value.replace(/\b\w/g, (letter) => letter.toUpperCase()) }))]);
           control.value = practices.includes(state.values.practiceArea.toLowerCase()) ? state.values.practiceArea.toLowerCase() : "";
@@ -158,5 +158,26 @@ export function createPublication({ state, session, api, ownerId, signal, onChan
       render();
     } finally { if (currentOperation(ticket)) publishing = false; }
   }
-  return { root, footer, render, check, prepare, refreshAfterSessionCheck:()=>publishing && publication.phase === "busy" ? check({background:true}) : Promise.resolve(), cancel:()=>{if(publication.phase!=="busy"){confirmation=false;render();}}, get visible() { return visible(); }, get locked() { return Boolean(publication.result || ["busy", "checking", "initializing", "uncertain"].includes(publication.phase) || confirmation); }, get result() { return publication.result; } };
+  async function confirmFromEditor() {
+    if (editorCommit || publication.phase !== 'ready' || publication.result || state.uncertain || state.conflict || state.restricted) return;
+    const reviewed = JSON.stringify(draftValues(state.values));
+    const requested = state.values.practiceArea.trim().toLowerCase();
+    const mapped = requested === 'litigation' && practices.includes('civil litigation') && !practices.includes(requested) ? 'civil litigation' : requested;
+    const practice = practices.find(value => value.toLowerCase() === mapped);
+    if (!practice) { publication.error = 'Choose a supported publishing practice area.'; render(); return; }
+    editorCommit = true;
+    try {
+      await prepare();
+      if (signal.aborted || !confirmation) return;
+      if (reviewed !== JSON.stringify(draftValues(state.values))) {
+        publication.error = 'Your draft changed. Review the current details before publishing.'; return;
+      }
+      await publish(practice);
+    } finally {
+      editorCommit = false;
+      if (publication.phase === 'ready') confirmation = false;
+      render();
+    }
+  }
+  return { root, footer, render, check, prepare, confirmFromEditor, refreshAfterSessionCheck:()=>publishing && publication.phase === "busy" ? check({background:true}) : Promise.resolve(), cancel:()=>{if(publication.phase!=="busy"){confirmation=false;render();}}, get visible() { return visible(); }, get locked() { return Boolean(editorCommit || publication.result || ["busy", "checking", "initializing", "uncertain"].includes(publication.phase) || confirmation); }, get result() { return publication.result; } };
 }

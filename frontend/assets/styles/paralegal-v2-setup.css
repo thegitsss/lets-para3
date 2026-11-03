@@ -177,3 +177,13 @@
 @media(prefers-reduced-motion:reduce){.lpc-setup-welcome .welcome-footer .setup-link::after{transition:none}}
 .setup-status-row .photo-submitted{display:inline-flex;align-items:center;justify-content:flex-end;gap:7px}
 .setup-status-row .photo-status-check{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+
+:root body.lpc-v2 .ri-setup-dialog .profile-photo-section>button[data-setup-linkedin-photo]{grid-column:1/-1;grid-row:5;justify-self:center;min-height:44px;color:var(--v2-blue-hover);outline-color:var(--v2-blue-hover)}
+
+/* Compact review rows keep the photo and action footer reachable without overlap. */
+.ri-setup-dialog .ri-skills-capacity {font-size:12px;color:var(--v2-muted,#637188);margin:8px 0;}
+.ri-setup-dialog .review-language>.review-content {display:none;}
+.ri-setup-dialog .review-language:has(.simple-edit[open])>.review-content {display:flex;}
+.ri-setup-dialog .review-skills-group>.ri-suggestion {padding-block:6px;}
+.ri-setup-dialog .profile-photo-section {margin-top:20px;padding-bottom:12px;}
+.ri-setup-dialog .ri-review-actions {position:static;}

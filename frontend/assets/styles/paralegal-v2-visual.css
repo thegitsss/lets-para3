@@ -28,7 +28,7 @@ body.lpc-v2 .pv2-security-section:last-child { padding-bottom: 0; margin-bottom:
 body.lpc-v2 .pv2-blocked-pages:has(> span:empty):not(:has(> button:not([hidden]))) { display: none; }
 
 /* Dialog padding belongs to each content region, never both the shell and body. */
-body.lpc-v2 :is(.v2-browse-dialog, .v2-work-dialog, .v2-matter-dialog) {
+body.lpc-v2 :is(dialog.v2-browse-dialog, .v2-work-dialog, .v2-matter-dialog) {
   width: min(560px, calc(100vw - 32px));
   padding: 0;
   border: 1px solid var(--v2-line);
@@ -39,7 +39,7 @@ body.lpc-v2 :is(.v2-browse-dialog, .v2-work-dialog, .v2-matter-dialog) {
 body.lpc-v2 :is(.v2-work-dialog, .v2-matter-dialog) > header { min-height: 0; padding: 16px 20px; gap: 12px; }
 body.lpc-v2 :is(.v2-work-dialog, .v2-matter-dialog, .v2-browse-dialog) h2 { font: 600 1.125rem/1.4 var(--v2-font-sans); letter-spacing: 0; }
 body.lpc-v2 :is(.v2-work-dialog-body, .v2-matter-dialog-body) { padding: 16px 20px; }
-body.lpc-v2 .v2-browse-dialog form { padding: 16px 20px; gap: 16px; }
+body.lpc-v2 dialog.v2-browse-dialog form { padding: 16px 20px; gap: 16px; }
 body.lpc-v2 :is(.v2-work-dialog, .v2-matter-dialog) > footer { justify-content: flex-start; flex-wrap: wrap; min-height: 0; padding: 12px 20px; background: var(--v2-white); }
 body.lpc-v2 .v2-browse-dialog footer { justify-content: flex-start; flex-wrap: wrap; }
 body.lpc-v2 :is(.v2-work-dialog-close, .v2-browse-dialog-close, .v2-matter-dialog-close) { width: 44px; min-width: 44px; min-height: 44px; }

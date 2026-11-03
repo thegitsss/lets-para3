@@ -1,0 +1,2 @@
+const path=require('node:path');
+module.exports={testDir:__dirname,testMatch:'*.spec.cjs',workers:3,retries:0,timeout:35000,expect:{timeout:8000},reporter:[['list']],outputDir:path.resolve(__dirname,'../../../../outputs/click-reduction/browser'),projects:['chromium','firefox','webkit'].map(name=>({name,use:{browserName:name}})),use:{headless:true,viewport:{width:1440,height:1000},screenshot:'only-on-failure',trace:'retain-on-failure'}};

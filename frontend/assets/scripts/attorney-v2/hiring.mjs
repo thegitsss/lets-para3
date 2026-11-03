@@ -4,14 +4,14 @@ import { createHiringReturn } from "./pending-hire.mjs";
 import { cardLabel } from "./payment-setup-model.mjs";
 import { readHiringReview, hiringMoney, confirmHiring, hiringReason, hiringError } from "./hiring-model.mjs";
 const p = text => node("p", { text });
-export function createHiring(caseId, item, { api, signal, ownerId, privateState, onSaved, current = false, autoReview = false, onRequirements, onReviewed, route }) {
+export function createHiring(caseId, item, { api, signal, ownerId, privateState, onSaved, current = false, autoReview = false, onRequirements, onReviewed, route, compact = false }) {
   const applicantId = item.applicantId, key = `${caseId}:${applicantId}`;
   if (!privateState.hiring.has(key)) privateState.hiring.set(key, {});
   const state = privateState.hiring.get(key), status = node("p", { role: "status" }), body = node("div"), confirmation = node("div");
   let review = null, operation = null, returnController = null;
   const refresh = button("Review hiring and funding", () => void load());
   const stop = button("Stop waiting", () => operation?.abort());
-  const section = node("section", { className: "av2-card", "aria-label": "Hiring and funding", "data-hiring": applicantId }, [node("h3", { text: "Hiring and funding" }), status, node("div", { className: "av2-actions" }, [refresh, stop]), body, confirmation]);
+  const section = node("section", { className: "av2-card", "aria-label": "Hiring and funding", "data-hiring": applicantId }, [...(compact ? [] : [node("h3", { text: "Hiring and funding" })]), status, node("div", { className: "av2-actions" }, [refresh, stop]), body, confirmation]);
   function clearBody() { returnController?.abort(); returnController = null; body.replaceChildren(); }
   function controls() { section.setAttribute("aria-busy", String(!!operation)); section.querySelectorAll("button").forEach(control => { control.disabled = !!operation && control !== stop; }); stop.hidden = !operation; refresh.hidden = !!confirmation.childElementCount; refresh.textContent = state.pending ? "Check saved hiring details" : review ? "Refresh hiring review" : "Review hiring and funding"; }
   function message(text, phase) { status.textContent = text; section.dataset.state = phase; }
@@ -23,6 +23,10 @@ export function createHiring(caseId, item, { api, signal, ownerId, privateState,
     finally { clearTimeout(timer); operation = null; state.busy = false; if (!signal.aborted) controls(); }
   }
   function figures(target, value) {
+    if(compact && value.canHire && !value.relisted && !value.canResume && !value.assigned){
+      const entries=[['Matter amount',hiringMoney(value,value.budgetCents)],['Platform fee',hiringMoney(value,value.feeCents)],['Total card charge',hiringMoney(value,value.chargeCents)],...(value.card?[['Payment card',cardLabel(value.card)]]:[])];
+      target.append(node('dl',{className:'av2-hiring-figures'},entries.map(([label,text])=>node('div',{},[node('dt',{text:label}),node('dd',{text})]))));return;
+    }
     target.append(p(`Recorded Matter amount: ${hiringMoney(value, value.budgetCents)}`));
     if (value.relisted) {
       target.append(p(`Remaining amount for replacement work: ${hiringMoney(value, value.remainingCents)}`));
@@ -33,9 +37,13 @@ export function createHiring(caseId, item, { api, signal, ownerId, privateState,
     if (value.card) target.append(p(`Payment card: ${cardLabel(value.card)}`));
   }
   function render() {
-    clearBody(); confirmation.replaceChildren(); body.append(node("h4", { text: review.caseTitle }), p(review.name)); figures(body, review);
+    clearBody(); confirmation.replaceChildren(); if(!compact)body.append(node("h4", { text: review.caseTitle }), p(review.name)); figures(body, review);
     const explanation = hiringReason(review); if (explanation && !(current && review.reason === "card_required")) body.append(p(explanation));
-    if (review.canHire || review.canResume) body.append(button(review.canResume ? "Review recorded charge and hire" : "Review hiring confirmation", showConfirmation, "av2-primary"));
+    if (review.canHire || review.canResume) {
+      if (compact) {
+        body.append(p(`${review.caseTitle} · ${review.name}`), p("The selected paralegal will be assigned. Other applicants will not be selected, and pending invitations will close."), button(review.canResume ? "Finish hire using recorded charge" : review.relisted ? "Hire replacement paralegal" : `Hire and charge ${hiringMoney(review, review.chargeCents)}`, () => void submit(), "av2-button"));
+      } else body.append(button(review.canResume ? "Review recorded charge and hire" : "Review hiring confirmation", showConfirmation, "av2-primary"));
+    }
     if (onRequirements && !review.assigned && !review.canResume && ["ready", "pre_engagement_required", "card_required"].includes(review.reason)) body.append(button("Review pre-engagement requirements", onRequirements));
     if (review.reason === "card_required") {
       if (current) { returnController = new AbortController(); body.append(createHiringReturn({ api, signal: returnController.signal, ownerId, privateState, caseId, paralegalId: applicantId, name: review.name, current: true, autoReview: true })); }
@@ -65,6 +73,7 @@ export function createHiring(caseId, item, { api, signal, ownerId, privateState,
       const value = await api.hireReviewedApplicant(caseId, applicantId, displayed.revision, options);
       if (signal.aborted) return; options.signal.throwIfAborted(); confirmHiring(value, displayed); delete state.pending; saved = true;
     });
+    if (!saved && state.pending && !signal.aborted) await load();
     if (saved && !signal.aborted) {
       state.confirmed = true;
       if (onSaved) onSaved("Hire recorded. Review the assigned paralegal and Matter funding below."); else await load();
@@ -72,6 +81,6 @@ export function createHiring(caseId, item, { api, signal, ownerId, privateState,
   }
   signal.addEventListener("abort", () => { operation?.abort(); returnController?.abort(); state.busy = false; review = null; section.replaceChildren(); }, { once: true });
   controls(); message(state.pending ? "An earlier hiring result was not confirmed. Check its saved details before continuing." : "", state.pending ? "uncertain" : "idle");
-  if (state.confirmed || autoReview && !state.pending) { delete state.confirmed; section.readiness = load(); }
+  if (state.confirmed || state.pending || autoReview) { delete state.confirmed; section.readiness = load(); }
   section.refresh = load; return section;
 }

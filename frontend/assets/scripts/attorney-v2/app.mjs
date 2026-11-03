@@ -1,3 +1,5 @@
+import { createAttorneyTour } from './workspace-tour.mjs';
+import { readHomeInventory } from './home-inventory-model.mjs';
 import { installRowActions } from '../utils/row-actions.mjs';
 import {applyAppearance} from '../utils/appearance.mjs';
 import {applyAccent} from '../utils/appearance-controls.mjs';
@@ -46,6 +48,8 @@ const ready = () => !leaving && root.dataset.attorneyState === "ready";
 const privateState = createPrivateState();
 const shortcuts = createFrequentShortcuts({role:"attorney",host:document.querySelector(".av2-sidebar > .av2-nav"),resolveMatter:(id,{signal,ownerId}={})=>api.get(`/api/cases/${id}?${new URLSearchParams({expectedOwnerId:ownerId})}`,{signal})});
 
+let attorneyTour = null;
+let creationNoticeTimer = null;
 let creation = null;
 const releaseControl = createWorkspaceReleaseController({ outlet, currentLocation: () => creation?.workspaceLocation(), noticeHost: () => creation?.noticeHost(), baselineAllowed: user => canEnter(user, location.hostname), hasUnfinishedWork: () => privateState.hasUnsaved(), onAccessLost: () => leave("/login.html") });
 const api = createApiClient({ fetchImpl: releaseControl.fetch, onAuthenticationLost: () => leave("/login.html") });
@@ -68,12 +72,64 @@ const router = createRouter({
   onCommit(route) {
     window.LPC_PORTAL_BOOT?.ready({outlet,settled:outlet.firstElementChild?.readiness});
     navigationRoute = route;
+    attorneyTour?.consider(route);
     syncNavigation();
     navigation.close();
     globalTools.routeChanged();
     shortcuts.scopeToIdentity(identity);
     shortcuts.record();
     telemetry.record("route_ready");
+  },
+});
+
+async function navigateTour(path, { signal } = {}) {
+  if (!ready() || signal?.aborted) throw new DOMException('Canceled', 'AbortError');
+  if (location.hash.slice(1) !== path) location.hash = path;
+  const deadline = performance.now() + 15000;
+  const currentPath = () => {
+    const query = new URLSearchParams(navigationRoute?.query); query.delete('replayTour');
+    return `${navigationRoute?.path}${query.size ? `?${query}` : ''}`;
+  };
+  while (currentPath() !== path || !outlet.firstElementChild) {
+    if (!ready() || signal?.aborted) throw new DOMException('Canceled', 'AbortError');
+    if (performance.now() > deadline) throw new Error('Tour destination unavailable');
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+  await outlet.firstElementChild?.readiness;
+}
+attorneyTour = createAttorneyTour({
+  getIdentity: () => ready() ? identity : null,
+  hasUnfinishedWork: () => privateState.hasUnsaved() || creationOpen,
+  onBlocked: () => {
+    const live = document.querySelector('[data-av2-live]');
+    const message = 'Save or cancel your edits before starting the tour.';
+    clearTimeout(creationNoticeTimer); live.textContent = message;
+    creationNoticeTimer = setTimeout(() => { if (live.textContent === message) live.textContent = ''; }, 6000);
+  },
+  navigate: navigateTour,
+  startMatter: async ({ownerId}) => {
+    if (!ready() || identity?.id !== ownerId || privateState.hasUnsaved() || creationOpen) return;
+    await creation.open();
+  },
+  readFirstVisit: async ({ownerId}) => {
+    if (!ready() || identity?.id !== ownerId) return false;
+    const ticket = sessionGeneration;
+    const [saved, raw] = await Promise.all([
+      accountApi.readOnboarding({ownerId}),
+      api.get(`/api/cases/inventory/home?expectedOwnerId=${ownerId}&attentionPage=1&deadlinePage=1`),
+    ]);
+    if (!ready() || identity?.id !== ownerId || ticket !== sessionGeneration) return false;
+    const inventory = readHomeInventory(raw, ownerId);
+    return saved?.onboarding?.attorneyTourCompleted === false && !inventory.postedCount && !Object.values(inventory.counts).some(Boolean);
+  },
+  complete: async ({ ownerId, signal, checkFirst }) => {
+    const options = { ownerId, signal };
+    if (checkFirst) {
+      const saved = await accountApi.readOnboarding(options);
+      if (saved?.onboarding?.attorneyTourCompleted === true) return;
+    }
+    const confirmed = await api.completeAttorneyTour(options);
+    if (confirmed !== true) throw new Error('Tour completion unconfirmed');
   },
 });
 
@@ -173,6 +229,7 @@ function discardClosure() {
   clearClosureProof();
 }
 function protect({ preserveDrafts = false, preserveSearchHistory = false, preserveHelpDrafts = false, preserveCardSetup = false, preserveCreationResume = false } = {}) {
+  attorneyTour?.stop(); clearTimeout(creationNoticeTimer);
   shortcuts.clear();
   releaseControl.stop();
   creation.clear({forgetResume:!preserveCreationResume&&Boolean(identity)&&!preserveDrafts});
@@ -224,7 +281,8 @@ async function establishSession({ background = false, preserveDrafts = accountDr
   checking = (async () => {
     let phase = "session";
     try {
-      const result = classifySession(await readSession(api, { isCurrent: () => !leaving && ticket === sessionGeneration }));
+      const sessionPayload = await readSession(api, { isCurrent: () => !leaving && ticket === sessionGeneration });
+      const result = classifySession(sessionPayload);
       if (leaving || ticket !== sessionGeneration) return;
       if (result.identity && identity && (result.identity.id !== identity.id || result.identity.role !== identity.role)) discardClosure();
       if (result.state !== "ready") { leave(sessionDestination(result)); return; }
@@ -233,10 +291,12 @@ async function establishSession({ background = false, preserveDrafts = accountDr
       if (!await releaseControl.start(result.identity)) return;
       if (leaving || ticket !== sessionGeneration) return;
       if (identity && identity.id !== result.identity.id) { discardClosure(); leave("/dashboard-attorney.html"); return; }
-      const identityChanged = JSON.stringify(identity) !== JSON.stringify(result.identity);
-      identity = result.identity;
       auth ||= await import("../auth.js");
       if (leaving || ticket !== sessionGeneration) return;
+      const stored=auth.getStoredSession().user;
+      if(typeof sessionPayload.user.isFirstLogin!=="boolean"&&String(stored?.id||stored?._id||'')===result.identity.id&&stored?.role==='attorney'&&stored?.status==='approved')result.identity.isFirstLogin=stored.isFirstLogin===true;
+      const identityChanged = JSON.stringify(identity) !== JSON.stringify(result.identity);
+      identity = result.identity;
       // Checking the same session must not rebuild a route, steal focus, or
       // republish an identical identity into other open tabs.
       if (!wasReady || identityChanged) {
@@ -272,6 +332,8 @@ async function establishSession({ background = false, preserveDrafts = accountDr
       if (leaving || ticket !== sessionGeneration) return;
       lastSessionFailure = null;
       telemetry.record("session_ready");
+      const welcome=()=>{if(!ready()||ticket!==sessionGeneration)return;attorneyTour?.consider(navigationRoute);if(!wasReady)void attorneyTour?.considerFirstVisit(navigationRoute);};
+      if(window.LPC_PORTAL_BOOT?.pending)void window.LPC_PORTAL_BOOT.finished.then(welcome);else welcome();
     } catch (error) {
       if (leaving || ticket !== sessionGeneration || error.name === "AbortError") return;
       protect({ preserveDrafts: Boolean(identity) || preserveDrafts });

@@ -1,3 +1,4 @@
+import { ATTORNEY_TOUR_VERSION } from './workspace-tour.mjs';
 import { node, link, button, page, region } from "./dom.mjs";
 import { SOURCES, count, id, validId, dates, person, profileComplete, matterHref, reviewHref, reconcileUnread } from "./read-model.mjs";
 import { readHomeInventory, readHomeApplications } from './home-inventory-model.mjs';
@@ -98,119 +99,15 @@ const deadlineRow = (item) => {
   return node("li", { className: "av2-summary-row" }, [target]);
 };
 
-function onboarding(progress, identity, { api, signal }) {
-  const key = `lpc_attorney_v2_onboarding:${identity.id}`;
-  let state = {};
-  try { state = JSON.parse(sessionStorage.getItem(key) || "{}") || {}; } catch { /* Storage is optional. */ }
-  if (typeof state !== "object" || Array.isArray(state)) state = {};
-  if (state.tour !== undefined && (!Number.isInteger(state.tour) || state.tour < 0 || state.tour > 3)) delete state.tour;
-  let replayRequested = new URLSearchParams(location.search).get("replayTour") === "1" || new URLSearchParams(location.hash.split("?")[1]).get("replayTour") === "1";
-  try {
-    if (sessionStorage.getItem("lpc_attorney_replay_tour") === "1") replayRequested = true;
-    sessionStorage.removeItem("lpc_attorney_replay_tour");
-  } catch { /* URL and visible replay controls still work. */ }
-  if (replayRequested) {
-    state.replaying = true;
-    const url = new URL(location.href);
-    url.searchParams.delete("replayTour");
-    const [path, query] = url.hash.split("?");
-    const params = new URLSearchParams(query);
-    params.delete("replayTour");
-    url.hash = `${path}${params.size ? `?${params}` : ""}`;
-    history.replaceState(history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }
-  state.tourCompleted = progress.tourCompleted || state.tourCompleted === true;
-  if (replayRequested || (identity.isFirstLogin && !progress.tourCompleted && !state.tourCompleted && !state.dismissed && state.tour === undefined)) {
-    state.dismissed = false; state.tour = 0;
-  }
-  const save = () => { try { sessionStorage.setItem(key, JSON.stringify(state)); } catch { /* Navigation remains available. */ } };
-  const tourSteps = [
-    { title: "Profile", copy: "Edit the practice details on your profile.", label: "Open profile", href: "#/settings" },
-    { title: "Payment method", copy: "Manage your card for Matter funding.", label: "Open payment settings", href: "#/payments/setup" },
-    { title: "Matters", copy: "Manage postings, applications, and work.", label: "View Matters", href: "#/matters" },
-    { title: "Paralegals", copy: "Find and invite paralegals to your Matters.", label: "Browse paralegals", href: "#/paralegals" },
-  ];
+function onboarding(progress, identity, { signal }) {
   const wrapper = node("div", { className: "av2-home-onboarding", "data-av2-onboarding": "" });
-  if (state.dismissed || (state.tourCompleted && !state.replaying)) { save(); return wrapper; }
-  const guide = node("details", { className: "av2-home-setup av2-workspace-guide" });
-  const summary = node("summary", { text: "Workspace guide" });
-  const contents = node("div", { className: "av2-guide-content" });
-  guide.open = !state.dismissed && Number.isInteger(state.tour);
-  guide.addEventListener("toggle", () => { state.dismissed = !guide.open; save(); });
-  let saving = false, saveError = "", guideFinished = false;
-  const changeStep = value => {
-    state.tour = value; state.dismissed = false; guideFinished = false; saveError = "";
-    save(); draw(); guide.open = true;
-    contents.querySelector('[data-guide-title]')?.focus();
-  };
-  async function finishTour() {
-    if (saving || signal.aborted) return;
-    saving = true; saveError = ""; draw();
-    try {
-      await api.completeAttorneyTour({ signal });
-      if (signal.aborted) return;
-      state.tourCompleted = true; state.replaying = false; guideFinished = true; delete state.tour;
-      try {
-        sessionStorage.setItem("lpc_attorney_tour_completed", "1");
-        sessionStorage.removeItem("lpc_attorney_tour_active");
-        sessionStorage.removeItem("lpc_attorney_tour_step");
-      } catch { /* Optional storage. */ }
-      save();
-    } catch {
-      saveError = "Couldn’t save guide completion. Try again.";
-    } finally {
-      if (!signal.aborted) {
-        saving = false; draw();
-        if (saveError) contents.querySelector('[data-setup-next]')?.focus();
-        else removeGuide();
-      }
-    }
-  }
-  const removeGuide = () => {
-    guide.remove();
-    const heading = document.querySelector('.av2-home h1');
-    if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
-  };
-  const closeGuide = () => {
-    state.dismissed = true; state.replaying = false; delete state.tour;
-    try {
-      sessionStorage.removeItem("lpc_attorney_onboarding_step");
-      sessionStorage.setItem("lpc_attorney_onboarding_dismissed", "1");
-      sessionStorage.removeItem("lpc_attorney_tour_active");
-      sessionStorage.removeItem("lpc_attorney_tour_step");
-    } catch { /* Closing never depends on browser storage. */ }
-    save(); removeGuide();
-  };
-  function draw() {
-    contents.replaceChildren();
-    const guided = Number.isInteger(state.tour);
-    if (!guided) {
-      if (guideFinished) contents.append(node("p", { className: "av2-muted", role: "status", tabindex: "-1", text: "Workspace guide finished." }));
-      const start = button(state.tourCompleted ? "Replay" : "Start", () => changeStep(0), "av2-guide-start");
-      start.setAttribute("aria-label", state.tourCompleted ? "Replay workspace guide" : "Start workspace guide");
-      contents.append(start);
-      return;
-    }
-    const step = tourSteps[state.tour];
-    contents.append(
-      node("p", { className: "av2-guide-progress", text: `Tour · ${state.tour + 1} of ${tourSteps.length}` }),
-      node("h3", { text: step.title, tabindex: "-1", "data-guide-title": "" }),
-      note(step.copy),
-      link(step.label, step.href, "av2-guide-destination"),
-    );
-    const previous = button("Back", () => changeStep(state.tour - 1), "av2-guide-back");
-    previous.disabled = saving || state.tour === 0;
-    const next = button(saving ? "Saving…" : state.tour < 3 ? "Next" : "Finish tour", () => {
-      if (state.tour < 3) changeStep(state.tour + 1); else void finishTour();
-    }, "av2-guide-next");
-    next.disabled = saving; next.dataset.setupNext = "";
-    const close = button("Close", closeGuide, "av2-guide-close");
-    close.disabled = saving;
-    contents.append(node("div", { className: "av2-guide-controls", "aria-label": "Workspace tour navigation" }, [close, previous, next]));
-    if (saveError) contents.append(node("p", { className: "av2-notice", role: "alert", text: saveError }));
-  }
-  guide.append(summary, contents); wrapper.append(guide);
-  save(); draw();
+  let state = {};
+  try { state = JSON.parse(sessionStorage.getItem(`lpc_attorney_v2_onboarding:${identity.id}`) || "{}") || {}; } catch { /* Storage is optional. */ }
+  if (progress.tourCompleted || state.tourCompleted || state.dismissed) return wrapper;
+  const label = state.tourVersion === ATTORNEY_TOUR_VERSION && Number.isInteger(state.tour) ? 'Resume workspace guide' : 'Start workspace guide';
+  wrapper.append(button(label, () => {
+    if (!signal.aborted) location.hash = '/home?replayTour=1';
+  }, 'lpc-tour-replay'));
   return wrapper;
 }
 
