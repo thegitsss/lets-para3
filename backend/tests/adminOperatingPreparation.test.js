@@ -127,6 +127,15 @@ test('System recovery only schedules the reviewed current failed preparation and
   await User.updateOne({ _id: applicant._id }, { $set: { state: 'CA' } });
   await expect(service.retryPreparation('application', String(applicant._id), { reviewedRevision: job.sourceRevision })).rejects.toMatchObject({ statusCode: 409 });
 });
+test('retry rejects query operators and arrays before changing a failed preparation', async () => {
+  await run(); const job = await Work.findOne();
+  await Work.updateOne({ _id: job._id }, { $set: { status: 'failed', attempts: 3 } });
+  for (const reviewedRevision of [{ $ne: null }, [job.sourceRevision]]) {
+    await expect(service.retryPreparation('application', String(applicant._id), { reviewedRevision })).rejects.toMatchObject({ statusCode: 400 });
+  }
+  expect((await Work.findById(job._id)).status).toBe('failed');
+  expect((await Work.findById(job._id)).attempts).toBe(3);
+});
 test('withdrawn approved knowledge invalidates a cached support draft before it can be returned', async () => {
   const Collection = require('../models/KnowledgeCollection'), Item = require('../models/KnowledgeItem'), Revision = require('../models/KnowledgeRevision');
   const collection = await Collection.create({ key: 'preparation-support', title: 'Preparation support', audienceScopes: ['support_safe'] });

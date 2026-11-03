@@ -5241,7 +5241,15 @@ const valueTd = document.createElement('td');
 
 if (options.link && value) {
 const link = document.createElement('a');
-link.href = value;
+let href;
+try { href = new URL(String(value), location.origin); } catch {}
+if (!href || (href.protocol !== 'https:' && href.protocol !== 'http:')) {
+valueTd.textContent = '—';
+tr.append(labelTd, valueTd);
+modalDetails.appendChild(tr);
+return;
+}
+link.href = href.href;
 link.target = '_blank';
 link.rel = 'noopener';
 link.textContent = options.linkLabel || 'View';

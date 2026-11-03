@@ -177,10 +177,10 @@ async function readCurrentPreparation(kind, id, { now = new Date() } = {}) {
 }
 async function retryPreparation(kind, id, { reviewedRevision, now = new Date(), session = null } = {}) {
   validKind(kind);
-  if (!/^[a-f0-9]{24}$/i.test(String(id)) || !/^[a-f0-9]{64}$/.test(String(reviewedRevision || ''))) throw Object.assign(new Error('Refresh this preparation before retrying.'), { statusCode: 400 });
+  if (typeof id !== 'string' || typeof reviewedRevision !== 'string' || !/^[a-f0-9]{24}$/i.test(id) || !/^[a-f0-9]{64}$/.test(reviewedRevision)) throw Object.assign(new Error('Refresh this preparation before retrying.'), { statusCode: 400 });
   const current = await source(kind, id, now, undefined, session);
   if (!current?.eligible || current.revision !== reviewedRevision) throw Object.assign(new Error('This record changed. Refresh before retrying preparation.'), { statusCode: 409 });
-  const changed = await Work.updateOne({ _id: `${kind}:${id}`, sourceRevision: reviewedRevision, status: 'failed' }, { $set: { status: 'pending', attempts: 0, nextAttemptAt: now, failure: '', claimId: '', leaseUntil: null } }, { session });
+  const changed = await Work.updateOne({ _id: `${kind}:${id}`, sourceRevision: { $eq: reviewedRevision }, status: 'failed' }, { $set: { status: 'pending', attempts: 0, nextAttemptAt: now, failure: '', claimId: '', leaseUntil: null } }, { session });
   if (!changed.modifiedCount) throw Object.assign(new Error('This preparation is no longer waiting for recovery.'), { statusCode: 409 });
   return { recorded: true, status: 'pending', key: `${kind}:${id}` };
 }
