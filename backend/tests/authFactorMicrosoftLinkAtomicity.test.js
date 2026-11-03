@@ -92,4 +92,3 @@ test("a mismatched pending-link owner cannot link an identity while a rightful f
   expect(await AuditLog.countDocuments({ action: "auth.microsoft.link.fail", targetId: f.user._id, "meta.reason": "authenticated_user_mismatch" })).toBe(1);
   expect(await AuditLog.countDocuments({ action: "auth.microsoft.link.success" })).toBe(0);
 });
-
