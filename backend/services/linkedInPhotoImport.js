@@ -63,8 +63,8 @@ async function complete({ ownerId, sessionHash, state, code, denied }) {
   }
 }
 async function result(ownerId, sessionHash, requestId) {
-  if (!/^[a-f0-9]{64}$/.test(String(requestId || ''))) throw failure('This LinkedIn request expired.', 404);
-  const record = await Store.findOne({ ownerId, sessionHash, requestId, expiresAt: { $gt: new Date() } }).select('+photo').lean();
+  if (typeof requestId !== 'string' || !/^[a-f0-9]{64}$/.test(requestId)) throw failure('This LinkedIn request expired.', 404);
+  const record = await Store.findOne({ ownerId, sessionHash, requestId: { $eq: requestId }, expiresAt: { $gt: new Date() } }).select('+photo').lean();
   if (!record) throw failure('This LinkedIn request expired.', 404);
   if (record.status !== 'ready') return { status: record.status };
   return { status: 'ready', contentType: 'image/jpeg', photo: (Buffer.isBuffer(record.photo) ? record.photo : Buffer.from(record.photo.buffer)).toString('base64') };

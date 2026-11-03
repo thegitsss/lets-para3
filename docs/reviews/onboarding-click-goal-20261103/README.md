@@ -21,7 +21,7 @@ These are successful-path local UI replays with synthetic account/email/provider
 
 ## LinkedIn photo connection
 
-The new photo action reuses the existing crop/submission contract. The server adapter binds single-use state and results to the approved account and session, limits provider response size and image decoding, allows only supported LinkedIn image hosts, and persists no OAuth tokens. A photo is uploaded for LPC approval only after explicit submission.
+The new photo action reuses the existing crop/submission contract. Photo-result lookups require a primitive 64-character hexadecimal request ID and explicit equality; array and operator-shaped inputs are rejected before a database read. The server adapter binds single-use state and results to the approved account and session, limits provider response size and image decoding, allows only supported LinkedIn image hosts, and persists no OAuth tokens. A photo is uploaded for LPC approval only after explicit submission.
 
 The action appears only when server configuration enables it. Use `LINKEDIN_PHOTO_CLIENT_ID` and `LINKEDIN_PHOTO_CLIENT_SECRET`, or the existing LinkedIn client credentials, plus `LINKEDIN_PHOTO_REDIRECT_URI`. The URI must be the actual HTTPS canonical origin followed by `/api/uploads/linkedin-photo/callback` and must be registered on the provider application. Keep existing member-sign-in and marketing callbacks unchanged. The `LinkedInPhotoImport` model declares its ten-minute TTL and unique request indexes; provision/confirm those indexes before activating the connection on hosts with automatic index creation disabled.
 
@@ -30,7 +30,7 @@ Live LinkedIn photo authorization/configuration was not verified or changed in t
 ## Validation
 
 - 57 focused onboarding browser cases passed across Chromium, Firefox and WebKit against source and against generated production assets. Six additional return-window cases passed against source and compiled assets for success/failure, real assets and popup closure; the final welcome styling and route-guard adjustment passed 18 affected reruns.
-- 12 photo-import service/route security checks and five saved-profile model checks passed.
+- 13 photo-import service/route security checks and five saved-profile model checks passed.
 - Both exact-action journey replays passed. The original two-step signup is covered for both roles in all three browser engines.
 - Production frontend build, frontend API-route contract and candidate secret scan passed locally. Required hosted CI status is reported separately on the pull request.
 - Scope review excludes unrelated local pages, styles, authentication changes and résumé-field-model changes. Source is based on current main rather than the shared authoring branch.
