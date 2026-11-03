@@ -13,7 +13,10 @@ function owned(req, input) {
 }
 router.get('/config', (_req, res) => res.json({ enabled: Boolean(service.configuration()) }));
 router.post('/start', csrfProtection, handle(async (req, res) => res.json(await service.begin(...owned(req, req.body)))));
-router.get('/result', handle(async (req, res) => res.json(await service.result(...owned(req, req.query), req.query.requestId))));
+router.get('/result', handle(async (req, res) => {
+  const [ownerId, sessionHash] = owned(req, req.query);
+  res.json(await service.result(ownerId, sessionHash, req.query.requestId));
+}));
 router.get('/callback', async (req, res) => {
   let ok = false;
   try { ok = await service.complete({ ownerId: String(req.user.id), sessionHash: requestSessionIdentifier(req), state: req.query.state, code: typeof req.query.code === 'string' ? req.query.code : '', denied: Boolean(req.query.error) }); } catch (error) { reportOperationalFailure("linkedin_photo_import.callback")(error); }
