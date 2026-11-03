@@ -377,7 +377,7 @@ function detailView(matter, actions) {
   const attorney = matter.attorney || {};
   const attorneyId = normalizeId(matter.attorneyId || attorney._id || attorney.id);
   const tasks = Array.isArray(matter.tasks) ? matter.tasks : [];
-  const page = node("section", { className: "v2-browse-detail", "aria-labelledby": "v2-browse-detail-title" }, [
+  const page = node("section", { className: "v2-browse-detail", "data-matter-id": listingId(matter), "aria-labelledby": "v2-browse-detail-title" }, [
     node("a", {
       className: "v2-browse-back",
       href: `paralegal-v2.html#${actions.browseRoute()}`,
@@ -394,7 +394,7 @@ function detailView(matter, actions) {
         ]),
         node("div", { className: "v2-browse-detail-actions" }, [
           node("button", { className: "v2-browse-report", type: "button", text: "Report", disabled: matterId(matter) ? null : "disabled" }),
-          eligibilityButton(matter, actions.apply, actions.showToast),
+          applicationEligibility(matter).ready === true ? null : eligibilityButton(matter, actions.apply, actions.blocked),
         ]),
       ]),
       node("dl", { className: "v2-browse-detail-facts" }, [
@@ -436,6 +436,7 @@ function detailView(matter, actions) {
       ]),
     ]),
   ]);
+  if(applicationEligibility(matter).ready===true)page.querySelector('.v2-browse-detail-sheet').append(actions.application(matter));
   const photo = page.querySelector('.v2-browse-attorney img');
   photo?.addEventListener('error', () => { photo.src = '/assets/avatar-placeholder.svg'; }, { once: true });
   page.querySelector(".v2-browse-report")?.addEventListener("click", (event) => actions.report(matter, event.currentTarget));
@@ -457,10 +458,13 @@ function bindDialogDismiss(dialog) {
   });
 }
 
-function createApplyDialog(api, matter, trigger, actions, drafts) {
+function createApplyDialog(api, matter, trigger, actions, drafts, {inline=false, requests=new Map()}={}) {
   const titleId = `v2-apply-${listingId(matter) || "matter"}`;
-  const draftKey = `${normalizeId(actions.viewerId?.())}:${listingId(matter)}`;
+  const applicantOwner=normalizeId(actions.viewerId?.());
+  const draftKey = `${applicantOwner}:${listingId(matter)}`;
   const draft = String(drafts.get(draftKey) || "");
+  if(!requests.has(draftKey))requests.set(draftKey,{sending:false,listeners:new Set()});
+  const flight=requests.get(draftKey);
   const counter = node("span", { text: `${draft.length} / ${APPLY_MAX_CHARACTERS}` });
   const status = node("p", { className: "v2-browse-dialog-status", role: "status", "aria-live": "polite" });
   const textarea = node("textarea", {
@@ -473,10 +477,10 @@ function createApplyDialog(api, matter, trigger, actions, drafts) {
     text: draft,
   });
   const submit = node("button", { className: "v2-browse-dialog-primary", type: "submit", text: "Submit application" });
-  const dialog = node("dialog", { className: "v2-browse-dialog", "aria-labelledby": titleId, "data-v2-route-dialog": "" }, [
-    node("form", { method: "dialog" }, [
+  const dialog = node(inline?"section":"dialog", { className: inline?"v2-browse-dialog v2-browse-application":"v2-browse-dialog", role:inline?"region":null, "aria-labelledby": titleId, "data-v2-route-dialog": inline?null:"" }, [
+    node("form", { method: inline?"post":"dialog" }, [
       node("header", {}, [
-        node("div", {}, [node("h2", { id: titleId, text: `Apply to ${matter.title || "this matter"}` })]),
+        node("div", {}, [node("h2", { id: titleId, text: inline?"Apply":`Apply to ${matter.title || "this matter"}` })]),
         node("span"),
       ]),
       node("p", { id: `${titleId}-help`, className: "v2-browse-dialog-help", text: "Your résumé and LinkedIn link are included, if saved to your profile." }),
@@ -488,22 +492,27 @@ function createApplyDialog(api, matter, trigger, actions, drafts) {
       ]),
     ]),
   ]);
-  dialog.querySelector("header > span").replaceWith(dialogCloseButton(dialog, "Close application"));
-  dialog.querySelector(".v2-browse-dialog-secondary").addEventListener("click", () => dialog.close());
-  let sending = false;
-  guardDialogDraft(dialog, {
+  if(inline){dialog.querySelector("header > span").remove();dialog.querySelector(".v2-browse-dialog-secondary").remove();}
+  else dialog.querySelector("header > span").replaceWith(dialogCloseButton(dialog, "Close application"));
+  dialog.querySelector(".v2-browse-dialog-secondary")?.addEventListener("click", () => dialog.close());
+  if(!inline)guardDialogDraft(dialog, {
     buttons: [...dialog.querySelectorAll('.v2-browse-dialog-close,.v2-browse-dialog-secondary')],
-    hasDraft: () => textarea.value.length > 0, isBusy: () => sending,
+    hasDraft: () => textarea.value.length > 0, isBusy: () => flight.sending,
     title: 'Discard your cover letter?', message: 'Your draft will be deleted.',
     confirmLabel: 'Discard letter', focusOnKeep: textarea,
     onDiscard: () => drafts.delete(draftKey),
   });
-  const setSending = value => {
-    sending = value; submit.disabled = value; textarea.readOnly = value;
-    dialog.querySelectorAll('.v2-browse-dialog-close,.v2-browse-dialog-secondary').forEach(control=>control.disabled=value);
+  const reflectSending = () => {
+    submit.disabled=flight.sending;textarea.readOnly=flight.sending;
+    dialog.setAttribute('aria-busy',String(flight.sending));
+    submit.textContent=flight.sending?'Submitting…':'Submit application';
+    dialog.querySelectorAll('.v2-browse-dialog-close,.v2-browse-dialog-secondary').forEach(control=>control.disabled=flight.sending);
   };
-  dialog.addEventListener('cancel',event=>{if(sending)event.preventDefault();});
-  dialog.addEventListener('click',event=>{if(sending&&event.target===dialog)event.stopImmediatePropagation();},true);
+  const update=()=>{if(!dialog.isConnected){flight.listeners.delete(update);return;}reflectSending();};
+  flight.listeners.add(update);reflectSending();
+  const setSending=value=>{flight.sending=value;flight.listeners.forEach(listener=>listener());};
+  dialog.addEventListener('cancel',event=>{if(flight.sending)event.preventDefault();});
+  dialog.addEventListener('click',event=>{if(flight.sending&&event.target===dialog)event.stopImmediatePropagation();},true);
   textarea.addEventListener("input", () => {
     counter.textContent = `${textarea.value.length} / ${APPLY_MAX_CHARACTERS}`;
     if (textarea.value) drafts.set(draftKey, textarea.value);
@@ -511,7 +520,8 @@ function createApplyDialog(api, matter, trigger, actions, drafts) {
   });
   dialog.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (sending) return;
+    if (flight.sending) return;
+    if(normalizeId(actions.viewerId?.())!==applicantOwner){status.textContent="Your account changed. Sign in before applying.";return;}
     const note = textarea.value.trim();
     if (note.length < 20) {
       status.textContent = "Add a cover letter of at least 20 characters.";
@@ -533,15 +543,16 @@ function createApplyDialog(api, matter, trigger, actions, drafts) {
         ? `/api/jobs/${encodeURIComponent(target.id)}/apply`
         : `/api/cases/${encodeURIComponent(target.id)}/apply`;
       await api.post(path, { coverLetter: note }, { signal: request.signal });
+      if(normalizeId(actions.viewerId?.())!==applicantOwner)return;
       drafts.delete(draftKey);
-      dialog.close();
+      if(inline)dialog.remove();else dialog.close();
       actions.applied(matter);
     } catch (error) {
       status.textContent = request.signal.aborted ? "We couldn’t confirm your application. Your letter is still here." : error?.message || "The application could not be submitted.";
       setSending(false);
       submit.textContent = "Submit application";
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timeout);setSending(false);
     }
   });
   dialog.addEventListener("close", () => trigger?.focus({ preventScroll: true }), { once: true });
@@ -672,13 +683,15 @@ export function createBrowseView({ api, showToast, invalidateHome, invalidateWor
   let currentFilters = null;
   let currentRoot = null;
   const applicationDrafts = new Map();
+  const applicationRequests = new Map();
+  let currentDetail = null;
   let browseContext = null;
   let refreshRoute = null, returnFocus = "";
   let pendingConfirmation = null;
   let retainedBrowseRoute = "";
   let pendingFilterRefresh = null;
   function hasInteraction() {
-    return Boolean(currentRoot?.isConnected && currentRoot.querySelector(".v2-browse-filter")?.matches(":popover-open"));
+    return Boolean(currentDetail?.isConnected && (currentDetail.querySelector('.v2-browse-application[aria-busy="true"]') || currentDetail.querySelector('.v2-browse-application')?.contains(document.activeElement))) || Boolean(currentRoot?.isConnected && currentRoot.querySelector(".v2-browse-filter")?.matches(":popover-open"));
   }
   window.addEventListener("lpc:v2-route-changed", event => {
     if (pendingConfirmation && event.detail?.name === "browse" && !event.detail.query?.get("matterId")) {
@@ -734,7 +747,7 @@ export function createBrowseView({ api, showToast, invalidateHome, invalidateWor
       browseContext = { id, route: filtersRoute(currentFilters), scrollTop: document.querySelector("[data-v2-route-outlet]")?.scrollTop || 0 };
     },
     viewerId() {
-      return currentSnapshot?.profile?._id || currentSnapshot?.profile?.id || "";
+      return normalizeId(getIdentity()) || currentSnapshot?.profile?._id || currentSnapshot?.profile?.id || "";
     },
     updateFilters(filters) {
       navigateFilters(filters);
@@ -745,8 +758,65 @@ export function createBrowseView({ api, showToast, invalidateHome, invalidateWor
     page(page) {
       navigateFilters({ ...currentFilters, page });
     },
+    async blocked(matter, trigger) {
+      const eligibility = applicationEligibility(matter);
+      if (!(eligibility.blockers || []).some(key => ["profile_photo_required", "paralegal_payout_setup_required"].includes(key))) {
+        showToast(applicationBlockMessage(matter));
+        return;
+      }
+      const owner = normalizeId(getIdentity());
+      const dialog = node("dialog", { className: "v2-browse-dialog", "aria-labelledby": "v2-apply-setup-title", "data-v2-route-dialog": "" });
+      const content = node("div", { className: "v2-browse-setup-content" });
+      const status = node("p", { className: "v2-browse-dialog-status", role: "status", text: "Checking your setup…" });
+      const body = node("div", { className: "v2-browse-setup-body" }, [
+        node("header", {}, [node("h2", { id: "v2-apply-setup-title", text: "Complete your setup" }), dialogCloseButton(dialog)]), content, status,
+      ]);
+      dialog.append(body);
+      const current = () => dialog.isConnected && dialog.open && owner && normalizeId(getIdentity()) === owner;
+      dialog.addEventListener("close", () => { dialog.remove(); if (normalizeId(getIdentity()) === owner) trigger?.focus({ preventScroll: true }); }, { once: true });
+      bindDialogDismiss(dialog);
+      document.querySelector("[data-v2-dialog-host]")?.append(dialog);
+      dialog.showModal();
+      try {
+        const results = await Promise.allSettled([api.get("/api/users/me"), api.get("/api/payments/connect/status")]);
+        if (!current()) return;
+        const auth = await api.get("/api/auth/me");
+        if (!current()) return;
+        if (normalizeId(auth?.user || auth) !== owner) { dialog.close(); return; }
+        const profile = results[0].status === "fulfilled" ? results[0].value?.user || results[0].value : null;
+        if (profile && normalizeId(profile) !== owner) { dialog.close(); return; }
+        const needsProfile = !profile || profileTodos({ complete: true, value: profile }).length || eligibility.blockers.includes("profile_photo_required");
+        if (needsProfile) {
+          const link = node("a", { href: "paralegal-v2.html#/settings?tab=profile", "data-v2-route": "", text: profile ? "Complete profile" : "Review profile" });
+          link.addEventListener("click", () => dialog.close());
+          content.append(link);
+        }
+        const stripe = results[1].status === "fulfilled" ? results[1].value?.readiness : null;
+        const known = stripe && (!stripe.evidenceState || stripe.evidenceState === "verified");
+        if (!known || stripe.ready !== true) {
+          const connect = node("button", { type: "button", text: known ? "Set up Stripe" : "Check Stripe setup" });
+          connect.addEventListener("click", async () => {
+            connect.disabled = true;
+            status.textContent = "Opening Stripe…";
+            try {
+              const auth = await api.get("/api/auth/me");
+              if (!current()) return;
+              if (normalizeId(auth?.user || auth) !== owner) { dialog.close(); return; }
+              await startStripeOnboarding({ isCurrent: current });
+            } catch (error) {
+              if (current()) { status.textContent = error.message || "Stripe could not open. Please try again."; connect.disabled = false; }
+            }
+          });
+          content.append(connect);
+        }
+        status.textContent = !profile || !known ? "Some setup details couldn’t be checked." : content.children.length ? "" : "Your setup is ready. Refresh matters to check this application.";
+      } catch (error) {
+        if (current()) status.textContent = "Your setup couldn’t be checked. Close this window and try again.";
+      }
+    },
+    application(matter){return createApplyDialog(api,matter,null,actions,applicationDrafts,{inline:true,requests:applicationRequests});},
     apply(matter, trigger) {
-      const dialog = createApplyDialog(api, matter, trigger, actions, applicationDrafts);
+      const dialog = createApplyDialog(api, matter, trigger, actions, applicationDrafts,{requests:applicationRequests});
       document.querySelector("[data-v2-dialog-host]")?.append(dialog);
       dialog.showModal();
       dialog.querySelector("textarea")?.focus();
@@ -836,7 +906,7 @@ export function createBrowseView({ api, showToast, invalidateHome, invalidateWor
     clearDrafts() {
       retainedBrowseRoute = "";
       pendingFilterRefresh = null;
-      applicationDrafts.clear();
+      applicationDrafts.clear();applicationRequests.clear();
       browseContext = null;
       returnFocus = "";
       pendingConfirmation = null;
@@ -862,13 +932,14 @@ export function createBrowseView({ api, showToast, invalidateHome, invalidateWor
         return currentRoot;
       }
       pendingFilterRefresh = null;
+      if(snapshot.selected && applicationEligibility(snapshot.selected).ready===true && normalizeId(snapshot.profile)===normalizeId(currentSnapshot?.profile) && currentDetail?.dataset.matterId===listingId(snapshot.selected) && currentDetail.isConnected && hasInteraction())return currentDetail;
       currentSnapshot = snapshot;
       currentFilters = { ...snapshot.filters };
       const requestedMatter = String(route.query.get("matterId") || "").trim();
       if (requestedMatter) {
         const matter = snapshot.selected;
         if (matter) {
-          const detail = detailView(matter, actions);
+          const detail = detailView(matter, actions);currentDetail=detail;
           void api.post(`/api/jobs/${encodeURIComponent(matterId(matter))}/view`, {}).catch(() => { console.warn("[browse] Matter view count could not be recorded."); });
           return detail;
         }
@@ -879,6 +950,7 @@ export function createBrowseView({ api, showToast, invalidateHome, invalidateWor
         return missing;
       }
       writeFiltersToHash(currentFilters);
+      currentDetail=null;
       currentRoot = buildBrowse(snapshot, currentFilters);
       retainedBrowseRoute = filtersRoute(currentFilters);
       return currentRoot;

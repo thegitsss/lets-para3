@@ -76,6 +76,7 @@ export function createAccountApi({ fetchImpl = window.fetch.bind(window), onAuth
     await owner(options); return result;
   }
   return Object.freeze({
+    readOnboarding: options => read("/api/users/me/onboarding",options),
     async readProfile(options) { return accountProfile(await read("/api/users/me", options), options.ownerId); },
     async saveProfile(values, expectedValues, options) { return accountProfile(await write("/api/users/me", "PATCH", { ...values, expectedValues }, options), options.ownerId); },
     async readPublicProfile(options) {

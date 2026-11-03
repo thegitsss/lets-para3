@@ -86,6 +86,10 @@ jobs:
           tests/uploadQuarantine.test.js tests/profileDraftProtection.test.js
           tests/stripeWebhookProtection.test.js tests/stripeWebhookSignature.test.js
           tests/webhookHandling.test.js tests/predeployIndexCompatibility.test.js tests/mobileHomepageImages.test.js
+      - name: Verify onboarding provider and profile preservation contracts
+        run: |
+          node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --runTestsByPath tests/linkedInPhotoImport.test.js tests/linkedInPhotoImportRoutes.test.js
+          node --test tests/resumeImportModel.test.mjs
       - run: npm audit --omit=dev --audit-level=moderate
   browser:
     name: Browser contracts
@@ -119,6 +123,10 @@ jobs:
       - run: npm run build:frontend
       - run: npx playwright test -c playwright.v2-stage1-release.config.cjs
           --fail-on-flaky-tests
+      - name: Verify signup-to-engagement shortcuts
+        env:
+          PW_TEST_SCREENSHOT_NO_FONTS_READY: "1"
+        run: npx playwright test -c tests/playwright/click-reduction/playwright.config.cjs --output=test-results/onboarding --fail-on-flaky-tests
   dependency-review:
     if: github.event_name == 'pull_request'
     name: Dependency review

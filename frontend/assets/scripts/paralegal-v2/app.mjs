@@ -268,6 +268,7 @@ let updatesPage = null;
 async function renderRoute(route, navigation) {
   if (documentReadsPaused || documentHasLeft || leavingProtectedShell) return;
   if (!navigation.isCurrent()) return;
+  if(await setupController?.continueAfterPayouts(route,navigation.isCurrent))return homeView.createLoadingView();
   if (captureClosure()) { leaveForExpiredSession(); return; }
   updatesPage?.destroy(); updatesPage = null;
   conversationsView.leave();

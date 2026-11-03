@@ -1,0 +1,30 @@
+{
+  "role": "attorney",
+  "environment": "local UI with synthetic outcomes",
+  "actions": [
+    "Continue",
+    "Submit registration",
+    "Verify email address",
+    "Verify email",
+    "Sign in to LPC",
+    "Sign in",
+    "Post a Matter",
+    "Build my Matter →",
+    "Confirm and publish Matter",
+    "Hire and charge $976.00"
+  ],
+  "totalIncludingOriginalSignup": 10,
+  "afterOriginalSignup": 8,
+  "exclusions": [
+    "Text fields, dropdowns, checkboxes and file selection",
+    "Stripe setup",
+    "Attorney candidate browsing/review",
+    "Additional applications",
+    "Retries and corrections"
+  ],
+  "externalAuthorization": {
+    "liveProviderVerified": false,
+    "simulatedActions": []
+  },
+  "engagement": "Hire and funding confirmed"
+}

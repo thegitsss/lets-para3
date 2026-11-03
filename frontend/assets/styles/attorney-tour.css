@@ -1,0 +1,10 @@
+/* Attorney tour follows the established four-step LPC welcome tour. */
+:root body.lpc-v2 .attorney-workspace-tour {--v2-ink:var(--av2-ink);--v2-white:var(--av2-bg);--v2-soft:var(--av2-soft);--v2-line:var(--av2-line);--v2-blue-hover:var(--av2-accent);--v2-font-sans:var(--lpc-portal-font-sans,"Sarabun"),sans-serif;}
+:root body.lpc-v2 .attorney-workspace-tour .attorney-tour-feedback {margin:0 0 8px;font:400 12px/1.5 var(--v2-font-sans);color:var(--v2-ink);}
+:root body.lpc-v2 .attorney-workspace-tour .lpc-tour-card:has(.attorney-tour-feedback:not([hidden])) {height:auto;min-height:min(450px,calc(100dvh - 32px));}
+:root body.lpc-v2 .attorney-workspace-tour .lpc-tour-card button {min-width:44px;min-height:44px;}
+:root body.lpc-v2 .attorney-workspace-tour .lpc-tour-card button:disabled {opacity:.6;cursor:wait;}
+:root.theme-dark body.lpc-v2 .attorney-workspace-tour .lpc-tour-card[data-scene="welcome"] {--v2-ink:#263347;}
+@media(max-height:500px) {
+  :root body.lpc-v2 .attorney-workspace-tour .lpc-tour-art .lpc-demo-window {transform:scale(.72);animation:none;}
+}

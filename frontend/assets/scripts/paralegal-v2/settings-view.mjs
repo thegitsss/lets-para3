@@ -1,3 +1,4 @@
+import { importLinkedInPhoto } from '../utils/linkedin-photo-import.mjs';
 import {enableSwipeDelete} from '../utils/swipe-delete.mjs';
 import {normalizeAccent} from '../utils/appearance-controls.mjs';
 import { cropFrame, cropDescriptor, restoreCrop, imageDimensions } from "./photo-crop.mjs";
@@ -361,7 +362,8 @@ function createLoadingView() {
   ]);
 }
 
-export function createSettingsView({ api, getIdentity, showToast, updateIdentity, invalidateHome, invalidateBrowse, invalidateWork, onSessionLost, onClosurePending, resumePresentation, onResumeSaved, onResumeManual, getPhotoReturnFocus }) {
+export function createSettingsView({ api, getIdentity, showToast, updateIdentity, invalidateHome, invalidateBrowse, invalidateWork, onSessionLost, onClosurePending, resumePresentation, onResumeSaved, onResumeManual, getPhotoReturnFocus, onLinkedInPhotoAvailability }) {
+  let linkedInAttempt = null;
   let user = null;
   let preferences = null;
   let root = null;
@@ -1115,11 +1117,37 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     initials.hidden = true;
 
     const fileInput = input({ type: "file", accept: ".jpg,.jpeg,.png,image/jpeg,image/png", hidden: true, "aria-label": "Choose profile photo" });
+    const linkedInPhoto = action('Use LinkedIn photo', {className:'v2-settings-menu-action',role:'menuitem','data-photo-linkedin':'',hidden:true});
+    const linkedInContext = accountContext();
+    void accountTransport('/api/uploads/linkedin-photo/config').then(config=>{
+      assertAccount(linkedInContext);
+      if(config?.enabled===true){linkedInPhoto.hidden=false;onLinkedInPhotoAvailability?.(true);}
+    }).catch(()=>{});
     const menu = node("div", { className: "v2-settings-photo-menu", role: "menu", hidden: true }, [
       action(photoOf(user) ? "Change photo" : "Add photo", { className: "v2-settings-menu-action", role: "menuitem", "data-photo-change": "" }),
       action("Edit", { className: "v2-settings-menu-action", role: "menuitem", hidden: !photoOf(user), "data-photo-edit": "" }),
       action("Remove photo", { className: "v2-settings-menu-action v2-settings-menu-action--danger", role: "menuitem", hidden: !photoOf(user), "data-photo-remove": "" }),
     ]);
+    menu.querySelector('[data-photo-change]').after(linkedInPhoto);
+    linkedInPhoto.addEventListener('click', async () => {
+      closePhotoMenu();
+      if (linkedInAttempt) { const active = linkedInAttempt; linkedInAttempt = null; active.abort(); linkedInPhoto.textContent = 'Use LinkedIn photo'; onLinkedInPhotoAvailability?.(true, linkedInPhoto.textContent); return; }
+      const controller = new AbortController(); linkedInAttempt = controller;
+      linkedInPhoto.textContent = 'Cancel LinkedIn import';
+      onLinkedInPhotoAvailability?.(true, linkedInPhoto.textContent);
+      try {
+        const context = accountContext(), expectedPhotoRevision = user.profilePhotoRevision;
+        const file = await importLinkedInPhoto({
+          start: () => writeAccount('/api/uploads/linkedin-photo/start', 'POST', {}, context),
+          read: async requestId => { assertAccount(context); const result = await accountTransport(`/api/uploads/linkedin-photo/result?expectedOwnerId=${encodeURIComponent(context.ownerId)}&requestId=${encodeURIComponent(requestId)}`); assertAccount(context); return result; },
+          signal: controller.signal,
+        });
+        assertAccount(context);
+        if (photoEditing || profileEditing) { showToast?.('Close the current editor, then import your LinkedIn photo again.'); return; }
+        await openPhotoEditor(file, { editExisting: false, returnFocus: photoButton, expectedPhotoRevision });
+      } catch (error) { if (error.name !== 'AbortError' && !accountStopped) showToast?.(error.message); }
+      finally { if (linkedInAttempt === controller) { linkedInAttempt = null; linkedInPhoto.textContent = 'Use LinkedIn photo'; onLinkedInPhotoAvailability?.(true, linkedInPhoto.textContent); } }
+    });
     const photoWrap = node("div", { className: "v2-settings-photo-wrap" }, [photoButton, fileInput, menu]);
     const refreshPhoto = () => {
       refreshSummary();
@@ -3212,6 +3240,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
   }
 
   function clearAccountDrafts() {
+    linkedInAttempt?.abort(); linkedInAttempt=null;
     documentMenuController?.abort(); documentMenuController = null;
     tabLayoutObserver?.disconnect(); tabLayoutObserver = null;
     resumeImport?.destroy(); resumeImport = null;
@@ -3237,6 +3266,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
   }
 
   function resetView() {
+    linkedInAttempt?.abort(); linkedInAttempt=null;
     documentMenuController?.abort(); documentMenuController = null;
     resumeImport?.destroy(); resumeImport = null;
     leaveSecurity();
@@ -3273,6 +3303,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
       return fresh;
     },
     openSetupPhoto() { profilePanel?.querySelector('input[type="file"][accept*="image"]')?.click(); },
+    openSetupLinkedInPhoto(){const control=profilePanel?.querySelector('[data-photo-linkedin]');if(accountStopped||!control||control.hidden)return false;control.click();return true;},
     hasUnsavedChanges: () => photoEditing || profileSavedRevision !== profileRevision || hasPendingDocuments() || closureSettings?.hasPending() || Boolean(closureAccountState.closure?.pending),
     getPendingClosure: () => closureAccountState.closure?.pending ? { ...closureAccountState.closure } : null,
     discardClosure() { delete closureAccountState.closure; clearClosureProof(); },

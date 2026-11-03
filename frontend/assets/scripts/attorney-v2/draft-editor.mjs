@@ -43,7 +43,7 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
   if (!navigation) step = route.query.get("step") === "describe" || (!id && !route.query.has("step")) ? "describe" : step === "review" ? "review" : "description";
   let errors = {};
   let canvasLayout;
-  let surface, saveStatus, stepHeading, saveReview, recoveringSave=false;
+  let surface, saveStatus, stepHeading, saveReview, editorPublish, editorDisclosure, recoveringSave=false;
   function syncIdentity() {
     if (signal.aborted) return;
     if (state.id) { route.query.set(retained ? "caseDraftId" : "draftId", state.id); route.query.delete("request"); privateState.drafts.set(stateKey(state.id), state); }
@@ -148,7 +148,8 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
     changeStep("description");
     panels.description.querySelector('.av2-draft-step-actions > button:last-child')?.focus({preventScroll:true});
   }:null,
-    confirmationDetails: !navigation ? () => {
+    confirmationDetails: !navigation ? confirmationDetails : null });
+  function confirmationDetails() {
       const cents=dollarCents(state.values.compAmount);if(cents===null)return null;
       const fee=Math.round(cents*.22);
       return node('div',{className:'av2-compose-disclosure','aria-label':'Attorney payment breakdown'},[
@@ -157,7 +158,7 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
         node('strong',{text:`Total when you hire ${currency(cents+fee)}`}),
         node('p',{text:'Publishing does not charge you. You’ll fund the Matter when you hire a paralegal.'})
       ]);
-    } : null });
+  }
   const restrictedActions = [link("Contact support", routeHref("#/help"), "av2-secondary"), link(`Return to ${returnLabel}`, returnHref, "av2-secondary")];
   recovery.root.querySelector(".av2-actions").append(...restrictedActions);
   section.append(publication.root, node("div", {className:"av2-draft-toolbar"}, [nav, recovery.root]), validation, ...Object.values(panels), confirmation, deleted);
@@ -258,6 +259,7 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
     validation.hidden = Boolean(publication?.result) || state.deleted || Boolean(state.restricted);
     taskError.textContent = errors.tasks || "";
     publish.disabled = Boolean(publication?.locked) || state.busy || state.uncertain || state.missing || state.deleted || Object.keys(draftErrors(state.values)).length > 0;
+    if(editorPublish){editorPublish.disabled=Boolean(publication?.locked)||!state.loaded||state.uncertain||state.missing||state.deleted||state.restricted;const details=confirmationDetails();editorDisclosure.replaceChildren(...(details?[details]:[]));}
     exit.disabled = Boolean(publication?.locked) || !state.loaded || state.busy || state.uncertain || state.missing || state.deleted;
     const returnFocused = document.activeElement === returnLink;
     returnLink.hidden = state.loaded && !state.dirty && !state.uncertain && !state.missing && !state.error;
@@ -307,6 +309,18 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
     const actions=panels.description.querySelector('.av2-draft-step-actions');
     actions.before(practical);
     actions.replaceChildren(button('← Back',()=>changeStep('describe'),'av2-secondary'),button('Review Matter →',()=>changeStep('review'),'av2-button'));
+    if(creationHost){
+      actions.classList.add('av2-editor-publish-actions');
+      editorDisclosure=node('div');
+      editorPublish=button('Confirm and publish Matter',async()=>{
+        if(!surface.prepareReview())return;
+        collect();errors=draftErrors(state.values);render();
+        if(Object.keys(errors).length){const key=Object.keys(errors)[0];if(key==='tasks')tasks.querySelector('input')?.focus();else surface.focus(key);return;}
+        await publication.confirmFromEditor();
+      },'av2-button');
+      actions.before(editorDisclosure,node('p',{className:'av2-compose-funding-note',text:'Paralegals can apply after publication. Compensation locks after the first application.'}));
+      actions.lastChild.replaceWith(editorPublish);
+    }
     publish.textContent='Publish Matter';
     panels.review.querySelector('.av2-draft-step-actions > button').textContent='← Back';
     saveReview=button('Save draft',async()=>{await session.save();},'av2-compose-example');publish.before(saveReview);

@@ -506,6 +506,7 @@ router.use(verifyToken);
 router.use(requireApproved);
 router.use(requireRole("admin", "attorney", "paralegal"));
 router.use(require("../utils/requestOwner"));
+router.use("/linkedin-photo", require("./linkedInPhotoImport"));
 
 /**
  * POST /api/uploads/presign

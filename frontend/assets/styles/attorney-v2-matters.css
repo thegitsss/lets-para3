@@ -240,3 +240,5 @@
  .av2 [aria-label="Matter funds summary"] .av2-matter-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); }
  .av2 [data-workspace-work] .av2-matter-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+@media(max-width:760px){.av2 [data-hiring] .av2-button{min-height:44px}}

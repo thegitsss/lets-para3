@@ -1,0 +1,32 @@
+{
+  "role": "paralegal",
+  "environment": "local UI with synthetic outcomes",
+  "actions": [
+    "Continue",
+    "Submit application",
+    "Verify email address",
+    "Verify email",
+    "Sign in to LPC",
+    "Sign in",
+    "Autofill from my résumé",
+    "Add or edit profile photo",
+    "Submit photo for approval",
+    "Save and continue",
+    "Medical Record Chronology",
+    "Submit application"
+  ],
+  "totalIncludingOriginalSignup": 12,
+  "afterOriginalSignup": 10,
+  "exclusions": [
+    "Text fields, dropdowns, checkboxes and file selection",
+    "Stripe setup",
+    "Attorney candidate browsing/review",
+    "Additional applications",
+    "Retries and corrections"
+  ],
+  "externalAuthorization": {
+    "liveProviderVerified": false,
+    "simulatedActions": []
+  },
+  "engagement": "Attorney hire and funding; no additional Paralegal acceptance click"
+}

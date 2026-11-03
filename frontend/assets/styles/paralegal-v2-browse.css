@@ -795,3 +795,6 @@ body.lpc-v2 .v2-browse-kicker {color:var(--v2-muted);font-weight:400;letter-spac
 :root body.lpc-v2 .v2-browse-error .v2-browse-empty p { margin:8px 0 16px; color:var(--v2-muted); font-size:calc(14 * var(--lpc-reading-unit, 1px)); }
 :root body.lpc-v2 .v2-browse-error button { min-height:32px; padding:5px 12px; border:1px solid var(--v2-line); border-radius:6px; background:var(--v2-white); color:var(--v2-ink); font:400 calc(13 * var(--lpc-reading-unit, 1px))/calc(20 * var(--lpc-reading-unit, 1px)) var(--v2-font-sans); cursor:pointer; }
 :root body.lpc-v2 .v2-browse-error button:hover { background:var(--v2-soft); }
+
+.v2-browse-dialog.v2-browse-application { width:100%; max-width:740px; max-height:none; overflow:visible; margin:24px 0 0; border:0; border-top:1px solid var(--browse-line); background:transparent; }
+.v2-browse-dialog.v2-browse-application form { padding:24px 0 0; }
