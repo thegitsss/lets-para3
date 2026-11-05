@@ -114,6 +114,13 @@ test.each(['attorney', 'paralegal'])('%s signup, email verification, information
   expect(approved.status).toBe(200);
   applicant = await User.findById(applicant._id);
   expect(applicant.status).toBe('approved');
+  if (role === 'attorney') {
+    const preview = await request(app).get(`/api/admin/email/approval-preview?userId=${applicant._id}`).set('Cookie', cookie(admin));
+    expect(preview.status).toBe(200);
+    expect(preview.text).toContain('You’re in.');
+    expect(preview.text.match(/src="data:image\/png;base64,/g)).toHaveLength(7);
+    expect(preview.text).not.toContain('src="cid:');
+  }
   expect((await request(app).get(`/api/${role}/dashboard`).set('Cookie', cookie(applicant))).status).toBe(200);
   expect((await request(app).get('/api/admin/pending-users').set('Cookie', cookie(applicant))).status).toBe(403);
 });
@@ -268,7 +275,7 @@ test('only exhausted or uncertain admission mail needs owner attention and delib
 });
 
 
-test.each(['attorney', 'paralegal'])('%s approval before verification emails a usable verification action, then allows first sign-in', async role => {
+test.each(['attorney', 'paralegal'])('%s approval allows sign-in while email verification separately confirms the address', async role => {
   const applicant = new User({ firstName: 'Synthetic', lastName: 'Applicant', email: `unverified-${role}@example.test`,
     password: 'Synthetic applicant passphrase', role, status: 'pending', emailVerified: false, yearsExperience: 3,
     paralegalQualification: 'law_firm_experience', barNumber: 'CA-12345', barState: 'CA', attorneyGoodStanding: true });
@@ -279,13 +286,47 @@ test.each(['attorney', 'paralegal'])('%s approval before verification emails a u
   expect(response.status).toBe(200);
   const email = sendEmail.mock.calls.find(call => call[0] === applicant.email && call[1] === 'Welcome to Let’s-ParaConnect');
   expect(email).toBeTruthy();
-  expect(email[2]).toContain('>Verify your email</a>');
-  expect(email[2]).not.toContain('>Sign in</a>');
+  expect(email[2]).toContain('>Confirm email address</a>');
+  expect(email[2]).toContain('Sign in to your workspace &nbsp; →</a>');
   const token = decodeURIComponent(email[2].match(/token=([^&\s"'<>]+)/)[1]);
   expect(jwt.decode(token)).not.toHaveProperty('exp');
-  expect(email[2]).toContain('Privacy Policy');
+  if (role === 'attorney') {
+    for (const label of ['LinkedIn', 'Facebook', 'Instagram']) expect(email[2]).toContain(`aria-label="${label}"`);
+  } else {
+    for (const label of ['LinkedIn', 'Facebook', 'Instagram']) expect(email[2]).toContain(`aria-label="${label}"`);
+    expect(email[3].attachments).toHaveLength(4);
+  }
   const login = () => request(app).post('/api/auth/login').send({ email: applicant.email, password: 'Synthetic applicant passphrase' });
-  expect((await login()).status).toBe(403);
+  const approvedLogin = await login();
+  expect(approvedLogin.status).toBe(200);
+  expect(approvedLogin.body.user.role).toBe(role);
+  expect((await User.findById(applicant._id)).emailVerified).toBe(false);
   expect((await request(app).post('/api/auth/verify-email').send({ token })).body).toMatchObject({ ok: true, accountStatus: 'approved' });
   expect((await login()).status).toBe(200);
+});
+
+test.each(['attorney', 'paralegal'])('%s approval after signup correction uses the corrected inbox and the current verification proof', async role => {
+  const applicant = new User({
+    firstName: 'Synthetic', lastName: 'Corrected applicant', email: `original-${role}@example.test`,
+    pendingEmail: `corrected-${role}@example.test`, emailVerificationVersion: 3,
+    password: 'Synthetic corrected applicant passphrase', role, status: 'pending', emailVerified: false,
+    yearsExperience: 3, paralegalQualification: 'law_firm_experience', barNumber: 'CA-12345',
+    barState: 'CA', attorneyGoodStanding: true,
+  });
+  applicant.resumeURL = `paralegal-resumes/${applicant._id}/resume.pdf`;
+  await applicant.save();
+  const response = await decide(applicant, 'approve', {
+    reviewedRevision: admissionRevision(applicant), ...(role === 'paralegal' ? { qualificationReview } : {}),
+  });
+  expect(response.status).toBe(200);
+  const mail = sendEmail.mock.calls.find(call => call[1] === 'Welcome to Let’s-ParaConnect');
+  expect(mail[0]).toBe(applicant.pendingEmail);
+  expect(sendEmail.mock.calls.filter(call => call[0] === applicant.email)).toHaveLength(0);
+  const token = decodeURIComponent(mail[2].match(/token=([^&\s"'<>]+)/)[1]);
+  expect(jwt.decode(token)).toMatchObject({ email: applicant.pendingEmail, ev: 3 });
+  expect((await request(app).post('/api/auth/verify-email').send({ token })).status).toBe(200);
+  const saved = await User.findById(applicant._id);
+  expect(saved).toMatchObject({ email: applicant.pendingEmail, pendingEmail: null, status: 'approved', emailVerified: true });
+  expect((await request(app).post('/api/auth/login').send({ email: applicant.pendingEmail, password: 'Synthetic corrected applicant passphrase' })).status).toBe(200);
+  expect((await request(app).post('/api/auth/login').send({ email: applicant.email, password: 'Synthetic corrected applicant passphrase' })).status).toBe(401);
 });

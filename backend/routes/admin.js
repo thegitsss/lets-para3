@@ -332,11 +332,11 @@ function buildUnsubscribeToken(user) {
 }
 
 function buildApprovalEmailHtml(user) {
-  return accountEmails.applicationApproved(user, LOGIN_URL).html;
+  return accountEmails.applicationApproved(user, LOGIN_URL, undefined, { preview: true }).html;
 }
 
 function buildAttorneyApprovalEmailHtml(user) {
-  return accountEmails.applicationApproved(user, LOGIN_URL).html;
+  return accountEmails.applicationApproved(user, LOGIN_URL, undefined, { preview: true }).html;
 }
 
 function buildCompleteProfileEmailHtml(user) {

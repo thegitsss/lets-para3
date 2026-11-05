@@ -90,3 +90,42 @@ test("generated plain-text mail retains paragraph boundaries and the action dest
   const decoded = plainPart.replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/gi, (_match, hex) => String.fromCharCode(parseInt(hex, 16)));
   expect(decoded).toContain("Hello,\r\n\r\nYour file is ready.\r\n\r\nView file (https://example.invalid/files/123)");
 });
+
+test('the approved Attorney email reaches SMTP without rewrapping or losing its inline images', async () => {
+  const mail = require('../email/accountTemplates').applicationApproved({ role: 'attorney', firstName: 'Synthetic', emailVerified: true }, 'https://example.invalid/login.html');
+  const result = await sendEmail('recipient@example.invalid', mail.subject, mail.html, options({ text: mail.text, attachments: mail.attachments, throwOnError: true }));
+  expect(result.accepted).toEqual(['recipient@example.invalid']);
+  expect(messages).toHaveLength(1);
+  expect(messages[0]).toContain('Content-Type: multipart/related');
+  for (const image of mail.attachments) expect(messages[0]).toContain(`Content-ID: <${image.cid}>`);
+  const html = messages[0].split('Content-Type: text/html')[1].split(/\r\n--/)[0]
+    .replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/gi, (_match, hex) => String.fromCharCode(parseInt(hex, 16)));
+  expect(html.match(/<html /g)).toHaveLength(1);
+  expect(html).toContain('class="social-links"');
+  expect(html).not.toContain('lpc-mountain.png');
+  expect(html).toContain('Sign in to your workspace');
+});
+
+test.each(['paralegal-approval', 'attorney-received', 'paralegal-received', 'verification', 'verified'])('%s retains its complete editable HTML and inline icons through SMTP', async kind => {
+  const emails = require('../email/accountTemplates');
+  const person = { firstName: 'Synthetic', role: 'paralegal', status: 'pending', emailVerified: false };
+  const templates = {
+    'paralegal-approval': () => emails.applicationApproved(person, 'https://example.invalid/login.html', 'https://example.invalid/verify-email.html?token=synthetic'),
+    'attorney-received': () => emails.applicationReceived({ ...person, role: 'attorney' }),
+    'paralegal-received': () => emails.applicationReceived(person),
+    verification: () => emails.emailVerification(person, 'https://example.invalid/verify-email.html?token=synthetic'),
+    verified: () => emails.applicationEmailVerified(person),
+  };
+  const mail = templates[kind]();
+  const result = await sendEmail('recipient@example.invalid', mail.subject, mail.html, options({ text: mail.text, attachments: mail.attachments, throwOnError: true }));
+  expect(result.accepted).toEqual(['recipient@example.invalid']);
+  expect(messages).toHaveLength(1);
+  expect(messages[0]).toContain('Content-Type: multipart/related');
+  for (const image of mail.attachments) expect(messages[0]).toContain(`Content-ID: <${image.cid}>`);
+  const html = messages[0].split('Content-Type: text/html')[1].split(/\r\n--/)[0]
+    .replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/gi, (_match, hex) => String.fromCharCode(parseInt(hex, 16)));
+  expect(html.match(/<html /g)).toHaveLength(1);
+  expect(html).toContain('data-lpc-email="letter"');
+  expect(html).toContain('class="social-links"');
+  expect(html).not.toContain('lpc-mountain.png');
+});

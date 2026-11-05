@@ -593,6 +593,8 @@
       text-underline-offset: 4px;
     }
 
+    #changeSignupEmail[hidden] { display:none; }
+
     .signup-confirmation a[href^="mailto:"] { color:var(--auth-accent); text-underline-offset:4px; }
 
     button.signup-confirmation__home {
@@ -951,6 +953,7 @@
           <p class="signup-confirmation__email" id="signupConfirmationEmail"></p>
           <div class="signup-confirmation__actions">
             <button id="resendSignupVerification" class="signup-confirmation__home" type="button" hidden>Resend verification email</button>
+            <a id="changeSignupEmail" class="signup-confirmation__home" href="change-signup-email.html" hidden>Use a different email address</a>
           </div>
           <p id="signupVerificationStatus" role="status" aria-live="polite"></p>
           <p>Need to make a change? Contact <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a>.</p>
@@ -999,7 +1002,7 @@
 
   <script src="assets/scripts/signup-upload.js"></script>
   <script src="assets/scripts/email-domain-policy.js"></script>
-  <script src="assets/scripts/signup-controller.js"></script>
+  <script src="assets/scripts/signup-controller.js?v=20261105-email-correction"></script>
   <script src="assets/scripts/signup-bar-help.js"></script>
   <script src="assets/scripts/signup-policy.js"></script>
   <script type="module" src="assets/scripts/web-vitals-rum.js"></script>

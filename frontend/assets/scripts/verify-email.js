@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
       status.textContent = message;
       status.setAttribute("role", state === "error" ? "alert" : "status");
     }
+    document.getElementById("verificationChangeEmail").hidden = state === "success";
     document.getElementById("verificationRecovery").hidden = state !== "error";
     confirmForm.hidden = !retry;
     if (action) {

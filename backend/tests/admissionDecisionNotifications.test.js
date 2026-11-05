@@ -20,6 +20,15 @@ test.each(['attorney', 'paralegal'])('%s pending notice recovers after a route s
   expect(await mail.processNotices()).toBe(1);
   expect(await Notice.findById(notice._id)).toMatchObject({ status: 'accepted', attempts: 1 });
   expect(sendEmail).toHaveBeenCalledWith(user.email, expect.any(String), expect.any(String), expect.objectContaining({ messageId: `<lpc-admission-decision.${notice._id}@lets-paraconnect.com>` }));
+  const [, , html, options] = sendEmail.mock.calls[0];
+  if (role === 'attorney') {
+    expect(html).toContain('You’re in.');
+    expect(options.attachments).toHaveLength(7);
+    for (const image of options.attachments) expect(html).toContain(`cid:${image.cid}`);
+  } else {
+    expect(html).toContain('Build a profile that highlights your experience');
+    expect(options.attachments).toHaveLength(4);
+  }
   expect(await mail.processNotices()).toBe(0);
 });
 test('an immediate send cannot drain another applicant notice', async () => {

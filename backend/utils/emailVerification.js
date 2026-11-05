@@ -9,12 +9,13 @@ function normalizeEmail(value = "") {
   return String(value || "").trim().toLowerCase();
 }
 
-function buildEmailVerificationToken({ userId, email, expiresIn }) {
+function buildEmailVerificationToken({ userId, email, expiresIn, version = 0 }) {
   return jwt.sign(
     {
       purpose: "verify-email",
       uid: String(userId),
       email: normalizeEmail(email),
+      ev: version,
       jti: crypto.randomBytes(32).toString("hex"),
     },
     process.env.JWT_SECRET,
@@ -33,6 +34,7 @@ async function createEmailVerificationLink({ user, email }) {
   const verifyToken = buildEmailVerificationToken({
     userId: user._id.toString(),
     email: targetEmail,
+    version: Number(user.emailVerificationVersion || 0),
   });
   const payload = jwt.decode(verifyToken);
   await EmailVerificationToken.create({
@@ -47,7 +49,9 @@ async function sendVerificationEmail({ user, email }) {
   const verifyUrl = await createEmailVerificationLink({ user, email: targetEmail });
   if (!verifyUrl) return;
   const message = accountEmails.emailVerification(user, verifyUrl);
-  const result = await sendEmail(targetEmail, message.subject, message.html, { text: message.text, throwOnError: true });
+  const result = await sendEmail(targetEmail, message.subject, message.html, {
+    text: message.text, attachments: message.attachments, throwOnError: true,
+  });
   if (result?.error) throw new Error(result.message || "Verification email delivery failed");
   return result;
 }

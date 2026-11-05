@@ -263,6 +263,7 @@ const userSchema = new Schema(
     resetPasswordExpiresAt: { type: Date, default: null, select: false },
     resetPasswordRequestedAt: { type: Date, default: null, select: false },
     emailVerified: { type: Boolean, default: false },
+    emailVerificationVersion: { type: Number, default: 0, min: 0 },
     phoneNumber: { type: String, default: null },
     phoneVerified: { type: Boolean, default: false },
 
