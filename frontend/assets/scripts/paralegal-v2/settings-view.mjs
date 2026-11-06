@@ -1,3 +1,5 @@
+import { createCalendarConnections } from '../connected-workspace/calendar-connections.mjs';
+import { createConnectedApi } from '../connected-workspace/native-api.mjs';
 import { importLinkedInPhoto } from '../utils/linkedin-photo-import.mjs';
 import {enableSwipeDelete} from '../utils/swipe-delete.mjs';
 import {normalizeAccent} from '../utils/appearance-controls.mjs';
@@ -415,6 +417,8 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
   let profilePanel = null;
   const profileElements = selector => [...(profilePanel?.querySelectorAll(selector) || [])];
   let preferencesPanel = null;
+  let connectionsPanel = null;
+  let calendarController = null;
   let beforeUnloadBound = false;
   const renderers = new Map();
   const documentStates = new Map();
@@ -3006,7 +3010,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
 
   function settingsHeader() {
     const tabs = node("div", { className: "v2-settings-tabs", role: "tablist", "aria-label": "Settings" });
-    [["profile", "Profile"], ["preferences", "Preferences"], ["security", "Security"]].forEach(([name, label]) => {
+    [["profile", "Profile"], ["preferences", "Preferences"], ["security", "Security"], ["connections", "Connections"]].forEach(([name, label]) => {
       const link = node("a", {
         id: `v2-settings-tab-${name}`,
         className: "v2-settings-tab",
@@ -3045,7 +3049,8 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     profilePanel = renderProfilePanel();
     securityPanel = node("section", { className: "v2-settings-panel", role: "tabpanel", id: "v2-settings-security", "aria-labelledby": "v2-settings-tab-security", hidden: true }, [node("div", { className: "v2-settings-local-loading", text: "Open Security to manage your sign-in and payout settings." })]);
     preferencesPanel = renderPreferencesPanel();
-    root.append(profilePanel, securityPanel, preferencesPanel);
+    connectionsPanel = node("section", { className: "v2-settings-panel", role: "tabpanel", id: "v2-settings-connections", "aria-labelledby": "v2-settings-tab-connections", hidden: true });
+    root.append(profilePanel, securityPanel, preferencesPanel, connectionsPanel);
     if (!beforeUnloadBound) {
       beforeUnloadBound = true;
       window.addEventListener("beforeunload", (event) => {
@@ -3058,7 +3063,8 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
   }
 
   function activateTab(name) {
-    const safe = ["profile", "security", "preferences"].includes(name) ? name : "profile";
+    const safe = ["profile", "security", "preferences", "connections"].includes(name) ? name : "profile";
+    if (safe !== 'connections') { calendarController?.abort(); calendarController = null; connectionsPanel?.replaceChildren(); }
     const pageTitle = root?.querySelector(".v2-settings-header h1");
     if (pageTitle) pageTitle.textContent = "Settings";
     root?.querySelectorAll("[data-settings-tab]").forEach((tab) => {
@@ -3066,13 +3072,25 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
       tab.setAttribute("aria-selected", String(current));
       tab.tabIndex = current ? 0 : -1;
     });
-    [["profile", profilePanel], ["security", securityPanel], ["preferences", preferencesPanel]].forEach(([tab, panel]) => {
+    [["profile", profilePanel], ["security", securityPanel], ["preferences", preferencesPanel], ["connections", connectionsPanel]].forEach(([tab, panel]) => {
       if (panel) panel.hidden = tab !== safe;
     });
     root?.querySelectorAll("[data-settings-feedback]").forEach((feedback) => {
       feedback.hidden = feedback.dataset.settingsFeedback !== safe;
     });
-    if (safe === "security") root.readiness = loadSecurity();
+    if (safe === 'connections') {
+      leaveSecurity();
+      if (!connectionsPanel.firstChild) {
+        calendarController = new AbortController();
+        const ownerId = accountContext().ownerId;
+        const api = createConnectedApi({ ownerId, role: 'paralegal', signal: calendarController.signal, onAccessLost: () => onSessionLost?.() });
+        const calendars = createCalendarConnections({ ownerId, api, signal: calendarController.signal });
+        connectionsPanel.append(calendars);
+        connectionsPanel.readiness = calendars.readiness;
+      }
+      root.readiness = connectionsPanel.readiness;
+    }
+    else if (safe === "security") root.readiness = loadSecurity();
     else { leaveSecurity(); root.readiness = Promise.resolve(); }
     return safe;
   }
@@ -3081,7 +3099,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     const requested = String(route?.query?.get("tab") || "").toLowerCase();
     const section = String(route?.query?.get("section") || "").toLowerCase();
     if (section === "payments" || section === "blocked" || section === "sessions" || section === "password" || section === "verification" || section === "passkeys" || section === "closure") return "security";
-    return ["profile", "security", "preferences"].includes(requested) ? requested : "profile";
+    return ["profile", "security", "preferences", "connections"].includes(requested) ? requested : "profile";
   }
 
   function afterMount(route, attempt = 0, { suppressIntro = false } = {}) {
@@ -3240,6 +3258,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
   }
 
   function clearAccountDrafts() {
+    calendarController?.abort(); calendarController = null;
     linkedInAttempt?.abort(); linkedInAttempt=null;
     documentMenuController?.abort(); documentMenuController = null;
     tabLayoutObserver?.disconnect(); tabLayoutObserver = null;
@@ -3266,6 +3285,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
   }
 
   function resetView() {
+    calendarController?.abort(); calendarController = null; connectionsPanel = null;
     linkedInAttempt?.abort(); linkedInAttempt=null;
     documentMenuController?.abort(); documentMenuController = null;
     resumeImport?.destroy(); resumeImport = null;
@@ -3308,7 +3328,7 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
     getPendingClosure: () => closureAccountState.closure?.pending ? { ...closureAccountState.closure } : null,
     discardClosure() { delete closureAccountState.closure; clearClosureProof(); },
     clearDrafts: clearAccountDrafts,
-    leave() { leaveSecurity(); resumeImport?.close(); document.querySelector("dialog.v2-photo-crop-dialog[open]")?.close("leave"); if (accountStopped) return; if (profileEditing) finishProfileEdit(); scheduleProfileAutosave(true); },
+    leave() { calendarController?.abort(); calendarController = null; connectionsPanel?.replaceChildren(); leaveSecurity(); resumeImport?.close(); document.querySelector("dialog.v2-photo-crop-dialog[open]")?.close("leave"); if (accountStopped) return; if (profileEditing) finishProfileEdit(); scheduleProfileAutosave(true); },
     invalidate() {
       if (hasPendingSettings()) return false;
       coreInvalidated = true;

@@ -157,6 +157,21 @@
 .av2-tasks-index .av2-task-row .av2-preview[open] > summary::after { transform:rotate(225deg); margin-top:3px; }
 .av2-tasks-index .av2-task-row .av2-preview[open] { padding-top:12px; }
 .av2-tasks-index .av2-task-paging { margin-top:12px; }
+/* The month view uses the same calendar owner and date-cell grammar as Paralegal Home. */
+.av2 .av2-tasks-index .av2-private-notes > .av2-month-calendar {--v2-line:var(--av2-line);--v2-ink:var(--av2-ink);--v2-muted:var(--av2-muted);--v2-blue-hover:var(--av2-accent);--v2-font-sans:var(--lpc-portal-font-sans);margin:0;padding:0!important;border:0;font:400 .875rem/1.428571 var(--lpc-portal-font-sans),sans-serif;}
+.av2 .av2-tasks-index .av2-month-calendar .pv2-calendar-header {flex-wrap:wrap;gap:16px 8px;}
+.av2 .av2-tasks-index .av2-month-calendar .pv2-calendar-controls {margin-left:auto;}
+.av2 .av2-tasks-index .av2-month-calendar .pv2-calendar-period {margin:0;font:500 calc(13 * var(--lpc-reading-unit,1px))/calc(20 * var(--lpc-reading-unit,1px)) var(--lpc-portal-font-sans),sans-serif;}
+.av2 .av2-month-calendar .pv2-calendar-control {color:var(--av2-muted);text-decoration:none;}
+.av2 .av2-month-calendar .pv2-calendar-control:hover {color:var(--av2-ink);}
+.av2 .av2-month-calendar .pv2-calendar-date-button {color:var(--av2-ink);text-decoration:none;}
+.av2 .av2-month-calendar .pv2-calendar-date-button[aria-current=date] .pv2-calendar-date {color:var(--av2-accent);font-weight:600;}
+.av2 .av2-month-calendar .av2-month-jump {position:relative;}
+.av2 .av2-month-calendar .av2-month-jump > summary {display:flex;align-items:center;min-height:44px;padding:0;list-style:none;cursor:pointer;}
+.av2 .av2-month-calendar .av2-month-jump > summary::-webkit-details-marker {display:none;}
+.av2 .av2-month-calendar .av2-month-jump-form {position:absolute;top:100%;left:0;z-index:3;display:grid;gap:8px;min-width:200px;padding:10px;border:1px solid var(--av2-line);border-radius:6px;background:var(--av2-bg);box-shadow:0 5px 16px #10243f14;}
+
+
 /* Notes stay visible, with a quiet break from the task list. */
 .av2-tasks-index .av2-private-notes { margin-top:56px; padding-top:40px; border-top:1px dotted var(--av2-line); }
 .av2-tasks-index .av2-private-notes > .av2-card { margin-top:0; }

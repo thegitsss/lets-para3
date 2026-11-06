@@ -363,7 +363,7 @@ export async function secureFetch(url, opts = {}) {
     // Registration and email recovery intentionally work before a member has a session.
     // Keep the session check for every protected mutation, including noRedirect callers.
     const isPublicAuthRequest = method === "POST" && requestUrl.origin === window.location.origin &&
-      ["/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification"].includes(requestUrl.pathname);
+      ["/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification", "/api/auth/signup-email"].includes(requestUrl.pathname);
     if (!isLogout && !isPublicAuthRequest && typeof window !== "undefined" && typeof window.refreshSession === "function") {
       const activeSession = await window.refreshSession();
       if (!activeSession) {

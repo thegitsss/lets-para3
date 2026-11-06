@@ -1396,7 +1396,7 @@
 }
 @media (max-width: 760px) {
   .v2-settings-navigation { flex-wrap: wrap; gap: 0 12px; }
-  .v2-settings-navigation .v2-settings-tabs { width: auto; gap: 14px; }
+  .v2-settings-navigation .v2-settings-tabs { width: 100%; flex-shrink: 1; gap: 14px; }
   .v2-settings-header-feedback { padding-block: 8px; }
 }
 

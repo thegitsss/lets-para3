@@ -94,6 +94,7 @@ async function draftProfile(ownerId) {
   const { draftProfileDefaults } = await import('../../frontend/assets/scripts/attorney-v2/draft-profile.mjs');
   return draftProfileDefaults(profile || {});
 }
+router.use('/transcribe', require('./matterDictation'));
 router.get('/defaults', asyncHandler(async(req,res)=>{
   if(req.query.expectedOwnerId !== String(req.user.id))return res.sendStatus(403);
   res.json({ownerId:String(req.user.id),...await draftProfile(req.user.id)});

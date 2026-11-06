@@ -21,6 +21,7 @@ const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const User = require("../models/User");
 const EmailVerificationToken = require("../models/EmailVerificationToken");
+const signupEmailRoutes = require("./signupEmail");
 const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
@@ -1208,7 +1209,7 @@ router.post(
     // Email: registration received
     try {
       const email = accountEmails.applicationReceived(user);
-      await sendEmail(user.email, email.subject, email.html, { text: email.text });
+      await sendEmail(user.email, email.subject, email.html, { text: email.text, attachments: email.attachments });
     } catch (error) {
       authLogger.warn("[auth] registration email delivery failed", {
         userId: String(user._id),
@@ -1287,6 +1288,7 @@ router.post(
       },
     });
 
+    signupEmailRoutes.rememberSignup(req, res, user);
     res.json({ msg: "Registered successfully. Await admin approval.", emailVerified: user.emailVerified === true, verificationEmailStatus });
   })
 );
@@ -1858,6 +1860,7 @@ router.post("/logout", verifyToken.optional, csrfProtection, asyncHandler(async 
 // POST /api/auth/resend-verification
 // POST /api/auth/verify-email  { token }
 // ----------------------------------------
+router.use("/signup-email", signupEmailRoutes({ recordPasswordFailure: recordCurrentPasswordLoginFailure, dummyPasswordHash: DUMMY_PASSWORD_HASH }));
 router.post(
   "/resend-verification",
   csrfProtection,
@@ -1877,7 +1880,7 @@ router.post(
     try {
       await sendVerificationEmail({
         user,
-        email: isPendingEmail ? user.pendingEmail : user.email,
+        email: isPendingEmail || (!user.emailVerified && user.pendingEmail) ? user.pendingEmail : user.email,
       });
     } catch (error) {
       authLogger.warn("[auth] verification email resend failed", {
@@ -1928,9 +1931,11 @@ router.post(
         const proofExpiry = Number.isFinite(payload.exp) ? { $gt: new Date() } : null;
         const proof = await EmailVerificationToken.findOne({ tokenHash, userId: payload.uid, expiresAt: proofExpiry }).session(session);
         if (!user || isDeactivatedUser(user) || !proof) throw invalid();
+        if (Number(payload.ev || 0) !== Number(user.emailVerificationVersion || 0)) throw invalid();
         const verifiedEmail = normalizeEmail(payload.email);
+        if (!user.emailVerified && user.pendingEmail && normalizeEmail(user.pendingEmail) !== verifiedEmail) throw invalid();
         const alreadyVerified = user.emailVerified === true && normalizeEmail(user.email) === verifiedEmail;
-        const notifyApplication = !user.emailVerified && user.role === "paralegal" && user.status === "pending";
+        const notifyApplication = !user.emailVerified && ["attorney", "paralegal"].includes(user.role) && user.status === "pending";
         const emailWillChange = normalizeEmail(user.pendingEmail) === verifiedEmail && normalizeEmail(user.email) !== verifiedEmail;
         if (proof.consumedAt) {
           if (!alreadyVerified) throw invalid();

@@ -60,10 +60,11 @@ for (const role of ["attorney", "paralegal"]) test(`${role}: email confirmation 
   expect(await AuthSession.countDocuments({ userId: user._id })).toBe(0);
 });
 
-test("approval alone cannot sign in; verification then enables the approved account", async () => {
-  const user = await fixture("attorney", { status: "approved" });
+test.each(["attorney", "paralegal"])("approved %s can sign in before confirming email without falsely confirming it", async (role) => {
+  const user = await fixture(role, { status: "approved" });
   const login = () => request(app).post("/api/auth/login").send({ email: user.email, password: PASSWORD });
-  expect((await login()).status).toBe(403);
+  expect((await login()).status).toBe(200);
+  expect((await User.findById(user._id)).emailVerified).toBe(false);
   expect((await verify(await issue(user))).body.accountStatus).toBe("approved");
   expect((await login()).status).toBe(200);
 });
@@ -88,8 +89,8 @@ test("resending does not invalidate an earlier unexpired link", async () => {
   expect((await verify(latest)).body.alreadyVerified).toBe(true);
 });
 
-test("paralegal review link is emailed after verification, once across simultaneous confirmations", async () => {
-  const user = await fixture("paralegal");
+test.each(["attorney", "paralegal"])("%s gets a neutral email-confirmed message once across simultaneous confirmations", async (role) => {
+  const user = await fixture(role);
   const token = await issue(user);
   expect(sendEmail.mock.calls[0][2]).not.toContain("/paralegal-admission.html");
   const responses = await Promise.all([verify(token), verify(token)]);
@@ -102,8 +103,10 @@ test("paralegal review link is emailed after verification, once across simultane
   const confirmations = sendEmail.mock.calls.filter(call => call[1] === "Your email is verified");
   expect(confirmations).toHaveLength(1);
   expect(confirmations[0][0]).toBe(user.email);
-  expect(confirmations[0][2]).toContain("/paralegal-admission.html");
-  expect(confirmations[0][3].text).toContain("Learn more about our application review");
+  expect(confirmations[0][2]).not.toContain("/paralegal-admission.html");
+  expect(confirmations[0][3].text).toContain("Thanks for confirming your email address.");
+  expect(confirmations[0][3].text).not.toMatch(/application|review|sign in/i);
+  expect(confirmations[0][3].attachments).toHaveLength(3);
   expect((await User.findById(user._id)).status).toBe("pending");
 });
 
@@ -121,12 +124,12 @@ test("review confirmation delivery failure does not undo successful verification
   expect(await SignupReviewNotice.findOne({ userId: user._id }).lean()).toMatchObject({ status: "accepted", attempts: 2 });
 });
 
-test("review email is limited to pending paralegal applications", async () => {
+test("confirmation is staged for initial pending member signups, while other states retain their existing verification flow", async () => {
   for (const [role, status] of [["attorney", "pending"], ["paralegal", "approved"], ["paralegal", "denied"]]) {
     const user = await fixture(role, { status, email: `${role}.${status}@example.test` });
     expect((await verify(await issue(user))).status).toBe(200);
   }
-  expect(await SignupReviewNotice.countDocuments()).toBe(0);
+  expect(await SignupReviewNotice.countDocuments()).toBe(1);
   expect(sendEmail.mock.calls.filter(call => call[1] === "Your email is verified")).toHaveLength(0);
 });
 
@@ -214,14 +217,16 @@ test("verification commits without waiting for SMTP and retains unknown delivery
   expect(await SignupReviewNotice.findOne({ userId: user._id }).lean()).toMatchObject({ status: "unknown", attempts: 1 });
 });
 
-test("saved review notice is skipped if the email or approval status changes before delivery", async () => {
+test("a neutral confirmation remains accurate if approval happens before its worker delivery", async () => {
   const user = await fixture("paralegal");
   await verify(await issue(user));
   await User.updateOne({ _id: user._id }, { $set: { status: "approved" } });
   sendEmail.mockClear();
+  sendEmail.mockResolvedValue({ accepted: [user.email] });
   await reviewDelivery.processNotices();
-  expect(sendEmail).not.toHaveBeenCalled();
-  expect(await SignupReviewNotice.findOne({ userId: user._id }).lean()).toMatchObject({ status: "skipped" });
+  expect(sendEmail).toHaveBeenCalledTimes(1);
+  expect(sendEmail.mock.calls[0][3].text).not.toMatch(/application|review|sign in/i);
+  expect(await SignupReviewNotice.findOne({ userId: user._id }).lean()).toMatchObject({ status: "accepted" });
 });
 
 for (const role of ["attorney", "paralegal"]) test(`${role}: an issued verification link remains valid a year later`, async () => {

@@ -242,6 +242,8 @@ export function createHomeView({ api, showToast, getIdentity = () => null, rende
   let currentRoot = null, currentUser = "", controller = null, pendingContent = null, paintTimer = null;
   let sessionRevision = 0, explicitRefresh = false;
   const desktopHistory = new Map();
+  let calendarWeeks = new Map();
+  let calendarController = new AbortController();
   const deadlineReads = new Map();
   let deadlineController = new AbortController();
   let desktop = { view: "overview", selected: "", search: "", sort: "priority", board: false }, desktopRoute = "";
@@ -289,7 +291,9 @@ export function createHomeView({ api, showToast, getIdentity = () => null, rende
     deadlineReads.set(rangeKey, value);
     return value;
   }
+  const hasCalendarDrafts = () => [...calendarWeeks.values()].some(week => week.dirty || week.uncertain || week.saveTask);
   const interacting = () => {
+    if (hasCalendarDrafts()) return true;
     if (currentRoot?.isConnected && currentRoot.dataset.homeLoading === "true") {
       // Disabled loading controls cannot retain an abandoned read. Protect real
       // input and open overlays while allowing its verified replacement to load.
@@ -354,7 +358,7 @@ export function createHomeView({ api, showToast, getIdentity = () => null, rende
     createLoadingView() { return node("section", { className: "v2-home ph-home", "aria-label": "Loading Home" }, [node("p", { role: "status", text: "Loading your work…" })]); },
     async render({ route, force = false, isCurrent = () => true, onRetry } = {}) {
       const userId = key();
-      if (currentUser !== userId) { explicitRefresh = false; invalidate(); sessionRevision += 1; currentRoot?.replaceChildren(); currentRoot = null; currentUser = userId; desktopHistory.clear(); desktop = { view: "overview", selected: "", search: "", sort: "priority", board: false }; desktopRoute = ""; }
+      if (currentUser !== userId) { calendarWeeks.clear(); calendarWeeks = new Map(); calendarController.abort(); calendarController = new AbortController(); explicitRefresh = false; invalidate(); sessionRevision += 1; currentRoot?.replaceChildren(); currentRoot = null; currentUser = userId; desktopHistory.clear(); desktop = { view: "overview", selected: "", search: "", sort: "priority", board: false }; desktopRoute = ""; }
       const routeChanged = Boolean(route && route.key !== desktopRoute);
       if (routeChanged) {
         if (desktopRoute) {
@@ -375,7 +379,9 @@ export function createHomeView({ api, showToast, getIdentity = () => null, rende
       // that read; the save still re-verifies the account and expected values.
       const availabilityIsValid=()=>session===sessionRevision && userId===key() && currentRoot?.isConnected && parseRouteHash(window.location.hash).key===route?.key;
       const retry = () => { explicitRefresh = true; invalidate(); onRetry?.(); };
-      const actions = { renderAccountSetup, userId, retry, onSessionLost, showToast, isValid: valid, availabilityIsValid, desktop,
+      const actions = { calendarApi: api, calendarWeeks,
+        calendarOwnsSession: () => session === sessionRevision && userId === key(),
+        aiSignal: calendarController.signal, renderAccountSetup, userId, retry, onSessionLost, showToast, isValid: valid, availabilityIsValid, desktop,
         snapshot: null,
         renderWorkContext: options => renderWorkContext?.({ ...options, isValid: () => valid() && (!options.isValid || options.isValid()), onChanged: retry }),
         markNotificationRead: item => valid() && markNotificationRead?.(item),
@@ -462,7 +468,10 @@ export function createHomeView({ api, showToast, getIdentity = () => null, rende
     refreshAvailability,
     deferRefresh: setRefreshNotice,
     hasInteraction: interacting,
+    hasDrafts: hasCalendarDrafts,
     clearProtected() {
+      calendarWeeks.clear(); calendarWeeks = new Map();
+      calendarController.abort(); calendarController = new AbortController();
       sessionRevision += 1; invalidate(); window.clearTimeout(paintTimer);
       currentRoot?.querySelector(".ph-content")?.__workspaceDispose?.();
       currentRoot?.querySelectorAll("dialog[open]").forEach(dialog => dialog.close());

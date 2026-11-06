@@ -31,6 +31,7 @@ function createEmailNoticeDelivery({ Notice, prepare, prefix }) {
           attempted = true;
           const result = await sendEmail(email.to, email.subject, email.html, {
             throwOnError: true, ...(email.text ? { text: email.text } : {}), headers: { "Auto-Submitted": "auto-generated" },
+            ...(Array.isArray(email.attachments) ? { attachments: email.attachments } : {}),
             messageId: `<lpc-${prefix}.${notice._id}@lets-paraconnect.com>`,
           });
           const includesRecipient = list => Array.isArray(list) && list.some(value => String(value?.address || value).toLowerCase() === email.to.toLowerCase());

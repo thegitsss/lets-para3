@@ -2,9 +2,12 @@ import { createMonthlyNotes } from "./monthly-notes.mjs";
 import { node, link, button, recoveryButton, setRecovery } from "./dom.mjs";
 import { calendarDate, dateKey, weekKey, moveWeek, readWeek, sameNotes } from "./private-state.mjs";
 
-export function createWeeklyNotes(route, { api, signal, privateState, ownerId }) {
+export function createWeeklyNotes(route, { api, signal, privateState, ownerId, dayOnly = false, onChange = () => {}, onClose }) {
   if (route.query.get("calendar") === "month") return createMonthlyNotes(route, { api, signal, privateState });
   const key = weekKey(route.query.get("week")) || weekKey();
+  const selectedDay = route.query.get("day");
+  if (dayOnly && (!calendarDate(selectedDay) || weekKey(selectedDay) !== key)) throw new TypeError("Invalid calendar note date");
+  const focusInput = () => inputs.find(input => input.dataset.av2NoteDay === selectedDay && input.isConnected) || inputs.find(input => input.isConnected);
   const date = calendarDate(key), end = calendarDate(key); end.setDate(end.getDate() + 6);
   const section = node("section", { className: "av2-card", "aria-label": "Personal notes", "data-av2-region": "weekly-notes" });
   const status = node("p", { role: "status", className: "av2-notice lpc-note-status", "data-routine": "true" });
@@ -20,7 +23,19 @@ export function createWeeklyNotes(route, { api, signal, privateState, ownerId })
   const jump = node("input", { type: "date", value: key, "aria-label": "Choose a date for personal notes" });
   const jumpForm = node("form", { className: "av2-actions" }, [jump, node("button", { type: "submit", className: "av2-secondary", text: "Go to week" })]);
   jumpForm.addEventListener("submit", event => { event.preventDefault(); const week = weekKey(jump.value); if (week) location.hash = queryFor(week); });
+  if (dayOnly) {
+    section.classList.add('pv2-calendar-notes');
+    section.setAttribute('aria-label', 'Calendar notes');
+    section.dataset.calendarNotes = selectedDay;
+    const selectedDate = calendarDate(selectedDay).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const heading = node('div', { className: 'pv2-note-heading' }, [node('span', { className: 'pv2-note-date', text: selectedDate })]);
+    section.append(node('div', { className: 'av2-card-heading' }, [heading, refresh]), content, status, conflict);
+    section.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !event.isComposing && !composing) { event.preventDefault(); onClose?.(); }
+    }, { signal });
+  } else {
   section.append(node("div", { className: "av2-card-heading" }, [node("h2", { text: "Personal notes" }), refresh]), node("p", { className: "av2-week-range", text: `${date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}` }), nav, jumpForm, node("p", { className: "av2-muted", text: "Changes save automatically." }), status, content, conflict, node("div", { className: "av2-actions lpc-note-history" }, [undo, redo]));
+  }
   for (const type of ["focusin", "input", "pointerdown", "keydown", "compositionstart"]) section.addEventListener(type, () => { interactionGeneration += 1; }, { capture: true, signal });
   signal.addEventListener("abort", () => {
     clearTimeout(timer);
@@ -29,7 +44,7 @@ export function createWeeklyNotes(route, { api, signal, privateState, ownerId })
     if (ownsDraft() && !busy && !composing && draft.dirty && !draft.saveTask && !latest && !paused && !draft.uncertain) void saveNotes();
   }, { once: true });
   function ownsDraft() { return Boolean(draft && privateState.weeks.get(key) === draft); }
-  function say(text, routine = false) { if(signal.aborted)return; status.textContent = text; status.dataset.routine = String(routine); }
+  function say(text, routine = false) { if(signal.aborted)return; status.textContent = text; status.dataset.routine = String(routine); if (dayOnly) status.dataset.quiet = String(routine && text === "Saved."); onChange(); }
   function history() { if (draft) { draft.undo ||= []; draft.redo ||= []; } }
   function controls() {
     history();
@@ -56,9 +71,10 @@ export function createWeeklyNotes(route, { api, signal, privateState, ownerId })
       });
       return control;
     });
-    content.replaceChildren(node("div", { className: "av2-weekly-grid", "data-av2-weekly-grid": "" }, inputs.map((control, index) => {
+    content.replaceChildren(node("div", { className: "av2-weekly-grid", "data-av2-weekly-grid": "" }, inputs.flatMap((control, index) => {
       const day = calendarDate(key); day.setDate(day.getDate() + index);
-      return node("label", { className: "av2-note-day" }, [node("span", { text: day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }) }), control]);
+      if (dayOnly && dateKey(day) !== selectedDay) return [];
+      return node("label", { className: "av2-note-day" }, [node("span", { ...(dayOnly ? { className: "pv2-note-label" } : {}), text: day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }) }), control]);
     })));
     controls();
   }
@@ -70,8 +86,8 @@ export function createWeeklyNotes(route, { api, signal, privateState, ownerId })
       conflict.append(node("details", { className: "av2-preview" }, [node("summary", { text: `Saved ${day.toLocaleDateString(undefined, { weekday: "long" })} note` }), node("p", { className: "av2-preserve-text", text: note || "No saved note." })]));
     });
     conflict.append(node("div", { className: "av2-actions" }, [
-      button("Use saved notes", () => { draft.notes = [...server.notes]; draft.baseline = [...server.notes]; draft.revision = server.revision; draft.dirty = false; draft.uncertain = false; draft.undo = []; draft.redo = []; latest = null; paused = false; conflict.hidden = true; say("Saved notes loaded.", true); render(); inputs[0].focus(); }),
-      button("Keep my edits", () => { draft.notes = draft.notes.map((note, index) => note === draft.baseline[index] ? server.notes[index] : note); draft.baseline = [...server.notes]; draft.revision = server.revision; draft.dirty = !sameNotes(draft.notes, server.notes); draft.uncertain = false; draft.undo = []; draft.redo = []; latest = null; paused = false; conflict.hidden = true; say("Saving your edits; other days keep their latest notes.", true); render(); inputs[0].focus(); schedule(); }),
+      button("Use saved notes", () => { draft.notes = [...server.notes]; draft.baseline = [...server.notes]; draft.revision = server.revision; draft.dirty = false; draft.uncertain = false; draft.undo = []; draft.redo = []; latest = null; paused = false; conflict.hidden = true; say("Saved notes loaded.", true); render(); focusInput()?.focus(); }),
+      button("Keep my edits", () => { draft.notes = draft.notes.map((note, index) => note === draft.baseline[index] ? server.notes[index] : note); draft.baseline = [...server.notes]; draft.revision = server.revision; draft.dirty = !sameNotes(draft.notes, server.notes); draft.uncertain = false; draft.undo = []; draft.redo = []; latest = null; paused = false; conflict.hidden = true; say("Saving your edits; other days keep their latest notes.", true); render(); focusInput()?.focus(); schedule(); }),
     ])); controls();
   }
   function denyAccess() {

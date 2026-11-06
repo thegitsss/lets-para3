@@ -50,6 +50,16 @@ function routeDeclarations(filePath, routerName = "router", seen = new Set()) {
     const target = require.resolve(path.resolve(path.dirname(filePath), match[3]));
     for (const route of routeDeclarations(target, "router", seen)) routes.push(joinRoute(match[2], route));
   }
+  const localImports = new Map();
+  for (const match of source.matchAll(/const\s+(\w+)\s*=\s*require\(["'](\.[^"']+)["']\)/g)) {
+    localImports.set(match[1], require.resolve(path.resolve(path.dirname(filePath), match[2])));
+  }
+  const namedNested = new RegExp(`${escaped}\\.use\\(\\s*(["'])([^"']+)\\1\\s*,\\s*(\\w+)(?=\\s*[\\(\\)])`, "g");
+  for (const match of source.matchAll(namedNested)) {
+    const target = localImports.get(match[3]);
+    if (!target) continue;
+    for (const route of routeDeclarations(target, "router", seen)) routes.push(joinRoute(match[2], route));
+  }
   return routes;
 }
 

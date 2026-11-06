@@ -244,6 +244,11 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
         if(!message&&value)delete errors.compAmount;
       }
       control.setAttribute("aria-invalid", String(Boolean(errors[key]))); errorNodes[key].textContent = errors[key] || "";
+      const needsInput=Boolean(creationHost&&step==='description'&&['title','description','practiceArea','state','compAmount'].includes(key)&&!value.trim());
+      const field=control.closest('.av2-field');field.toggleAttribute('data-needs-input',needsInput);
+      let needed=field.querySelector('.av2-field-needed');
+      if(needsInput&&!needed){needed=node('span',{className:'av2-field-needed',text:' · Needed'});field.querySelector('label').append(needed);}
+      if(needed)needed.hidden=!needsInput;
     }
     const taskSnapshot = JSON.stringify({tasks:state.values.tasks,manual:manualEntry()});
     if (taskSnapshot !== renderedTasks && !tasks.contains(document.activeElement)) renderTasks();

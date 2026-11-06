@@ -1,3 +1,5 @@
+import { createCalendarConnections } from '../connected-workspace/calendar-connections.mjs';
+import { createConnectedApi } from '../connected-workspace/native-api.mjs';
 import {enableSwipeDelete} from '../utils/swipe-delete.mjs';
 import {enhanceAppearanceRow} from '../utils/appearance-controls.mjs';
 import { node, page, link, button } from "./dom.mjs";
@@ -26,6 +28,14 @@ function input(id, value, attrs = {}) { const element = node("input", { id, name
 function fieldset(title, children) { return node("fieldset", { className: "av2-account-section" }, [node("legend", { text: title }), node("div", { className: "av2-account-fields" }, children)]); }
 
 export function createAccountView(route, identity, context = {}) {
+  if (route.query.get('tab') === 'connections') {
+    const view = page('Settings'); view.classList.add('av2-account');
+    const api = createConnectedApi({ ownerId: identity.id, role: 'attorney', signal: context.signal });
+    const calendars = createCalendarConnections({ ownerId: identity.id, api, signal: context.signal });
+    view.append(accountNavigation('connections'), calendars);
+    view.readiness = calendars.readiness;
+    return view;
+  }
   if (isClosureRoute(route)) return createClosureView(route, identity, context);
   if (isBlockedRoute(route)) return createBlockedView(route, identity, context);
   if (isSecurityRoute(route)) return createSecurityView(route, identity, context);

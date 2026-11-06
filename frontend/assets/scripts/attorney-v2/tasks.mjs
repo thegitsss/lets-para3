@@ -3,7 +3,9 @@ import { safeMatterOrigin, withMatterReturn } from "./matter-return.mjs";
 import { node, page, button, link, recoveryButton, setRecovery } from "./dom.mjs";
 import { readTaskPage } from "./private-state.mjs";
 import { createMatterPicker } from './matter-picker.mjs';
-import { createWeeklyNotes } from "./weekly-notes.mjs";
+import { readOwnedInventory } from './owned-inventory.mjs';
+import { dates } from './read-model.mjs';
+import { renderHomeCalendar } from '../paralegal-v2/home-calendar.mjs';
 
 const objectId = (value) => /^[a-f0-9]{24}$/i.test(value || "");
 function message(error, action, linked = false) {
@@ -176,10 +178,30 @@ export function createTasks(route, identity, { api, signal, privateState }) {
       else checked.hidden = false;
     }
   });
-  const weekly = createWeeklyNotes(route, { api, signal, privateState, ownerId: identity.id });
-  const notesSection = node("section", { className: "av2-private-notes", "aria-label": "Personal notes" }, [weekly]);
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const calendarState=privateState.calendar;
+  if(route.query.get('calendar')==='month')calendarState.calendarView='month';
+  if(/^\d{4}-\d{2}$/.test(route.query.get('month')||''))calendarState.calendarAnchor=route.query.get('month')+'-01';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(route.query.get('day')||'')){calendarState.calendarSelected=route.query.get('day');calendarState.calendarNotesDay=route.query.get('day');}
+  const notesSection=node('section',{className:'av2-private-notes','aria-label':'Notes'});
+  const calendarApi={get:(path,options)=>api.get(path,options),request:(path,options)=>{
+    if(path!=='/api/users/me/weekly-notes'||options.method!=='PUT')throw new Error('Unsupported calendar action');
+    return api.saveWeeklyNotes(JSON.parse(options.body),{ownerId:identity.id,signal:options.signal});
+  }};
+  const calendar=renderHomeCalendar({page:notesSection,model:{today,activeWork:[],sources:{dashboard:{complete:false,state:'loading'}}},actions:{desktop:calendarState,calendarApi,calendarRole:'attorney',calendarWeeks:privateState.weeks,calendarOwnsSession:()=>!signal.aborted,aiSignal:signal,userId:identity.id,isValid:()=>!signal.aborted,calendarMatterHref:matter=>`/matters/${matter.id}/deadlines`},node,link,button:(text,action,className,attrs={})=>{const control=button(text,action,className);for(const[key,value]of Object.entries(attrs))control.setAttribute(key,value);return control;}});
+  calendar.classList.add('av2-month-calendar');
+  signal.addEventListener('abort',()=>calendar.__calendarDispose?.(),{once:true});
   view.append(notesSection);
-  view.readiness = Promise.allSettled([load(), associationPicker.readiness, weekly.readiness]);
-  view.refreshWeeklyNotesAfterSessionCheck = options => weekly.refreshAfterSessionCheck?.(options);
+  async function loadCalendar(){
+    try {
+      const inventory=await readOwnedInventory(api,identity.id,{signal,views:['active']});
+      if(signal.aborted)return;
+      const activeWork=inventory.items.filter(item=>item.paralegal||item.paralegalId).map(item=>({id:item.id||item._id,title:item.title,deadline:dates.matterValue(item)}));
+      calendar.updateModel({today,activeWork,sources:{dashboard:{complete:true}}});
+    } catch { if(!signal.aborted) { calendar.updateModel({today,activeWork:[],sources:{dashboard:{complete:false,state:'error'}}}); retryCalendar.hidden=false; } }
+  }
+  const retryCalendar=button('Retry Matter deadlines',()=>{retryCalendar.hidden=true;void loadCalendar();},'av2-text-link');retryCalendar.hidden=true;notesSection.append(retryCalendar);
+  view.readiness = Promise.allSettled([load(), associationPicker.readiness,loadCalendar()]);
+  view.refreshWeeklyNotesAfterSessionCheck = options => calendar.refreshAfterSessionCheck?.(options);
   return view;
 }

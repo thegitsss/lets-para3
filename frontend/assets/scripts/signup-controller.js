@@ -1037,6 +1037,7 @@ form.addEventListener("submit", async e => {
                 signupConfirmationEmail.textContent = email;
             }
             document.getElementById("resendSignupVerification").hidden = verified;
+      document.getElementById("changeSignupEmail").hidden = verified;
             signupConfirmation.hidden = false;
             signupConfirmationTitle.focus();
             window.scrollTo({

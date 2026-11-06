@@ -9,9 +9,9 @@ async function stage(user, session) {
   await Notice.updateOne({ userId: user._id }, { $setOnInsert: { emailHash: emailHash(user.email) } }, { upsert: true, session });
 }
 async function prepare(notice) {
-  const user = await User.findById(notice.userId).select("email emailVerified role status disabled deleted suspended").lean();
-  if (!user || user.role !== "paralegal" || user.status !== "pending" || !user.emailVerified || user.disabled || user.deleted || user.suspended || emailHash(user.email) !== notice.emailHash) return null;
-  return { to: user.email, ...accountEmails.applicationEmailVerified() };
+  const user = await User.findById(notice.userId).select("email emailVerified firstName role status disabled deleted suspended").lean();
+  if (!user || !["attorney", "paralegal"].includes(user.role) || !user.emailVerified || user.disabled || user.deleted || user.suspended || emailHash(user.email) !== notice.emailHash) return null;
+  return { to: user.email, ...accountEmails.applicationEmailVerified(user) };
 }
 const delivery = require("./emailNoticeDelivery").createEmailNoticeDelivery({ Notice, prepare, prefix: "signup-review" });
 module.exports = { stage, prepare, ...delivery };

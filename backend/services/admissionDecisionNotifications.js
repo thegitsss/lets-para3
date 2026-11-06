@@ -5,23 +5,24 @@ const accountEmails = require('../email/accountTemplates');
 const { createEmailVerificationLink } = require('../utils/emailVerification');
 const { revision } = require('./communicationRetry');
 const emailHash = value => createHash('sha256').update(String(value).trim().toLowerCase()).digest('hex');
+const deliveryAddress = user => user.emailVerified === false && user.pendingEmail ? user.pendingEmail : user.email;
 
 async function stage(user, decision, session) {
   if (!session?.inTransaction()) throw new Error('Admission mail requires the account decision transaction.');
   await Notice.updateOne({ userId: user._id, auditIndex: user.audit.length }, {
-    $setOnInsert: { decision, emailHash: emailHash(user.email) },
+    $setOnInsert: { decision, emailHash: emailHash(deliveryAddress(user)) },
   }, { upsert: true, session });
 }
 async function prepare(notice) {
-  const user = await User.findById(notice.userId).select('email emailVerified firstName lastName role status audit disabled deleted suspended').lean();
+  const user = await User.findById(notice.userId).select('email pendingEmail emailVerified emailVerificationVersion firstName lastName role status audit disabled deleted suspended').lean();
   if (!user || user.disabled || user.deleted || user.suspended || user.status !== notice.decision ||
-      !['attorney', 'paralegal'].includes(user.role) || emailHash(user.email) !== notice.emailHash ||
+      !['attorney', 'paralegal'].includes(user.role) || emailHash(deliveryAddress(user)) !== notice.emailHash ||
       user.audit?.[notice.auditIndex - 1]?.action !== notice.decision ||
       user.audit.slice(notice.auditIndex).some(entry => ['approved', 'denied'].includes(entry.action))) return null;
   const loginUrl = `${(process.env.EMAIL_BASE_URL || 'https://www.lets-paraconnect.com').replace(/\/$/, '')}/login.html`;
   const verificationUrl = notice.decision === 'approved' && user.emailVerified === false
-    ? await createEmailVerificationLink({ user, email: user.email }) : undefined;
-  return { to: user.email, ...(notice.decision === 'approved'
+    ? await createEmailVerificationLink({ user, email: deliveryAddress(user) }) : undefined;
+  return { to: deliveryAddress(user), ...(notice.decision === 'approved'
     ? accountEmails.applicationApproved(user, loginUrl, verificationUrl) : accountEmails.applicationDenied(user)) };
 }
 const delivery = require('./emailNoticeDelivery').createEmailNoticeDelivery({ Notice, prepare, prefix: 'admission-decision' });
