@@ -430,7 +430,7 @@
       text-align: center;
     }
 
-    #attorneyPricingText { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; text-align: left; }
+    #attorneyPricingText { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; margin-top: 12px; text-align: left; }
     #attorneyPricingAccepted { flex: 0 0 16px; width: 16px; height: 16px; min-height: 16px; margin: 2px 0 0; padding: 0; }
 
     .attorney-submit-legal a {
@@ -929,6 +929,7 @@
 
             <div id="attorneyConfirmWrap" hidden>
               <label class="attorney-standing"><input id="attorneyGoodStanding" type="checkbox" /><span>I confirm that I am licensed to practice law and in good standing with the state bar selected above.</span></label>
+              <label class="attorney-standing attorney-submit-legal" id="attorneyPricingText" hidden><input id="attorneyPricingAccepted" name="attorneyPricingAccepted" type="checkbox" disabled /><span>$400 minimum per matter, paid to your paralegal. A 22% platform fee applies.</span></label>
             </div>
             </div>
             <div class="turnstile-wrap" aria-hidden="true">
@@ -945,9 +946,8 @@
 
 
             <div id="signupSubmitActions" class="signup-submit-actions" hidden>
-            <label class="attorney-standing attorney-submit-legal" id="attorneyPricingText" hidden><input id="attorneyPricingAccepted" name="attorneyPricingAccepted" type="checkbox" disabled /><span>$400 minimum per matter, paid to your paralegal. A 22% platform fee applies.</span></label>
+            
               <div class="signup-submit-row">
-                <button id="editSignupBasics" type="button" aria-label="Back to account details" title="Back" hidden><span aria-hidden="true">‹</span></button>
                 <button id="submitBtn" class="btn" type="submit" form="signupForm" data-public-action="primary" data-action-shape="control">Submit registration</button>
               </div>
             </div>

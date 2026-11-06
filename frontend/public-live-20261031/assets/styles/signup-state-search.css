@@ -1,10 +1,4 @@
-.signup-state-search{display:flow-root;width:100%}
-.signup-state-search>select[hidden]{display:none!important}
-.signup-state-search>.select-field{display:block;cursor:text;font-family:Sarabun,sans-serif;font-weight:300;color:#27394d}
-.signup-state-options{position:fixed;z-index:3000;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:auto;padding:4px;border:1px solid #dfe6ef;border-radius:8px;background:#fff;box-shadow:0 8px 24px #27394d20;color:#27394d;font:300 14px/1.4 Sarabun,sans-serif}
-.signup-state-options[hidden]{display:none}
-.signup-state-option{display:flex;align-items:center;box-sizing:border-box;min-height:44px;padding:10px 10px;border-radius:4px;cursor:pointer;overflow-wrap:anywhere}
-.signup-state-option:is(:hover,.is-active){background:#eef3fb}
-.signup-state-option[aria-selected=true]{font-weight:500}
-.signup-state-empty{padding:12px 10px;color:#52647b}
-@media(max-width:768px){.signup-state-options{font-size:16px}}
+.signup-state-search { display: flow-root; width: 100%; }
+.signup-state-search > select[hidden] { display: none !important; }
+.signup-state-search > .select-field { display: block; padding-right: 36px; cursor: text; }
+.signup-state-search input::-webkit-calendar-picker-indicator { opacity: 0; }
