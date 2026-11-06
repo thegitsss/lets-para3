@@ -81,10 +81,10 @@ describe("Auth workflows", () => {
     expect(user.termsAcceptedAt).toBeInstanceOf(Date);
     expect(user.privacyAcknowledgedAt).toBeInstanceOf(Date);
 
-    const registrationEmail = sendEmail.mock.calls.find((call) => call[1] === "Your LPC application was received");
+    const registrationEmail = sendEmail.mock.calls.find((call) => call[1] === "Registration received — Let’s-ParaConnect");
     expect(registrationEmail).toBeTruthy();
-    expect(registrationEmail[2]).toContain("We’ve received your application");
-    expect(registrationEmail[3].text).toContain("You can sign in once your email is verified and your application is approved.");
+    expect(registrationEmail[2]).toContain("Thanks for registering with Let’s-ParaConnect.");
+    expect(registrationEmail[3].text).toContain("You can sign in after your registration is approved.");
 
     const verificationEmail = sendEmail.mock.calls.find((call) => call[1] === "Verify your email");
     expect(verificationEmail).toBeTruthy();
