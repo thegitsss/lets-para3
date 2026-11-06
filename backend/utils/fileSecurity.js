@@ -116,36 +116,6 @@ function validateMatterFileBuffer({ buffer, mimeType, filename = "", extension =
   return { mimeType: mime, extension: ext };
 }
 
-function createMatterFileInspector({ mimeType, filename, maximum = require("./matterFilePolicy").MAX_MATTER_FILE_BYTES } = {}) {
-  const mime = normalizeMimeType(mimeType), extension = extensionFromFilename(filename);
-  if (!isExtensionAllowedForMime(extension, mime)) throw Object.assign(new Error("The file extension does not match its declared type."), { code: "FILE_EXTENSION_MISMATCH", statusCode: 400 });
-  const text = ["text/plain", "text/csv"].includes(mime), office = mime.startsWith("application/vnd.openxmlformats-officedocument.");
-  const decoder = text ? new TextDecoder("utf-8", { fatal: true }) : null;
-  let size = 0, prefix = Buffer.alloc(0), tail = Buffer.alloc(0), contentTypes = false, directory = false;
-  const invalid = () => { throw Object.assign(new Error("The file contents do not match its declared type."), { code: "FILE_SIGNATURE_MISMATCH", statusCode: 400 }); };
-  return {
-    write(value) {
-      const chunk = Buffer.from(value); size += chunk.length;
-      if (size > maximum) throw Object.assign(new Error("This document exceeds the Matter file size limit."), { code: "FILE_TOO_LARGE", statusCode: 413 });
-      if (prefix.length < 8) prefix = Buffer.concat([prefix, chunk.subarray(0, 8 - prefix.length)]);
-      if (text) { if (chunk.includes(0)) invalid(); try { decoder.decode(chunk, { stream: true }); } catch { invalid(); } }
-      if (office) {
-        const data = tail.length ? Buffer.concat([tail, chunk]) : chunk;
-        contentTypes ||= data.includes(Buffer.from("[Content_Types].xml"));
-        directory ||= data.includes(Buffer.from(mime.includes("wordprocessingml") ? "word/" : mime.includes("spreadsheetml") ? "xl/" : "ppt/"));
-        tail = Buffer.from(data.subarray(-32));
-      }
-    },
-    finish(expectedBytes) {
-      if (!size || expectedBytes !== undefined && size !== expectedBytes) throw Object.assign(new Error("The stored document size could not be confirmed."), { code: "FILE_SIZE_CHANGED", statusCode: 409 });
-      if (text) { try { decoder.decode(); } catch { invalid(); } }
-      else if (office) { if (!startsWith(prefix, [0x50, 0x4b, 0x03, 0x04]) || !contentTypes || !directory) invalid(); }
-      else if (!matchesDeclaredFileType(prefix, mime)) invalid();
-      return { mimeType: mime, extension, size };
-    },
-  };
-}
-
 async function bodyToBuffer(body) {
   if (!body) return Buffer.alloc(0);
   if (Buffer.isBuffer(body)) return body;
@@ -240,7 +210,6 @@ async function assertObjectMalwareSafe(options = {}) {
 }
 
 module.exports = {
-  createMatterFileInspector,
   ALLOWED_MATTER_MIME_TYPES,
   BLOCKED_SCAN_RESULT,
   CLEAN_SCAN_RESULT,

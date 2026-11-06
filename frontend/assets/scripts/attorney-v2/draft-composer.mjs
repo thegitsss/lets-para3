@@ -1,13 +1,11 @@
 import {createDraftUpdater} from './draft-updater.mjs';
 import {createDraftDictation} from './draft-dictation.mjs';
-import {createClioPostingEntry} from '../connected-workspace/native-clio.mjs';
-import {createConnectedApi} from '../connected-workspace/native-api.mjs';
 import {node,button} from './dom.mjs';
 import {draftPractices,draftStates,draftExperience} from './draft-options.mjs';
 import {validDraftDate,dollarCents} from '../matter-draft-contract.mjs';
 const content = v => ({title:v.title,description:v.description,tasks:v.tasks,practiceArea:v.practiceArea,state:v.state,sourceDescription:v.sourceDescription,compAmount:v.compAmount,deadline:v.deadline,appliedSourceDescription:v.appliedSourceDescription,experience:v.experience,requirements:v.requirements});
-export function createDraftComposer({api,ownerId,signal,values,edit,go,available,memory,canvas=false,retainSource=false,beforeClioNavigate,clioDraftId}) {
-  let pending=false, proposal=null, baseline=null, failed=false, updater, voice, clio;
+export function createDraftComposer({api,ownerId,signal,values,edit,go,available,memory,canvas=false,retainSource=false}) {
+  let pending=false, proposal=null, baseline=null, failed=false, updater, voice;
   const intro=node('fieldset',{className:'av2-card av2-draft-fields av2-compose-intro','data-draft-step':'describe',tabindex:-1});
   const brief=node('textarea',{id:'av2-compose-brief',rows:canvas?3:5,maxlength:4000,placeholder:canvas?'Organize medical records for this Wednesday…':'Organize approximately 1,200 pages of medical records and prepare a chronology highlighting treatment dates, providers, diagnoses, and gaps in care.'});
   function fitBrief(){
@@ -83,7 +81,6 @@ export function createDraftComposer({api,ownerId,signal,values,edit,go,available
   if(canvas)manual.replaceChildren(node('span',{className:'av2-compose-manual-label',text:manual.textContent}));
   voice=createDraftDictation({api,ownerId,signal,brief,available,onState:()=>update()});
   intro.append(node('h2',{text:canvas?'Start a new Matter.':'What do you need help with?'}),node('label',{for:brief.id,text: canvas?'Write or dictate your notes. We’ll put them in order.':'Describe the work in your own words. You don’t need to format anything yet.'}),...(canvas?[node('div',{className:'av2-compose-notes'},[brief,voice.root])]:[brief,voice.root]),examples,status,node('div',{className:'av2-actions'},[build,manual]));
-  if(beforeClioNavigate){clio=createClioPostingEntry({ownerId,signal,api:createConnectedApi({ownerId,role:'attorney',signal}),beforeNavigate:beforeClioNavigate,returnDraftId:clioDraftId});intro.append(clio.root);}
   const refine=button('Refine draft',()=>void generate(true),'av2-secondary');
   refinePanel.append(node('label',{for:instruction.id,text:'What would you like to change?'}),instruction,refine,refinementStatus,preview,node('div',{className:'av2-actions'},[accept,button('Cancel',()=>{refinePanel.hidden=true;launch.setAttribute('aria-expanded','false');launch.focus();},'av2-compose-example')]));
   if(canvas)updater=createDraftUpdater({api,ownerId,signal,values,edit,available,memory,brief,isShape:()=>brief.closest('.av2-living-canvas')?.dataset.creationStep==='description'});
@@ -94,7 +91,6 @@ export function createDraftComposer({api,ownerId,signal,values,edit,go,available
     examples.querySelectorAll('button').forEach(control=>control.disabled=disabled||pending||voice?.busy);
     brief.readOnly=pending||disabled;accept.disabled=disabled||pending;
     voice?.update(disabled||pending);
-    clio?.update(disabled||pending||voice?.busy);
     intro.setAttribute('aria-busy',String(pending));refinePanel.setAttribute('aria-busy',String(pending));updater?.update();
   }
   return {intro,brief,updater,examples,build,manual,status,refinePanel,launch,update,fitBrief};

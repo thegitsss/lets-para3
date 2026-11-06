@@ -6,7 +6,7 @@ const loginReturn = require('../../frontend/assets/scripts/utils/login-return-ta
 const user = { firstName: '<Morgan & Co>', emailVerified: false, status: 'pending' };
 const verifyUrl = 'https://example.test/verify-email.html?token=issued-proof&source=email';
 const cases = [
-  ['Attorney approval', () => emails.applicationApproved({ ...user, role: 'attorney' }), 7],
+  ['Attorney approval', () => emails.applicationApproved({ ...user, role: 'attorney' }), 6],
   ['Paralegal approval', () => emails.applicationApproved({ ...user, role: 'paralegal' }), 4],
   ['Attorney receipt', () => emails.applicationReceived({ ...user, role: 'attorney' }), 3],
   ['Paralegal receipt', () => emails.applicationReceived({ ...user, role: 'paralegal' }), 3],

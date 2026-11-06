@@ -75,7 +75,7 @@ async function recorded(req, operation, doc) {
 async function prepareUpload(req, doc, { name, clientUploadId = "", revisionOfFileId = "", revisionRequestAt = "", onlyRecorded = false }) {
   if (onlyRecorded && !clientUploadId) return {};
   await ready(); const requestId = clientUploadId || crypto.randomUUID(), query = uploadQuery(req, requestId), mimeType = String(req.file.mimetype || "").toLowerCase();
-  const hash = crypto.createHash("sha256").update(JSON.stringify(["legacy-upload", name, mimeType, (req.file.buffer?.length ?? req.file.size), revisionOfFileId, revisionRequestAt])).update(req.file.buffer || req.file.contentFingerprint).digest("hex");
+  const hash = crypto.createHash("sha256").update(JSON.stringify(["legacy-upload", name, mimeType, req.file.buffer.length, revisionOfFileId, revisionRequestAt])).update(req.file.buffer).digest("hex");
   let operation = await Upload.collection.findOne(query, { readConcern: { level: "majority" } });
   if (operation && (operation.fingerprint !== hash || (operation.kind || "upload") !== "upload")) fail(409, "UPLOAD_CHANGED", "This upload request already belongs to different or unverified contents. Refresh Files to review the earlier document.");
   if (operation?.status === "recorded") { const result = await recorded(req, operation, doc); await read(req); return { recorded: result }; }
@@ -84,7 +84,7 @@ async function prepareUpload(req, doc, { name, clientUploadId = "", revisionOfFi
     const prior = await CaseFile.collection.find({ caseId: { $in: [doc._id, id(doc._id)] }, clientUploadId }).toArray();
     if (prior.some(value => id(value.userId) === id(req.user.id) || value.replacedAt || value.history?.length)) fail(409, "UPLOAD_CHANGED", "The earlier upload has no verified record of its original contents. Refresh Files before trying another upload.");
   }
-  const now = new Date(), token = crypto.randomBytes(16).toString("hex"), leaseUntil = new Date(now.getTime() + ((req.file.buffer?.length ?? req.file.size) > 20 * 1024 * 1024 ? 600000 : 90000)), suffix = name.includes(".") ? name.slice(name.lastIndexOf(".")).toLowerCase() : "", extension = /^\.[a-z0-9]{1,12}$/.test(suffix) ? suffix : "";
+  const now = new Date(), token = crypto.randomBytes(16).toString("hex"), leaseUntil = new Date(now.getTime() + 90000), suffix = name.includes(".") ? name.slice(name.lastIndexOf(".")).toLowerCase() : "", extension = /^\.[a-z0-9]{1,12}$/.test(suffix) ? suffix : "";
   const attempt = { token, extension, keyVersion: 2, startedAt: now };
   if (!operation) {
     try { operation = (await Upload.create({ ...query, fingerprint: hash, fileId: new mongoose.Types.ObjectId(), kind: "upload", status: "uploading", claimToken: token, leaseUntil, attempts: [attempt] })).toObject(); }

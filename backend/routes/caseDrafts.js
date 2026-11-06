@@ -230,11 +230,7 @@ router.delete(
       return res.status(404).json({ error: "Draft not found" });
     }
     if (!requireRevision(req, res, current)) return;
-    const result = await require("../utils/activeAccountWrite").withActiveAccountWrite([req.user.id], async session => {
-      const removed = await CaseDraft.collection.deleteOne(snapshotFilter(current), { session });
-      if (removed.deletedCount) await require("../services/connectedWorkspace/clio").cleanupDraft(req.user.id, draftId, { session });
-      return removed;
-    }, { ownerId: req.user.id, authVersion: req.auth?.payload?.av || 0 });
+    const result = await CaseDraft.collection.deleteOne(snapshotFilter(current));
     if (!result.deletedCount) return changed(res);
     res.json({ success: true });
   })

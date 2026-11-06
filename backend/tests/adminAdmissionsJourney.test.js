@@ -118,7 +118,7 @@ test.each(['attorney', 'paralegal'])('%s signup, email verification, information
     const preview = await request(app).get(`/api/admin/email/approval-preview?userId=${applicant._id}`).set('Cookie', cookie(admin));
     expect(preview.status).toBe(200);
     expect(preview.text).toContain('You’re in.');
-    expect(preview.text.match(/src="data:image\/png;base64,/g)).toHaveLength(7);
+    expect(preview.text.match(/src="data:image\/png;base64,/g)).toHaveLength(6);
     expect(preview.text).not.toContain('src="cid:');
   }
   expect((await request(app).get(`/api/${role}/dashboard`).set('Cookie', cookie(applicant))).status).toBe(200);

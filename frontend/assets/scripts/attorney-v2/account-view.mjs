@@ -1,4 +1,3 @@
-import { createClioConnection } from '../connected-workspace/native-clio.mjs';
 import { createCalendarConnections } from '../connected-workspace/calendar-connections.mjs';
 import { createConnectedApi } from '../connected-workspace/native-api.mjs';
 import {enableSwipeDelete} from '../utils/swipe-delete.mjs';
@@ -32,10 +31,9 @@ export function createAccountView(route, identity, context = {}) {
   if (route.query.get('tab') === 'connections') {
     const view = page('Settings'); view.classList.add('av2-account');
     const api = createConnectedApi({ ownerId: identity.id, role: 'attorney', signal: context.signal });
-    const clio = createClioConnection({ ownerId: identity.id, api, signal: context.signal, route });
     const calendars = createCalendarConnections({ ownerId: identity.id, api, signal: context.signal });
-    view.append(accountNavigation('connections'), clio, calendars);
-    view.readiness = Promise.all([clio.readiness, calendars.readiness]);
+    view.append(accountNavigation('connections'), calendars);
+    view.readiness = calendars.readiness;
     return view;
   }
   if (isClosureRoute(route)) return createClosureView(route, identity, context);

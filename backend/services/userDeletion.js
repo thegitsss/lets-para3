@@ -581,7 +581,6 @@ async function deactivateUserAccount(userOrId, { now = new Date(), expectedOwner
   user.totpLastUsedTimeStep = null;
     await user.save({ session, pathsToSave: ["deleted", "deletedAt", "disabled", "status", "pendingHire", "authVersion", "twoFactorEnabled", "twoFactorTempCode", "twoFactorExpiresAt", "twoFactorChallengeHash", "twoFactorChallengeAuthVersion", "twoFactorFailedAttempts", "twoFactorBackupCodes", "totpSecretEncrypted", "totpLastUsedTimeStep", "updatedAt"] });
     await revokeAllUserSessions(user._id, "account_deactivated", { session });
-    await require("./connectedWorkspace/clio").cleanupOwner(user._id, { session });
     await require("./calendar/connections").cleanupOwner(user._id, { session });
     await AuthChallenge.deleteMany({ userId: user._id }).session(session);
     if (req) await AuditLog.create([{ actor: req.user?.id || req.user?._id, actorRole: req.user?.role || "system", action: "account.deactivate", targetType: "user", targetId: String(user._id), ip: req.ip, ua: req.headers?.["user-agent"], method: req.method, path: req.originalUrl, meta: { role: user.role } }], { session });
@@ -673,7 +672,6 @@ async function removeEphemeralAccountData(userId) {
   const ticketFilter = {$or:[{userId},{requesterUserId:userId},...(account?.email?[{requestKind:'email',requesterEmail:account.email}]:[])]};
   const ticketIds = (await SupportTicket.find(ticketFilter).select('_id').lean()).map(t=>t._id);
   await Promise.all([
-    require("./connectedWorkspace/clio").cleanupOwner(userId),
     require("./calendar/connections").cleanupOwner(userId),
     AdminDraft.deleteMany({$or:[{owner:userId},{kind:'account',recordId:userId},{kind:'inquiry',recordId:{$in:ticketIds}}]}),
     // Retain provider-ID tombstones so a later mailbox scan cannot restore erased bodies.

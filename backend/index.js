@@ -248,7 +248,6 @@ app.use("/api/admin/workspace", adminWorkspaceRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/cases", casesRouter);
 app.use("/api/case-drafts", caseDraftsRouter);
-app.use("/api/integrations/clio", require("./routes/clioIntegration"));
 app.use("/api/integrations/calendars", require("./routes/calendarIntegrations"));
 app.use("/api/messages", messagesRouter);
 app.use("/api/uploads", uploadsRouter);

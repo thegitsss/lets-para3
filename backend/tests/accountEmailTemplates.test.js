@@ -91,8 +91,8 @@ test('Attorney approval preserves the complete approved email and bundles every 
   expect(mail.html).toContain('Hello &lt;Maya &amp; Co&gt;,');
   expect(mail.html).toContain('from=approval&amp;next=workspace');
   expect(require('../email/layout').letterEmail(mail.html)).toBe(mail.html);
-  expect(mail.attachments).toHaveLength(7);
-  expect(mail.html.match(/src="cid:/g)).toHaveLength(7);
+  expect(mail.attachments).toHaveLength(6);
+  expect(mail.html.match(/src="cid:/g)).toHaveLength(6);
   for (const image of mail.attachments) {
     expect(mail.html).toContain(`src="cid:${image.cid}"`);
     expect(image).toMatchObject({ contentType: 'image/png', contentDisposition: 'inline' });
@@ -113,7 +113,7 @@ test('Attorney approval preserves the complete approved email and bundles every 
 
 test('protected Attorney approval preview renders the same images without MIME attachment references', () => {
   const mail = emails.applicationApproved({ role: 'attorney', emailVerified: true }, 'https://example.test/login.html', undefined, { preview: true });
-  expect(mail.html.match(/src="data:image\/png;base64,/g)).toHaveLength(7);
+  expect(mail.html.match(/src="data:image\/png;base64,/g)).toHaveLength(6);
   expect(mail.html).not.toContain('src="cid:');
   expect(mail.attachments).toBeUndefined();
 });

@@ -6,7 +6,7 @@ const { actionUrl } = require('./accountEmailUrls');
 // The approved Canva composition remains live HTML; only the product capture
 // and provider/social marks are images. CID assets travel with the message.
 const template = fs.readFileSync(path.join(__dirname, 'attorneyApproval.html'), 'utf8');
-const assetNames = ['new-matter', 'clio', 'google-calendar', 'microsoft-outlook', 'linkedin-icon', 'facebook-icon', 'instagram-icon'];
+const assetNames = ['new-matter', 'google-calendar', 'microsoft-outlook', 'linkedin-icon', 'facebook-icon', 'instagram-icon'];
 const assets = assetNames.map(name => ({
   filename: `${name}.png`,
   path: path.join(__dirname, 'assets', 'attorney-approval', `${name}.png`),
@@ -35,7 +35,7 @@ function attorneyApprovalEmail(user, loginUrl, verificationUrl, { preview = fals
     ...(confirm ? ['You can sign in now. Confirm your email address so Let’s-ParaConnect messages reach the right inbox.', `Confirm email address: ${confirm}`] : []),
     'A clear brief. A better beginning.',
     'Say it. Shape it. Make it a Matter.\nDictate your instructions, then review and edit the notes.\nOrganize instructions and selected files into a working checklist you can review.',
-    'Bring your tools with you.\nConnect Clio in Settings to bring selected documents into a Matter. Connect Google Calendar or Microsoft Outlook to bring Matter dates into your schedule.',
+    'Bring your tools with you.\nConnect Google Calendar or Microsoft Outlook to bring Matter dates into your schedule.',
     'Connections are optional. Product view shows sample content.',
     'Questions? Reply to this email or contact help@lets-paraconnect.com',
     'LinkedIn: https://www.linkedin.com/company/lets-paraconnect/\nFacebook: https://www.facebook.com/LetsParaConnect/\nInstagram: https://www.instagram.com/letsparaconnect/',
