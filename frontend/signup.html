@@ -716,13 +716,16 @@
     /* Reserve the same measured frame before either signup step is shown. */
     .signup-page.auth-entry.signup-shared-frame .overlay { height: var(--signup-common-height); min-height: 0; }
     @media (min-width: 769px) {
-      .signup-page.auth-entry.signup-shared-frame:not(.signup-sizing-measure) .overlay { height: min(740px, calc(100dvh - 48px)); }
+      .signup-page.auth-entry.signup-shared-frame:not(.signup-sizing-measure) .overlay { height: max(min(740px, calc(100dvh - 48px)), var(--signup-desktop-min-height, 0px)); }
+    }
+    @media (min-width: 769px) and (max-height: 700px) {
+      .signup-page.auth-entry { --signup-desktop-min-height: var(--signup-short-desktop-height, 0px); }
     }
     /* Keep the original blue-panel composition when the form reserves extra height. */
     @media (min-width: 769px) and (min-height: 501px) {
-      .signup-page.auth-entry.signup-shared-frame .signup-aside-copy { height: calc(min(740px, calc(100dvh - 48px)) - 20px); align-self: start; }
+      .signup-page.auth-entry.signup-shared-frame .signup-aside-copy { height: calc(max(min(740px, calc(100dvh - 48px)), var(--signup-desktop-min-height, 0px)) - 20px); align-self: start; }
       .signup-page.auth-entry.signup-application-step .overlay { overflow: visible; }
-      .signup-page.auth-entry.signup-application-step:has(#signupForm .signup-field-error) .overlay { height: max(min(740px, calc(100dvh - 48px)), var(--signup-common-height)); }
+      .signup-page.auth-entry.signup-application-step:has(#signupForm .signup-field-error) .overlay { height: max(min(740px, calc(100dvh - 48px)), var(--signup-common-height), var(--signup-desktop-min-height, 0px)); }
     }
     .signup-page.auth-entry.signup-shared-frame .left-panel { height: 100%; padding-bottom: calc(var(--signup-panel-padding-bottom) + var(--signup-common-extra)); }
     .signup-page.signup-shared-frame:not(.signup-application-step) :is(#nextStepBtn, #stepOnePanel > .extra-links, #stepOnePanel > #msg) { position: relative; top: var(--signup-action-offset, 0px); }
@@ -752,7 +755,7 @@
 .signup-page.auth-entry.signup-application-step .left-panel input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]),
 .signup-page.auth-entry.signup-application-step .select-field { margin-bottom: 12px; }
 @media (min-width: 769px) {
- .signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) .overlay { height: calc(min(740px, calc(100dvh - 48px)) + var(--signup-footer-space, 0px)); min-height: min(740px, calc(100dvh - 48px)); }
+ .signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) .overlay { height: calc(max(min(740px, calc(100dvh - 48px)), var(--signup-desktop-min-height, 0px)) + var(--signup-footer-space, 0px)); min-height: min(740px, calc(100dvh - 48px)); }
  .signup-page.auth-entry.signup-shared-frame.signup-application-step .left-panel { padding-top: 72px; padding-bottom: 24px; }
 }
 /* Bar-number help stays beside its field without reserving a text row. */

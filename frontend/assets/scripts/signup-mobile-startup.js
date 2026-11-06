@@ -13,7 +13,7 @@ if (window.matchMedia('(max-width: 768px)').matches) {
   mobileLayout.textContent = `
     @media (max-width: 768px) {
       .signup-page:not(.signup-application-step) #stepOnePanel > :is(#nextStepBtn, #msg, .extra-links) { top: 0 !important; }
-      .signup-page:not(.signup-application-step):not(.signup-received) .signup-stage { bottom: 48px; }
+      .signup-page:not(.signup-application-step):not(.signup-received) .signup-stage { bottom: 0; }
       .signup-page.auth-entry:not(.signup-application-step):not(.signup-received) .overlay { height: auto !important; }
       .signup-page.auth-entry:not(.signup-application-step):not(.signup-received) .left-panel { height: auto; padding-bottom: 30px; }
     }
