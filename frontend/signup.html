@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="/assets/scripts/signup-layout-startup.js?v=20261106"></script>
+  <style>html.auth-layout-pending .overlay { visibility: hidden; }</style>
 
-  <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
+  <link rel="stylesheet" href="/assets/styles/fonts.css" />
+  <link rel="stylesheet" href="/assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -11,15 +13,15 @@
   <meta charset="UTF-8" />
   <title>Create an account – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="assets/scripts/signup-mobile-startup.js"></script>
-  <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
+  <script src="/assets/scripts/signup-mobile-startup.js"></script>
+  <link href="/assets/styles/styles.css" rel="stylesheet" />
+  <link href="/assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
   <script async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
 
     <style>
@@ -428,6 +430,9 @@
       text-align: center;
     }
 
+    #attorneyPricingText { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; margin-top: 12px; text-align: left; }
+    .signup-page.auth-entry #stepTwoPanel #attorneyPricingAccepted { flex: 0 0 16px; width: 16px; height: 16px; min-height: 16px; margin: 2px 0 0; padding: 0; }
+
     .attorney-submit-legal a {
       color: var(--auth-accent);
       text-decoration: none;
@@ -695,15 +700,15 @@
     }
   </style>
 
-  <script src="assets/scripts/signup-password-policy.js"></script>
-  <script type="module" src="assets/scripts/auth.js"></script>
-  <link rel="stylesheet" href="assets/styles/auth-entry.css?v=20261012-compact-preview" />
-  <link rel="stylesheet" href="assets/styles/auth-workspace-preview.css?v=20260925-contrast" />
+  <script src="/assets/scripts/signup-password-policy.js"></script>
+  <script type="module" src="/assets/scripts/auth.js"></script>
+  <link rel="stylesheet" href="/assets/styles/signup-auth-entry.css?v=20261106" />
+  <link rel="stylesheet" href="/assets/styles/auth-workspace-preview.css?v=20260925-contrast" />
   <link rel="stylesheet" href="/assets/styles/brand-lockup.css?v=20261016-mountain" />
   <link rel="stylesheet" href="/assets/styles/auth-field-boundaries.css" />
-  <link id="stepTwoLayout" rel="stylesheet" href="assets/styles/signup-application.css" media="not all" />
-  <link rel="stylesheet" href="assets/styles/signup-upload.css" />
-  <link rel="stylesheet" href="assets/styles/signup-frame.css" />
+  <link id="stepTwoLayout" rel="stylesheet" href="/assets/styles/signup-application.css?v=20261106" media="not all" />
+  <link rel="stylesheet" href="/assets/styles/signup-upload.css?v=20261106" />
+  <link rel="stylesheet" href="/assets/styles/signup-frame.css?v=20261106" />
   <style>
     .signup-form-scroll { display: contents; }
     .signup-sizing-measure #msg { height: 1px; overflow: hidden; }
@@ -714,7 +719,11 @@
       .signup-page.auth-entry.signup-shared-frame:not(.signup-sizing-measure) .overlay { height: min(740px, calc(100dvh - 48px)); }
     }
     /* Keep the original blue-panel composition when the form reserves extra height. */
-    .signup-page.auth-entry.signup-shared-frame .signup-aside-copy { padding-bottom: calc(18px + var(--signup-common-extra)); }
+    @media (min-width: 769px) and (min-height: 501px) {
+      .signup-page.auth-entry.signup-shared-frame .signup-aside-copy { height: calc(min(740px, calc(100dvh - 48px)) - 20px); align-self: start; }
+      .signup-page.auth-entry.signup-application-step .overlay { overflow: visible; }
+      .signup-page.auth-entry.signup-application-step:has(#signupForm .signup-field-error) .overlay { height: max(min(740px, calc(100dvh - 48px)), var(--signup-common-height)); }
+    }
     .signup-page.auth-entry.signup-shared-frame .left-panel { height: 100%; padding-bottom: calc(var(--signup-panel-padding-bottom) + var(--signup-common-extra)); }
     .signup-page.signup-shared-frame:not(.signup-application-step) :is(#nextStepBtn, #stepOnePanel > .extra-links, #stepOnePanel > #msg) { position: relative; top: var(--signup-action-offset, 0px); }
   </style>
@@ -727,7 +736,6 @@
 .signup-page.auth-entry:not(.signup-application-step) .left-panel input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]) { margin-bottom: 12px; }
 @media (min-width: 769px) {
  .signup-page.auth-entry.signup-shared-frame:not(.signup-application-step) .left-panel { padding: 72px 36px 24px; }
- .signup-page.auth-entry.signup-shared-frame:not(.signup-application-step) .signup-aside-copy { padding-bottom: 18px; }
 }
 /* Give the second step the same form spacing and minimum frame as the first. */
 .signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) .form-container {
@@ -744,13 +752,8 @@
 .signup-page.auth-entry.signup-application-step .left-panel input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]),
 .signup-page.auth-entry.signup-application-step .select-field { margin-bottom: 12px; }
 @media (min-width: 769px) {
- .signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) .overlay { min-height: min(740px, calc(100dvh - 48px)); }
+ .signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) .overlay { height: calc(min(740px, calc(100dvh - 48px)) + var(--signup-footer-space, 0px)); min-height: min(740px, calc(100dvh - 48px)); }
  .signup-page.auth-entry.signup-shared-frame.signup-application-step .left-panel { padding-top: 72px; padding-bottom: 24px; }
- .signup-page.auth-entry.signup-shared-frame.signup-application-step:not(.signup-sizing-measure) #signupPolicyReview {
-  max-height: max(36px, calc(100% - var(--signup-action-top) - var(--signup-action-offset, 0px) - var(--signup-error-space, 0px) - var(--signup-action-height) - 70px));
-  overflow-y: auto;
- }
- .signup-page.auth-entry.signup-shared-frame.signup-application-step .signup-aside-copy { padding-bottom: 18px; }
 }
 /* Bar-number help stays beside its field without reserving a text row. */
 .signup-bar-field { position: relative; }
@@ -763,7 +766,7 @@
 /* Signup-only spacing: retain the existing fields, type, controls and artwork. */
 .signup-page.auth-entry .overlay { max-width: 1440px; }
 .signup-page.auth-entry:not(.signup-shared-frame) .overlay { min-height: min(740px, calc(100dvh - 48px)); }
-.signup-page.auth-entry :is(#signupHeading, .signup-step-two-title) { margin-bottom: 16px; }
+.signup-page.auth-entry :is(#signupHeading, .signup-step-two-title) { margin-bottom: 20px; }
 .signup-page.auth-entry .seg { margin-bottom: 16px; }
 .signup-page.auth-entry .auth-divider { margin: 8px 0; }
 .signup-page.auth-entry .left-panel input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]),
@@ -771,8 +774,8 @@
 .signup-page.auth-entry :is(.google-auth-button, .btn, .pw-toggle) { height: 44px; min-height: 44px; padding-block: 10px; }
 .signup-page.auth-entry .password-guidance { margin-bottom: 12px; }
 .signup-page.auth-entry #roleFieldWrap label { margin-bottom: 0; }
-.signup-page.auth-entry #attorneyPricingText { position: absolute; bottom: calc(100% + 12px); left: 0; width: 100%; margin: 0; padding-top: 10px; }
-.signup-page.auth-entry .attorney-standing { margin-block: 8px; }
+.signup-page.auth-entry #attorneyPricingText { position: static; width: 100%; margin: 12px 0 0; padding: 0; }
+.signup-page.auth-entry .attorney-standing { margin-block: 0; }
 .signup-page.auth-entry .lpc-resume-upload .resume-zone { height: 164px; }
 @media (min-width:769px) {
  .signup-page.auth-entry:not(.signup-application-step) .left-panel { padding-top: 56px; }
@@ -856,6 +859,7 @@
 
           <div id="stepTwoPanel" class="step-panel hidden-step" hidden inert aria-hidden="true">
             <h2 class="signup-step-two-title">Create your account, it’s free.</h2>
+            <div id="signupDetailFields" class="signup-detail-fields">
             <div class="name-row paralegal-core-row" id="paralegalCoreRow">
               <div id="signupStateWrap">
                 <label for="signupState"><span class="sr-only">State</span></label>
@@ -924,6 +928,8 @@
 
             <div id="attorneyConfirmWrap" hidden>
               <label class="attorney-standing"><input id="attorneyGoodStanding" type="checkbox" /><span>I confirm that I am licensed to practice law and in good standing with the state bar selected above.</span></label>
+              <label class="attorney-standing attorney-submit-legal" id="attorneyPricingText" hidden><input id="attorneyPricingAccepted" name="attorneyPricingAccepted" type="checkbox" disabled /><span>$400 minimum per matter, paid to your paralegal. A 22% platform fee applies.</span></label>
+            </div>
             </div>
             <div class="turnstile-wrap" aria-hidden="true">
               <div
@@ -939,8 +945,9 @@
 
 
             <div id="signupSubmitActions" class="signup-submit-actions" hidden>
-            <p class="attorney-submit-legal" id="attorneyPricingText" hidden>$400 minimum per matter, paid to your paralegal. A 22% platform fee applies.</p>
-              <button id="submitBtn" class="btn" type="submit" form="signupForm" data-public-action="primary" data-action-shape="control">Submit registration</button>
+              <div class="signup-submit-row">
+                <button id="submitBtn" class="btn" type="submit" form="signupForm" data-public-action="primary" data-action-shape="control">Submit registration</button>
+              </div>
             </div>
           </div>
 
@@ -961,7 +968,6 @@
         </div>
         <footer id="signupFooter" class="signup-footer" hidden>
           <div id="signupFooterStatus"></div>
-          <button id="editSignupBasics" class="signup-confirmation__home" type="button" hidden>Back</button>
           <div id="signupPolicyReview">
             <p>By selecting <span id="signupPolicySubmitLabel">Submit application</span>, you agree to the <a id="signupTermsLink" href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a id="signupPrivacyLink" href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
             <p id="signupPolicyStatus" role="status" aria-live="polite">Loading the policy documents…</p>
@@ -1000,12 +1006,12 @@
   </main>
   </div>
 
-  <script src="assets/scripts/signup-upload.js"></script>
-  <script src="assets/scripts/email-domain-policy.js"></script>
-  <script src="assets/scripts/signup-controller.js?v=20261105-email-correction"></script>
-  <script src="assets/scripts/signup-bar-help.js"></script>
-  <script src="assets/scripts/signup-policy.js"></script>
-  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
-  <script src="assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
+  <script src="/assets/scripts/signup-upload.js"></script>
+  <script src="/assets/scripts/email-domain-policy.js"></script>
+  <script src="/assets/scripts/signup-controller.js?v=20261106-native-state"></script>
+  <script src="/assets/scripts/signup-bar-help.js"></script>
+  <script src="/assets/scripts/signup-policy.js"></script>
+  <script type="module" src="/assets/scripts/web-vitals-rum.js"></script>
+  <script src="/assets/scripts/signup-illustration-fit.js?v=20261106"></script>
 </body>
 </html>

@@ -1,0 +1,313 @@
+/* Shared public authentication composition. Form behavior stays page-owned. */
+html:has(body.auth-entry) {
+  min-height: 100%;
+  height: auto;
+  background: #e9edf1;
+  overflow-x: clip;
+  overflow-y: auto
+}
+body.auth-entry {
+  --lpc-focus: #385f9e;
+  --lpc-gold: #6495ed;
+  min-height: 100dvh;
+  height: auto;
+  padding: clamp(12px, 2dvh, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Keep the document as the scroll owner. An overflow-x:hidden body creates
+     a non-scrolling container that traps wheel input with overscroll contain. */
+  overflow-x: clip;
+  overflow-y: visible;
+  overscroll-behavior-y: auto;
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%),#edf0f3
+}
+.auth-entry .overlay {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 48% 52%;
+  align-items: stretch;
+  width: 100%;
+  max-width: 1440px;
+  min-height: min(740px, calc(100dvh - 48px));
+  padding: 10px;
+  background: rgba(255, 255, 255, .72);
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(24, 42, 60, .12)
+}
+.auth-entry .left-panel {
+  z-index: 2;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 72px 36px 24px;
+  border-radius: 0;
+  background: transparent;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+.auth-entry .form-container {
+  width: 100%;
+  max-width: 350px
+}
+.auth-entry .brand,
+.auth-entry .brand-fixed {
+  position: absolute;
+  top: 24px;
+  left: 30px;
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -.02em;
+  z-index: 2
+}
+.auth-entry .brand-heading {
+  margin: 0
+}
+.auth-entry .left-panel h1,
+.auth-entry #signupHeading {
+  margin: 0 0 20px;
+  padding: 0;
+  font-family: 'Sarabun',sans-serif;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.22;
+  letter-spacing: -.035em;
+  text-wrap: initial;
+  text-align: left
+}
+.auth-entry #signupHeading em {
+  font-style: normal;
+  font-weight: inherit
+}
+.auth-entry .left-panel h2 {
+  font-family: 'Sarabun',sans-serif;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -.025em
+}
+.auth-entry .login-actions {
+  margin-top: 20px
+}
+.auth-entry .extra-links {
+  font-size: 13px
+}
+.auth-entry .auth-divider {
+  margin: 12px 0
+}
+.auth-entry.signup-page.attorney-step-two .left-panel {
+  padding-bottom: 36px
+}
+.auth-entry :is(.login-aside-copy, .signup-aside-copy) {
+  z-index: 2;
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 30px;
+  border-radius: 20px;
+  overflow: hidden;
+  pointer-events: auto;
+  background: radial-gradient(ellipse at 100% 0%, #e4ecff, transparent 65%),linear-gradient(155deg, #cfddfb, #b8cdf5);
+  color: #27394d
+}
+.auth-entry .auth-story {
+  max-width: 440px;
+  text-align: center
+}
+.auth-entry .auth-story__title {
+  margin: 0;
+  font: 500 clamp(26px, 4dvh, 38px)/1.13 'Sarabun',sans-serif;
+  letter-spacing: -.035em;
+  color: #27394d
+}
+@media (max-width: 1050px) and (min-width: 769px) {
+  body.auth-entry {
+    padding: clamp(12px, 2dvh, 24px)
+  }
+  .auth-entry .left-panel {
+    padding-inline: 24px
+  }
+  .auth-entry :is(.login-aside-copy, .signup-aside-copy) {
+    padding: 22px
+  }
+}
+@media (max-width: 768px) {
+  body.auth-entry {
+    padding: 16px
+  }
+  .auth-entry .overlay {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    border-radius: 22px
+  }
+  .auth-entry .left-panel {
+    width: 100%;
+    padding: 90px 24px 30px
+  }
+  .auth-entry .brand,
+  .auth-entry .brand-fixed {
+    top: 26px;
+    left: 24px;
+    font-size: 20px
+  }
+  .auth-entry :is(.login-aside-copy, .signup-aside-copy) {
+    display: none
+  }
+  .auth-entry .left-panel h1,
+  .auth-entry #signupHeading {
+    font-size: 26px
+  }
+  .auth-entry .left-panel input:not([type="checkbox"]):not([type="hidden"]):not([type="file"]),
+  .auth-entry .select-field {
+    font-size: 16px
+  }
+}
+@media (max-width: 768px) and (max-height: 700px) {
+  .auth-entry .left-panel {
+    padding-top: 64px;
+    padding-bottom: 20px
+  }
+  .auth-entry .brand,
+  .auth-entry .brand-fixed {
+    top: 20px
+  }
+  .auth-entry .left-panel h1,
+  .auth-entry #signupHeading {
+    margin-bottom: 14px
+  }
+  .auth-entry .left-panel input:not([type="checkbox"]):not([type="hidden"]):not([type="file"]) {
+    margin-bottom: 10px
+  }
+  .auth-entry .login-actions {
+    margin-top: 12px
+  }
+}
+@media (max-width: 360px) {
+  body.auth-entry {
+    padding: 12px
+  }
+  .auth-entry .left-panel {
+    padding-inline: 18px
+  }
+  .auth-entry .brand,
+  .auth-entry .brand-fixed {
+    left: 18px
+  }
+}
+/* Compact desktop forms; retain roomy touch controls and input text on phones. */
+@media (min-width: 769px) {
+  .auth-entry .left-panel input:not([type="checkbox"]):not([type="hidden"]):not([type="file"]),
+  .auth-entry .select-field {
+    min-height: 44px;
+    padding-block: 10px;
+    font-size: 14px;
+    margin-bottom: 12px
+  }
+  .auth-entry .google-auth-button,
+  .auth-entry .login-btn,
+  .auth-entry .btn {
+    min-height: 44px;
+    padding-block: 10px;
+    font-size: 14px
+  }
+  .auth-entry .show-toggle,
+  .auth-entry #togglePw {
+    height: 44px;
+    min-height: 44px;
+    font-size: 12px
+  }
+  .auth-entry .btn {
+    margin-top: 12px
+  }
+}
+/* Readable public confirmation links and bounded error messages. */
+.auth-entry :is(.signup-confirmation__eyebrow, .signup-confirmation__home, .extra-links a, .forgot-password) {
+  color: #385f9e
+}
+.auth-entry #toastBanner {
+  max-width: calc(100vw - 24px);
+  width: max-content;
+  max-height: 25dvh;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  bottom: 12px
+}
+.login-session-notice {
+  margin: -12px 0 24px;
+  color: #65758b;
+  font-size: 14px;
+  line-height: 1.5
+}
+/* Signup-only field errors and consent. */
+.signup-page .signup-field-error {
+  margin: 2px 0 12px;
+  color: #a33127;
+  font-size: .82rem;
+  line-height: 1.45
+}
+.signup-page [aria-invalid="true"] {
+  outline: 1px solid #a33127;
+  outline-offset: 2px
+}
+.signup-page #signupPolicyReview {
+  margin: 18px 0 8px;
+  color: var(--muted);
+  font: 300 .8rem/1.5 'Sarabun',sans-serif
+}
+.signup-page #signupPolicyReview p {
+  margin: 10px 0
+}
+.signup-page #signupPolicyReview .terms-label {
+  font-size: .85rem;
+  font-weight: 300;
+  color: var(--navy)
+}
+.signup-page :is(#signupPolicyReview, #attorneyConfirmWrap) input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--navy)
+}
+.signup-page #signupPolicyReview a {
+  color: #385f9e;
+  text-underline-offset: 2px
+}
+.signup-page #signupPolicyStatus {
+  font-size: .72rem
+}
+.signup-page #signupPolicyReload {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: #385f9e;
+  cursor: pointer;
+  font: inherit
+}
+.signup-page .msg {
+  overflow-wrap: anywhere
+}
+.login-application-status {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-left: 2px solid #4d70a8;
+  background: #eef3fb;
+  color: #27394d;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left
+}
+.login-application-status[hidden] {
+  display: none
+}
