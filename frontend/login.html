@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="/public-live-20261031/assets/scripts/auth-layout-startup.js"></script>
+  <style>html.auth-layout-pending .overlay { visibility: hidden; }</style>
 
-  <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
-  <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
-  <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/fonts.css" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/public-design-system.css?v=20260828-phase8" />
+  <link rel="preload" as="font" href="/public-live-20261031/assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
+  <link rel="preload" as="font" href="/public-live-20261031/assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
+  <link rel="preload" as="font" href="/public-live-20261031/assets/fonts/DtVjJx26TKEr37c9aBVJn3YO5gg.woff2" type="font/woff2" crossorigin />
   <script>
     (function applyStoredPreferences() {
       const FONT_SIZE_MAP = {
@@ -49,15 +52,15 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
-<link href="assets/styles/styles.css" rel="stylesheet" />
-<link href="assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
-<script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+<link href="/public-live-20261031/assets/styles/styles.css" rel="stylesheet" />
+<link href="/public-live-20261031/assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
+<script src="/public-live-20261031/assets/scripts/utils/session.js?v=20260902-1"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sign in – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" href="/favicon.ico" />
-  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="icon" href="/public-live-20261031/favicon.ico" />
+  <link rel="shortcut icon" href="/public-live-20261031/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -370,12 +373,12 @@ button[type="submit"]:focus-visible,
     .signup-prompt a { min-height: 44px; display: inline-flex; align-items: center; }
   }
 </style>
-  <link rel="stylesheet" href="assets/styles/auth-entry.css?v=20261012-compact-preview" />
-  <link rel="stylesheet" href="assets/styles/auth-workspace-preview.css?v=20260925-contrast" />
-  <link rel="stylesheet" href="/assets/styles/brand-lockup.css?v=20261016-mountain" />
-  <link rel="stylesheet" href="/assets/styles/auth-field-boundaries.css" />
-  <link rel="stylesheet" href="assets/styles/verification-resend.css" />
-  <link rel="stylesheet" href="assets/styles/dialogs.css" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/auth-entry.css?v=20261012-compact-preview" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/auth-workspace-preview.css?v=20260925-contrast" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/brand-lockup.css?v=20261016-mountain" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/auth-field-boundaries.css" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/verification-resend.css" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/dialogs.css" />
   <style>
     .login-page.auth-entry .signup-aside-copy .lpc-closeup--conversation { box-shadow: none; }
     .login-page #loginPanel { padding-bottom: 62px; }
@@ -383,7 +386,7 @@ button[type="submit"]:focus-visible,
     #loginVerificationDialog .lpc-dialog__button--secondary { background: #fff; color: #334155; border-color: #cbd5e1; }
     @media (min-width: 513px) { #loginVerificationDialog button[type="submit"] { width: auto; } }
   </style>
-  <link rel="stylesheet" href="assets/styles/login-approval.css" />
+  <link rel="stylesheet" href="/public-live-20261031/assets/styles/login-approval.css" />
 </head>
 
 <body class="login-page auth-entry" data-public-page="true">
@@ -536,7 +539,7 @@ button[type="submit"]:focus-visible,
     });
   </script>
 
-  <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script src="/public-live-20261031/assets/scripts/utils/toast.js?v=20260208"></script>
   <script>
     (() => {
       const status = new URLSearchParams(window.location.search).get('unsubscribe');
@@ -549,9 +552,9 @@ button[type="submit"]:focus-visible,
       );
     })();
   </script>
-  <script src="/assets/vendor/simplewebauthn-13.3.0.js"></script>
-  <script type="module" src="assets/scripts/login.js"></script>
-  <script type="module" src="assets/scripts/verification-resend.js"></script>
-  <script src="assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
+  <script src="/public-live-20261031/assets/vendor/simplewebauthn-13.3.0.js"></script>
+  <script type="module" src="/public-live-20261031/assets/scripts/login.js"></script>
+  <script type="module" src="/public-live-20261031/assets/scripts/verification-resend.js"></script>
+  <script src="/public-live-20261031/assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
 </body>
 </html>

@@ -59,6 +59,7 @@ async function signup(page, role) {
     await page.locator('#bar').fill('CA12345');
     await selectState(page, 'barState', 'CA');
     await page.locator('#attorneyGoodStanding').check();
+    await page.locator('#attorneyPricingAccepted').check();
   } else {
     await selectState(page, 'signupState', 'CA');
     await page.locator('#resumeUpload').setInputFiles({

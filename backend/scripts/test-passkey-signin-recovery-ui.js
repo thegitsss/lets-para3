@@ -15,7 +15,7 @@ async function pageFor(browser, mode, width) {
   page.on("pageerror", error => state.errors.push(error.message));
   await page.route("http://lpc.test/**", async route => {
     const url = new URL(route.request().url());
-    if (url.pathname === "/assets/vendor/simplewebauthn-13.3.0.js") {
+    if (["/assets/vendor/simplewebauthn-13.3.0.js", "/public-live-20261031/assets/vendor/simplewebauthn-13.3.0.js"].includes(url.pathname)) {
       return route.fulfill({ contentType: "text/javascript", body: `
         window.nativeCalls = 0;
         window.SimpleWebAuthnBrowser = {
