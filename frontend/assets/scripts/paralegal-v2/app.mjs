@@ -99,6 +99,7 @@ function identityKey(identity) {
 function hasUnfinishedWork() {
   return Boolean(
     setupController?.hasUnsavedChanges?.()
+    || homeView?.hasDrafts?.()
     || conversationsView?.hasDrafts?.()
     || browseView?.hasDrafts?.()
     || workView?.hasDrafts?.()
