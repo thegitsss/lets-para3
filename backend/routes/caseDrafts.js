@@ -94,6 +94,7 @@ async function draftProfile(ownerId) {
   const { draftProfileDefaults } = await import('../../frontend/assets/scripts/attorney-v2/draft-profile.mjs');
   return draftProfileDefaults(profile || {});
 }
+router.use('/transcribe', require('./matterDictation'));
 router.get('/defaults', asyncHandler(async(req,res)=>{
   if(req.query.expectedOwnerId !== String(req.user.id))return res.sendStatus(403);
   res.json({ownerId:String(req.user.id),...await draftProfile(req.user.id)});
@@ -229,7 +230,11 @@ router.delete(
       return res.status(404).json({ error: "Draft not found" });
     }
     if (!requireRevision(req, res, current)) return;
-    const result = await CaseDraft.collection.deleteOne(snapshotFilter(current));
+    const result = await require("../utils/activeAccountWrite").withActiveAccountWrite([req.user.id], async session => {
+      const removed = await CaseDraft.collection.deleteOne(snapshotFilter(current), { session });
+      if (removed.deletedCount) await require("../services/connectedWorkspace/clio").cleanupDraft(req.user.id, draftId, { session });
+      return removed;
+    }, { ownerId: req.user.id, authVersion: req.auth?.payload?.av || 0 });
     if (!result.deletedCount) return changed(res);
     res.json({ success: true });
   })

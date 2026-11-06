@@ -248,6 +248,8 @@ app.use("/api/admin/workspace", adminWorkspaceRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/cases", casesRouter);
 app.use("/api/case-drafts", caseDraftsRouter);
+app.use("/api/integrations/clio", require("./routes/clioIntegration"));
+app.use("/api/integrations/calendars", require("./routes/calendarIntegrations"));
 app.use("/api/messages", messagesRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/payments", paymentsRouter);
@@ -368,6 +370,7 @@ function connectWithRetry() {
     })
     .then(() => {
       logger.info("Connected to MongoDB Atlas.");
+      require("./services/calendar/sync").start();
       if (!realtimeProjectionBridge) {
         realtimeProjectionBridge = startRealtimeProjectionBridge({ logger });
       }
@@ -415,6 +418,7 @@ async function shutdown(signal) {
 
     const closeError = await closed;
     clearTimeout(forceTimer);
+    require("./services/calendar/sync").stop();
     await realtimeProjectionBridge?.stop?.();
     realtimeProjectionBridge = null;
     try {

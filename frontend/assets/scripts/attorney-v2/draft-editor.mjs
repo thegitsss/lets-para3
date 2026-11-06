@@ -244,6 +244,11 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
         if(!message&&value)delete errors.compAmount;
       }
       control.setAttribute("aria-invalid", String(Boolean(errors[key]))); errorNodes[key].textContent = errors[key] || "";
+      const needsInput=Boolean(creationHost&&step==='description'&&['title','description','practiceArea','state','compAmount'].includes(key)&&!value.trim());
+      const field=control.closest('.av2-field');field.toggleAttribute('data-needs-input',needsInput);
+      let needed=field.querySelector('.av2-field-needed');
+      if(needsInput&&!needed){needed=node('span',{className:'av2-field-needed',text:' · Needed'});field.querySelector('label').append(needed);}
+      if(needed)needed.hidden=!needsInput;
     }
     const taskSnapshot = JSON.stringify({tasks:state.values.tasks,manual:manualEntry()});
     if (taskSnapshot !== renderedTasks && !tasks.contains(document.activeElement)) renderTasks();
@@ -328,7 +333,7 @@ export function createDraftEditor(route, identity, { api, signal, privateState, 
     panels.description.querySelector('.av2-draft-task-heading h2').textContent='Tasks';
     panels.description.querySelector(':scope > button').textContent='+ Add task';
     surface=createDraftSurface({controls,panel:panels.description,tasks,review,state,canvas:Boolean(creationHost),edit:values=>{if(creationHost&&JSON.stringify(values.requirements)!==JSON.stringify(state.values.requirements))state.creationEditedFields=[...new Set([...(state.creationEditedFields||[]),'requirements'])];session.edit(values);},focus:key=>{changeStep('description');if(key==='tasks'&&!tasks.querySelector('input'))panels.description.querySelector(':scope > button').click();const control=controls[key] || (key==='requirements'?surface.input:tasks.querySelector('input'));if(key==='requirements'){surface.showAdditional();if(!creationHost)surface.add.click();}if(creationHost&&controls[key])surface.focus(key);else if(creationHost&&control?.canvasEditor)control.canvasEditor.open();else {if(key==='deadline')controls.deadline.hidden=false;control?.focus();}control?.scrollIntoView({block:'center'});}});
-    assistant=createDraftComposer({canvas:Boolean(creationHost),retainSource:!retained,api:suggestionApi,ownerId:identity.id,signal,values:()=>state.values,memory:state,
+    assistant=createDraftComposer({canvas:Boolean(creationHost),retainSource:!retained,api:suggestionApi,ownerId:identity.id,signal,values:()=>state.values,memory:state,beforeClioNavigate:retained?null:()=>session.save(),clioDraftId:()=>state.id,
       available:()=>state.loaded&&!state.restricted&&!state.uncertain&&!state.missing&&!state.deleted&&!publication.locked&&!publication.result,
       edit:changes=>{session.edit({...state.values,...changes});errors={};render();},go:changeStep});
     panels.describe=assistant.intro;

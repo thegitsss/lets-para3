@@ -1,3 +1,5 @@
+import { createClioMatterTransfers } from '../connected-workspace/native-clio.mjs';
+import { createConnectedApi } from '../connected-workspace/native-api.mjs';
 import {showDocumentQuickLook} from "../utils/document-quick-look.mjs";
 import { matterLink } from "./workspace-model.mjs";
 import {nativeSelectControl,portalIcon} from '../utils/portal-controls.mjs';
@@ -37,8 +39,22 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   for(const control of [statusFilter,sort])control.addEventListener("change",()=>filters.requestSubmit());
   let value = null, files = [], selected = null, busy = false, controller = null, reading = false, quietReading = false, sequence = 0, blobUrl = null, initialSelection = true, historyView = null, replacementController = null;
   const stale = new Set();
+  let clioFingerprint = "";
+  const connectedApi = createConnectedApi({ ownerId, role: 'attorney', signal });
+  const clio = createClioMatterTransfers({ caseId, ownerId, api: connectedApi, signal, files: async () => {
+    const selected = [], cursors = new Set(), filters = { q: '', status: 'approved', sort: 'newest' };
+    let cursor;
+    do {
+      const page = readFiles(await api.readWorkspaceFiles(caseId, { ownerId, signal, ...filters, ...(cursor ? { cursor } : {}) }), caseId, ownerId, filters);
+      selected.push(...page.files); cursor = page.nextCursor;
+      if (selected.length > 500 || cursor && cursors.has(cursor)) throw new Error('Refresh the approved file inventory before sending to Clio.');
+      if (cursor) cursors.add(cursor);
+    } while (cursor && !signal.aborted);
+    return selected;
+  }, readOnly: () => !value?.canUpload, onFilesChanged: () => load() });
+
   const refresh = recoveryButton("Retry files", () => void load()), more = button("Load more files", () => void load({ append: true })), cancel = button("Cancel file transfer", () => controller?.abort());
-  section.append(node("div",{className:"av2-section-heading"},[node("h2", { text: "Files" }),node("div", { className: "av2-actions" }, [refresh, cancel])]), notice, feedback, browser); inventory.append(more);
+  section.append(node("div",{className:"av2-section-heading"},[node("h2", { text: "Files" }),node("div", { className: "av2-actions" }, [refresh, cancel])]), notice, feedback, browser, clio); inventory.append(more);
   const upload = createWorkspaceFileUploads(caseId, { api, signal, ownerId, state: state.upload, route, onSaved: () => void load({ quiet: true }) }); browser.before(upload);
   const removal = createWorkspaceFileRemoval(caseId, { api, signal, ownerId, state: state.removal, onRemoved: async fileId => { if (signal.aborted) return; if (selected?.id === fileId) { selected = null; rememberSelection(null); } await load(); earlier.invalidate(); }, onDenied: denied, onClose: () => { const heading = section.querySelector("h2"); heading.tabIndex = -1; heading.focus(); } }); section.append(removal);
   const earlier = createWorkspaceEarlierFiles(caseId, { api, signal, ownerId, route, onDenied: denied }); section.append(node("details", {className:"av2-secondary-disclosure", ...(route.query.has("earlierFileId") ? {open:""} : {})}, [node("summary", {text:"Earlier documents and retained versions"}), earlier]));
@@ -204,6 +220,11 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
       }
       const previousAccess = value?.access, previousCanUpload = value?.canUpload;
       stale.clear(); files = append ? [...files, ...loaded] : loaded; state.loadedCount=files.length; value = next;
+      const connectedFingerprint = JSON.stringify([value.revision, value.canUpload, files.map(file => [file.id, file.revision, file.status, file.securityStatus])]);
+      if (connectedFingerprint !== clioFingerprint) {
+        clioFingerprint = connectedFingerprint;
+        void Promise.resolve(clio.readiness).then(() => { if (!signal.aborted && clioFingerprint === connectedFingerprint) return clio.refresh(); });
+      }
       const preserveDetail = quiet && previousAccess === next.access && previousCanUpload === next.canUpload && selected && next.selectedFile && detail.childElementCount > 0 && JSON.stringify(selected) === JSON.stringify(next.selectedFile);
       selected = target ? next.selectedFile : null;
       if (state.pending) { feedback.textContent = selected ? `Current saved review: ${fileStatus(selected)}. Check the document before making another decision.` : "The previously reviewed document is no longer available."; state.pending = null; }

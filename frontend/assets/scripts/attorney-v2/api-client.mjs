@@ -138,6 +138,24 @@ export function createApiClient({ fetchImpl = window.fetch.bind(window), onAuthe
   }
   return Object.freeze({
     readDraftDefaults: options => workspaceRead(`/api/case-drafts/defaults?expectedOwnerId=${encodeURIComponent(options.ownerId)}`, options),
+    async connectMatterDictation(sdp, options) {
+      const answer = await workspaceWrite(`/api/case-drafts/transcribe/live?expectedOwnerId=${encodeURIComponent(options.ownerId)}`, 'POST', {sdp}, options);
+      if (typeof answer.sdp !== 'string' || !answer.sdp.startsWith('v=0')) throw new ApiError('invalid_response');
+      return answer.sdp;
+    },
+    async transcribeMatterNotes(audio, options) {
+      const ticket = generation;
+      await verifyDownloadOwner(options);
+      const csrf = await request('/api/csrf', options);
+      if (ticket !== generation || options.signal?.aborted) throw new DOMException('Canceled', 'AbortError');
+      if (typeof csrf.csrfToken !== 'string' || !csrf.csrfToken) throw new ApiError('invalid_response');
+      const body = new FormData();
+      body.append('audio', audio, audio.type.startsWith('audio/webm') ? 'notes.webm' : 'notes.mp4');
+      const result = await request(`/api/case-drafts/transcribe?expectedOwnerId=${encodeURIComponent(options.ownerId)}`, {signal:options.signal, method:'POST', body, headers:{'X-CSRF-Token':csrf.csrfToken}});
+      await verifyDownloadOwner(options);
+      if (typeof result?.text !== 'string' || !result.text.trim() || result.text.length > 4000) throw new ApiError('invalid_response');
+      return result.text;
+    },
     suggestMatterDraft: (brief, options) => workspaceWrite("/api/case-drafts/suggest", "POST", {brief, practiceArea:options.practiceArea || "", state:options.state || "", ...(options.current?{current:options.current}:{}), ...(options.update?{update:options.update}:{})}, options),
     mutateNotification: (path, method, options) => {
       const allowed = method === "POST" && /^\/api\/notifications\/(?:read-all|[a-f\d]{24}\/(?:read|unread))$/i.test(path)
