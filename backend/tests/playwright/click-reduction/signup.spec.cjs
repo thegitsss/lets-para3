@@ -20,6 +20,15 @@ for(const role of ['attorney','paralegal'])test(`restored two-step signup preser
  await page.locator('#fullName').fill('Morgan Applicant');await page.locator('#email').fill(role+'@example.com');await page.locator('#password').fill('Eight character private password');
  for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.screenshot({path:info.outputPath(`${role}-step-1-${width}.png`),fullPage:true});}
  await page.locator('#nextStepBtn').click();await expect(page.locator('#stepTwoPanel')).toBeVisible();await expect(page.locator('#stepOnePanel')).toBeHidden();
+ const stateId=role==='attorney'?'barState':'signupState';
+ await page.locator(`#${stateId}Search`).click();
+ await expect(page.locator(`#${stateId}Options`)).toBeVisible();
+ await page.locator(`#${stateId}Search`).fill('New');
+ await expect(page.locator(`#${stateId}Options [role=option]`)).toHaveCount(4);
+ await page.locator(`#${stateId}Options`).getByRole('option',{name:'New York',exact:true}).click();
+ await expect(page.locator(`#${stateId}`)).toHaveValue('NY');
+ await expect(page.locator('#editSignupBasics')).toHaveCount(0);
+
  if(role==='attorney'){await page.locator('#bar').fill('NY12345');await selectState(page,'barState','NY');await page.locator('#attorneyGoodStanding').check();await page.locator('#submitBtn').click();await expect(page.locator('#attorneyPricingAcceptedError')).toBeVisible();expect(submissions).toEqual([]);await page.locator('#attorneyPricingAccepted').check();}
  else {await selectState(page,'signupState','NY');await page.locator('#resumeUpload').setInputFiles({name:'resume.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\nsynthetic')});await page.locator('#btnA').click();await page.locator('#bar').fill('NY98765');await page.locator('#btnP').click();expect(await page.locator('#resumeUpload').evaluate(e=>e.files[0].name)).toBe('resume.pdf');await expect(page.locator('#signupState')).toHaveValue('NY');}
  for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.evaluate(width=>{document.documentElement.style.fontSize=width===320?'125%':'100%';},width);await page.locator('#submitBtn').scrollIntoViewIfNeeded();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:info.outputPath(`${role}-step-2-${width}.png`),fullPage:true});}
